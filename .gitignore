@@ -1,0 +1,41 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.npm/
+
+# Uploads / Storage
+uploads/
+backend/uploads/
+*.pdf
+*.docx
+
+# macOS / OS
+.DS_Store
+*.log
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo

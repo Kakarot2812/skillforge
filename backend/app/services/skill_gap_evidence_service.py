@@ -188,17 +188,49 @@ class SkillGapEvidenceService:
         resume_items: List[ResumeEvidenceItem] = []
         raw_mention_sample = None
         if include_resume:
+            # Resolve authoritative candidate resume scope:
+            # - If resume_id is provided, restrict strictly to that resume ID.
+            # - When resume_id is absent: do NOT union all historical anonymous resumes.
+            #   For authenticated users: resolve the latest resume for that user.
+            #   For unauthenticated sessions: resolve the latest anonymous resume deterministically.
+            effective_resume_id = resume_id
+            if effective_resume_id is None:
+                if user_id is not None:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id == user_id)
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+                else:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id.is_(None))
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+
             resume_query = (
                 db.query(UserClaimedSkill, Resume)
                 .outerjoin(Resume, UserClaimedSkill.resume_id == Resume.id)
                 .filter(UserClaimedSkill.skill_id == skill_id)
             )
-            if resume_id:
-                resume_query = resume_query.filter(UserClaimedSkill.resume_id == resume_id)
-            elif user_id:
+            if effective_resume_id:
+                resume_query = resume_query.filter(UserClaimedSkill.resume_id == effective_resume_id)
+                if user_id is not None:
+                    resume_query = resume_query.filter(Resume.user_id == user_id)
+                else:
+                    resume_query = resume_query.filter(Resume.user_id.is_(None))
+            elif user_id is not None:
+                # Fallback for authenticated direct claims created without a resume entity (e.g. unit tests)
                 resume_query = resume_query.filter(UserClaimedSkill.user_id == user_id)
             else:
-                resume_query = resume_query.filter(UserClaimedSkill.user_id.is_(None))
+                # No resume exists in unauthenticated context; do NOT aggregate historical claims
+                resume_query = resume_query.filter(False)
 
             resume_rows = resume_query.all()
             # Deterministic ordering: confidence_score DESC, source ASC, claim_id ASC

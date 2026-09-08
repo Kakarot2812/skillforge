@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [hasResume, setHasResume] = useState<boolean>(false);
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
+  const [resumeId, setResumeId] = useState<string | null>(null);
   const [connectedGitHubUser, setConnectedGitHubUser] = useState<string | null>(null);
 
   // Sync client-side state on mount from local storage
@@ -23,6 +24,7 @@ export default function DashboardPage() {
       const activeFileName = localStorage.getItem("skillforge_active_resume_filename");
       setHasResume(Boolean(activeResume));
       setResumeFileName(activeFileName || null);
+      setResumeId(activeResume || null);
 
       const activeGitHub = localStorage.getItem("skillforge_connected_github_user");
       setConnectedGitHubUser(activeGitHub || null);
@@ -131,9 +133,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TargetRoleSelector selectedRoleId={selectedRoleId} onSelectRole={setSelectedRoleId} />
             <ResumeUploadPlaceholder
-              onResumeChange={(has, filename) => {
+              onResumeChange={(has, filename, id) => {
                 setHasResume(has);
                 setResumeFileName(filename || null);
+                setResumeId(has ? (id || null) : null);
               }}
             />
             <GitHubConnectPlaceholder
@@ -149,6 +152,7 @@ export default function DashboardPage() {
               hasGitHub={Boolean(connectedGitHubUser)}
               connectedGitHubUsername={connectedGitHubUser}
               resumeFileName={resumeFileName}
+              resumeId={resumeId}
             />
           </div>
         </section>

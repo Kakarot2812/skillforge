@@ -47,6 +47,7 @@ export interface SkillGapExplorerProps {
   hasGitHub?: boolean;
   connectedGitHubUsername?: string | null;
   resumeFileName?: string | null;
+  resumeId?: string | null;
 }
 
 export default function SkillGapExplorer({
@@ -57,13 +58,17 @@ export default function SkillGapExplorer({
   hasGitHub,
   connectedGitHubUsername,
   resumeFileName,
+  resumeId,
 }: SkillGapExplorerProps = {}) {
   // Determine effective candidate profile readiness (supporting direct props or localStorage fallback)
-  const effectiveHasResume =
-    hasResume ??
+  const effectiveResumeId =
+    resumeId ??
     (typeof window !== "undefined"
-      ? Boolean(localStorage.getItem("skillforge_active_resume_id"))
-      : false);
+      ? localStorage.getItem("skillforge_active_resume_id")
+      : null);
+
+  const effectiveHasResume =
+    hasResume ?? Boolean(effectiveResumeId);
 
   const effectiveConnectedGitHub =
     connectedGitHubUsername ??
@@ -174,10 +179,11 @@ export default function SkillGapExplorer({
     const incResume = Boolean(effectiveHasResume);
     const incGitHub = Boolean(effectiveHasGitHub);
     const ghUser = effectiveConnectedGitHub || undefined;
+    const resResumeId = effectiveResumeId || undefined;
 
     const [gapRes, prioRes] = await Promise.all([
-      fetchSkillGaps(roleId, "India", undefined, incResume, incGitHub, ghUser),
-      fetchPrioritizedGaps(roleId, "India", undefined, incResume, incGitHub, ghUser),
+      fetchSkillGaps(roleId, "India", undefined, incResume, incGitHub, ghUser, resResumeId),
+      fetchPrioritizedGaps(roleId, "India", undefined, incResume, incGitHub, ghUser, resResumeId),
     ]);
 
     if (gapRes.success && gapRes.data) {
@@ -196,13 +202,20 @@ export default function SkillGapExplorer({
     }
 
     setLoadingGaps(false);
-  }, [effectiveHasResume, effectiveHasGitHub, effectiveConnectedGitHub]);
+  }, [effectiveHasResume, effectiveHasGitHub, effectiveConnectedGitHub, effectiveResumeId]);
+
+  // Invalidate any open evidence modal when resume identity changes
+  useEffect(() => {
+    setSelectedEvidenceSkillId(null);
+    setEvidenceData(null);
+    setEvidenceError(null);
+  }, [effectiveResumeId]);
 
   useEffect(() => {
     if (selectedRoleId) {
       loadRoleData(selectedRoleId, isCandidateReady);
     }
-  }, [selectedRoleId, isCandidateReady, loadRoleData]);
+  }, [selectedRoleId, isCandidateReady, effectiveResumeId, loadRoleData]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -225,6 +238,7 @@ export default function SkillGapExplorer({
     const incResume = Boolean(effectiveHasResume);
     const incGitHub = Boolean(effectiveHasGitHub);
     const ghUser = effectiveConnectedGitHub || undefined;
+    const resResumeId = effectiveResumeId || undefined;
 
     const res = await fetchSkillGapEvidence(
       selectedRoleId,
@@ -233,7 +247,8 @@ export default function SkillGapExplorer({
       undefined,
       incResume,
       incGitHub,
-      ghUser
+      ghUser,
+      resResumeId
     );
     if (res.success && res.data) {
       setEvidenceData(res.data);

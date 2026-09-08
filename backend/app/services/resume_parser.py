@@ -1,6 +1,7 @@
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
+from fastapi import HTTPException, status
 from pypdf import PdfReader
 from docx import Document
 
@@ -263,3 +264,80 @@ def parse_resume_file(file_path: str, file_type: str) -> Tuple[str, Dict[str, An
     raw_text = extract_text_from_file(file_path, file_type)
     parsed_data = parse_resume_sections(raw_text)
     return raw_text, parsed_data
+
+
+# Canonical section names that provide structural resume signal
+CANONICAL_RESUME_SECTIONS: Set[str] = {"skills", "experience", "projects", "education", "summary"}
+MIN_RESUME_WORD_COUNT: int = 4
+MIN_RESUME_CHAR_COUNT: int = 20
+
+RESUME_PROFILE_KEYWORDS: Set[str] = {
+    "curriculum vitae", "resume", "cv", "bachelor", "master", "degree",
+    "b.tech", "b.e.", "b.s.", "m.s.", "m.tech", "btech", "mtech",
+    "university", "college", "institute", "gpa", "cgpa", "graduated",
+    "developer", "engineer", "software", "programmer", "intern",
+    "internship", "employment", "experience", "education", "skills",
+    "technologies", "projects", "certifications", "coursework",
+}
+
+
+def validate_resume_document(
+    raw_text: Optional[str],
+    parsed_sections: Dict[str, Any],
+) -> None:
+    """
+    Deterministic post-extraction validation gate for uploaded resume documents.
+
+    Distinguishes:
+    1. Extractable document validity:
+       - Ensures document has non-empty, non-whitespace extractable text.
+       - Rejects scanned or image-only PDFs with no extractable text layer.
+       - Rejects extremely sparse text (< MIN_RESUME_WORD_COUNT or < MIN_RESUME_CHAR_COUNT).
+    2. Resume semantic signals:
+       - Uses existing parsed section structure and contact information.
+       - Accepts documents with sufficient meaningful resume signals:
+         * One or more recognized canonical sections (skills, experience, projects, education, summary), or
+         * Candidate contact details (email, phone, github, linkedin) combined with career/profile indicators.
+       - Rejects non-resume documents (e.g. academic problem statements, essays, invoices, terms of service)
+         that lack resume structure and candidate profile signals.
+
+    Raises:
+        HTTPException(status_code=422) if document is not a valid resume.
+    """
+    clean_text = (raw_text or "").strip()
+    if not clean_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uploaded document contains no extractable text. Scanned or image-only documents are not supported.",
+        )
+
+    words = clean_text.split()
+    if len(words) < MIN_RESUME_WORD_COUNT or len(clean_text) < MIN_RESUME_CHAR_COUNT:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uploaded document contains insufficient text to be processed as a resume.",
+        )
+
+    detected_sections = parsed_sections.get("detected_sections", [])
+    recognized_sections = [s for s in detected_sections if s in CANONICAL_RESUME_SECTIONS]
+
+    contact_info = parsed_sections.get("contact_info", {})
+    has_contact_info = bool(
+        contact_info.get("email")
+        or contact_info.get("phone")
+        or contact_info.get("github_handle")
+        or contact_info.get("linkedin_url")
+    )
+
+    # Check for candidate profile keywords in the text as auxiliary signal
+    lower_text = clean_text.lower()
+    has_profile_keywords = any(kw in lower_text for kw in RESUME_PROFILE_KEYWORDS)
+
+    has_resume_signal = bool(recognized_sections or (has_contact_info and has_profile_keywords))
+
+    if not has_resume_signal:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The uploaded document does not appear to be a resume. No recognized resume sections or candidate profile details were detected.",
+        )
+

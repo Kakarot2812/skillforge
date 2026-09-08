@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.db.models import JobRole, IndustrySkillDemand, Skill, UserClaimedSkill, DemonstratedSkill, SkillGap
+from app.db.models import JobRole, IndustrySkillDemand, Skill, UserClaimedSkill, DemonstratedSkill, SkillGap, Resume
 from app.schemas.skill_gap import (
     SkillGapItem,
     SkillGapSummary,
@@ -190,13 +190,49 @@ class SkillGapService:
         if not include_resume:
             claimed_map = {}
         else:
-            claimed_query = db.query(UserClaimedSkill)
-            if resume_id:
-                claimed_query = claimed_query.filter(UserClaimedSkill.resume_id == resume_id)
-            elif user_id:
+            # Resolve authoritative candidate resume scope:
+            # - If resume_id is provided, restrict strictly to that resume ID.
+            # - When resume_id is absent: do NOT union all historical anonymous resumes.
+            #   For authenticated users: resolve the latest resume for that user.
+            #   For unauthenticated sessions: resolve the latest anonymous resume deterministically.
+            effective_resume_id = resume_id
+            if effective_resume_id is None:
+                if user_id is not None:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id == user_id)
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+                else:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id.is_(None))
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+
+            claimed_query = (
+                db.query(UserClaimedSkill)
+                .outerjoin(Resume, UserClaimedSkill.resume_id == Resume.id)
+            )
+            if effective_resume_id:
+                claimed_query = claimed_query.filter(UserClaimedSkill.resume_id == effective_resume_id)
+                if user_id is not None:
+                    claimed_query = claimed_query.filter(Resume.user_id == user_id)
+                else:
+                    claimed_query = claimed_query.filter(Resume.user_id.is_(None))
+            elif user_id is not None:
+                # Fallback for authenticated direct claims created without a resume entity (e.g. unit tests)
                 claimed_query = claimed_query.filter(UserClaimedSkill.user_id == user_id)
             else:
-                claimed_query = claimed_query.filter(UserClaimedSkill.user_id.is_(None))
+                # No resume exists in unauthenticated context; do NOT aggregate historical claims
+                claimed_query = claimed_query.filter(False)
+
             claimed_map = {cs.skill_id: cs for cs in claimed_query.all()}
 
         # 3. Fetch candidate demonstrated skills for this user

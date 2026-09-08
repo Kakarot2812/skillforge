@@ -25,7 +25,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export interface ResumeUploadPlaceholderProps {
-  onResumeChange?: (hasResume: boolean, filename?: string) => void;
+  onResumeChange?: (hasResume: boolean, filename?: string, resumeId?: string) => void;
 }
 
 export default function ResumeUploadPlaceholder({
@@ -53,7 +53,7 @@ export default function ResumeUploadPlaceholder({
         if (res.success && res.data?.data) {
           const matching = res.data.data.find((r: ResumeListItem) => r.resume_id === activeId);
           if (matching) {
-            onResumeChange?.(true, matching.filename || activeName || "Resume");
+            onResumeChange?.(true, matching.filename || activeName || "Resume", matching.resume_id);
             setUploadResult({
               resume_id: matching.resume_id,
               filename: matching.filename,
@@ -74,7 +74,7 @@ export default function ResumeUploadPlaceholder({
         onResumeChange?.(false);
       } catch {
         if (activeName) {
-          onResumeChange?.(true, activeName);
+          onResumeChange?.(true, activeName, activeId || undefined);
         }
       }
     }
@@ -150,7 +150,7 @@ export default function ResumeUploadPlaceholder({
         localStorage.setItem("skillforge_active_resume_id", result.data.resume_id);
         localStorage.setItem("skillforge_active_resume_filename", result.data.filename);
       }
-      onResumeChange?.(true, result.data.filename);
+      onResumeChange?.(true, result.data.filename, result.data.resume_id);
     } else {
       setErrorMessage(result.error || "Upload failed. Please try again.");
     }

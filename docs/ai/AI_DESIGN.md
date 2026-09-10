@@ -1,12 +1,328 @@
-             ┌─────────────────────┐
-             │ Structured Data     │
-             │ + Algorithms        │
-             └──────────┬──────────┘
-                        ↓
-                 FACT / SCORE
-                        ↓
-             ┌─────────────────────┐
-             │ LLM + RAG           │
-             └──────────┬──────────┘
-                        ↓
-                 EXPLANATION
+# SkillForge AI — AI Architecture & Design Principles
+
+## 1. Core AI Principles
+
+SkillForge AI establishes a strict architectural boundary between deterministic mathematical computation and generative artificial intelligence.
+
+```text
+Structured Data
++
+Deterministic Algorithms
+        ↓
+   FACT / SCORE
+        ↓
+    LLM + RAG
+        ↓
+   EXPLANATION
+```
+
+### Foundational Invariants
+
+> **"The LLM never decides what is true. It only reasons over what SkillForge has already verified."**
+
+> **"Deterministic systems decide what is true. AI explains, reasons over, and personalizes verified evidence."**
+
+This boundary is an immutable architectural invariant enforced at the code, schema, and API levels—not merely an instruction in a system prompt.
+
+---
+
+# Part 1: v1.0.0 MVP — Deterministic Intelligence
+
+## 2. v1.0.0 MVP — Deterministic Intelligence
+
+The frozen v1.0.0 MVP operates as an end-to-end deterministic intelligence engine. Core career intelligence, evidence aggregation, demand analysis, skill gap classification, and priority calculations do **not** depend on a live LLM or active RAG pipeline.
+
+### Implemented MVP Intelligence Flow
+```text
+Resume Evidence
++
+GitHub Evidence
++
+Industry Skill Demand
+        ↓
+Canonical Skill Model
+        ↓
+Deterministic Skill Gap Engine
+        ↓
+Deterministic Priority Engine
+        ↓
+Evidence Audit
+        ↓
+Candidate Career Insight
+```
+
+The deterministic intelligence layer is solely responsible for producing authoritative results. No LLM generates, calculates, or mutates these outputs.
+
+---
+
+## 3. Division of Authority
+
+### What the Deterministic Layer Decides (Authoritative)
+- **Canonical Skill Identity**: Normalized against the canonical taxonomy dictionary and aliases.
+- **Resume-Derived Evidence**: Claimed skills and raw text mentions extracted via structured parsing.
+- **GitHub Demonstrated Evidence**: Concrete code artifacts (dependencies, Dockerfiles, CI workflows) and multi-repo score aggregation via independent probability union.
+- **Industry Demand Signals**: Structured baseline metrics (`demand_score`, `growth_rate`, `sample_size`).
+- **Skill Gap Classification**: Categorization into `STRONG`, `PARTIAL`, or `MISSING`.
+- **Priority Scoring & Level**: Weighted calculation based on demand, growth, and gap severity (`HIGH`, `MEDIUM`, `LOW`).
+- **Evidence Audit**: Direct traceability linking conclusions to source database records.
+
+### What the LLM Does NOT Decide (Prohibited)
+- Whether a candidate possesses a skill.
+- Whether a skill is classified as `STRONG`, `PARTIAL`, or `MISSING`.
+- The authoritative market demand score.
+- The authoritative market growth signal.
+- The authoritative priority score.
+
+---
+
+## 4. Evidence Flow Architecture
+
+All intelligence flows through a strict evidence pipeline:
+
+```text
+Resume
+   ↓
+Resume Evidence (user_claimed_skills)
+   ↓
+Candidate Evidence
+
+GitHub
+   ↓
+Repository Evidence (project_evidence)
+   ↓
+Demonstrated Skills (demonstrated_skills)
+
+Industry Demand
+   ↓
+Market Evidence (skill_demand)
+
+Candidate Evidence
++
+Market Evidence
+   ↓
+Deterministic Intelligence Engine
+   ↓
+Skill Gap + Priority + Evidence Audit
+```
+
+The generative AI layer sits strictly **after** this verified intelligence pipeline, consuming its structured outputs as read-only grounding context.
+
+---
+
+# Part 2: Post-MVP Planned AI Architecture
+
+> [!NOTE]
+> All components, models, RAG pipelines, and conversational interfaces in Part 2 are **POST-MVP / PLANNED** on the `post-mvp-foundation` branch. They are not implemented in the frozen `v1.0.0-mvp` release.
+
+---
+
+## 5. Post-MVP — Qwen + RAG Architecture
+
+In post-MVP evolution, SkillForge integrates a local open-weight large language model (**Qwen 3 8B**) coupled with a Retrieval-Augmented Generation (RAG) pipeline to provide natural-language reasoning, career coaching, and personalized learning guidance.
+
+### Planned Post-MVP AI Flow
+```text
+Verified SkillForge Results
+        +
+Candidate Evidence
+        +
+Market Evidence
+        ↓
+Retrieval / RAG
+        ↓
+Qwen 3 8B (Local LLM)
+        ↓
+Structured AI Response
+        ↓
+Verification Gate
+        ↓
+User
+```
+
+Qwen 3 8B runs locally to ensure complete candidate data privacy, low latency, and zero data leakage to third-party APIs.
+
+---
+
+## 6. The Role of RAG (Retrieval vs. Calculation)
+
+RAG functions strictly as an **evidence retrieval and contextual assembly mechanism**.
+
+### What RAG Does NOT Do
+- RAG does **not** calculate industry demand.
+- RAG does **not** decide skill ownership.
+- RAG does **not** classify skill gaps.
+- RAG does **not** calculate priority scores.
+
+### Authoritative Pipeline
+```text
+Market / Data Sources
+        ↓
+Data Ingestion & Normalization
+        ↓
+Deterministic Demand Engine
+        ↓
+Verified Market Data (PostgreSQL)
+        ↓
+Indexed / Retrievable Knowledge
+        ↓
+RAG Retrieval
+        ↓
+LLM Explanation
+```
+
+> **"RAG retrieves evidence.
+> The deterministic demand engine determines the authoritative market signal."**
+
+---
+
+## 7. Evidence-Grounded Career Chatbot (P3)
+
+The planned career chatbot provides natural-language interaction over verified candidate and market data.
+
+### Example Interaction
+**Candidate Question**: *"Why is Docker a high priority for me?"*
+
+### Response Processing Pipeline
+```text
+Candidate Evidence (Zero Docker repo artifacts)
++
+GitHub Evidence (No container manifests found)
++
+Industry Demand (80% demand for Backend Engineer)
++
+Growth Signal (+12% YoY growth rate)
++
+Deterministic Priority Result (HIGH priority score: 0.71)
+        ↓
+RAG Retrieval (Audit trail + canonical role benchmarks)
+        ↓
+Qwen 3 8B
+        ↓
+Contextual Explanation:
+"Docker is prioritized as HIGH because your target role (Backend Engineer)
+exhibits 80% market demand with +12% annual growth, and no containerization
+evidence was detected in your connected repositories."
+```
+
+The chatbot explains an existing, mathematically verified result rather than generating a subjective opinion.
+
+---
+
+## 8. AI Safety and Verification Boundary
+
+To ensure complete reliability and prevent hallucination, the AI layer enforces strict verification rules:
+
+1. **Non-Authoritative Output**: LLM responses are treated as untrusted interpretations until verified against database records.
+2. **Candidate Fact Grounding**: All candidate assertions must originate directly from verified `user_claimed_skills` or `project_evidence`.
+3. **Market Fact Grounding**: All market assertions must originate from verified `skill_demand` data.
+4. **Classification Invariance**: Explanations must exactly reflect the deterministic gap classification (`STRONG`, `PARTIAL`, or `MISSING`).
+5. **Priority Invariance**: Priority explanations must align with the calculated `priority_score` and tier.
+6. **Explicit Abstention**: If required evidence is missing or ambiguous, the AI system must abstain with an explicit status code such as `INSUFFICIENT_EVIDENCE` rather than fabricating facts.
+7. **No Override**: The LLM is technically barred from mutating system-of-record tables.
+
+---
+
+## 9. Future Verification Pipeline
+
+Before an AI-generated explanation is returned to the user, an automated verification pipeline cross-validates the response:
+
+```text
+Deterministic Engine
+        ↓
+Verified Facts
+        ↓
+RAG Retrieval
+        ↓
+Qwen 3 8B
+        ↓
+Verification Gate
+        ├── Validate factual claims against retrieved evidence
+        ├── Validate candidate claims against candidate evidence
+        ├── Validate market claims against market evidence
+        ├── Validate classification against deterministic classification
+        └── Validate priority explanation against deterministic score
+        ↓
+Verified Response Delivered to User
+```
+
+---
+
+## 10. Conceptual Structured AI Response Schema
+
+Future AI endpoints will return structured JSON envelopes to allow client-side validation and rendering:
+
+```json
+{
+  "answer": "Docker is classified as a HIGH priority gap because it is required by 80% of Backend Engineer roles (+12% YoY) and lacks demonstrated code artifacts in your repositories.",
+  "evidence": [
+    {
+      "source": "skill_demand",
+      "metric": "demand_score",
+      "value": 0.80
+    },
+    {
+      "source": "project_evidence",
+      "metric": "evidence_count",
+      "value": 0
+    }
+  ],
+  "sources": [
+    "PostgreSQL:skill_demand",
+    "PostgreSQL:project_evidence"
+  ],
+  "confidence": "HIGH",
+  "status": "VERIFIED"
+}
+```
+
+*(Note: This schema illustrates future design concepts and is not an active MVP API contract).*
+
+---
+
+## 11. AI Development Principles
+
+1. **Evidence Before Generation**: Ground every prompt in verified database facts.
+2. **Deterministic Core Before LLM**: Compute all numbers, ranks, and categories mathematically first.
+3. **Retrieval Before Generation**: Retrieve relevant audit context before invoking the model.
+4. **Verification After Generation**: Check generated statements against source facts.
+5. **Abstain When Evidence is Insufficient**: Never guess or extrapolate beyond verified data.
+6. **Zero Silent Overrides**: Never allow the LLM to alter authoritative system conclusions.
+7. **Modular Decoupling**: Keep the system fully operational even if the AI explanation layer is offline.
+
+---
+
+## 12. Relation to Post-MVP Roadmap
+
+The AI design aligns directly with the five-phase post-MVP roadmap:
+
+```text
+P1: Real-Time Industry Demand
+        ↓ (Produces fresher, verified market evidence)
+P2: Local Qwen 3 8B AI Layer
+        ↓ (Provides local, privacy-preserving reasoning)
+P3: Evidence-Grounded Career Chatbot
+        ↓ (Enables natural-language interaction over verified facts)
+P4: Personalized Roadmap + Resources
+        ↓ (Generates actionable learning milestones matched to gaps)
+P5: GitHub Verification Loop
+          (Closes the loop from learning back to verified evidence)
+```
+
+Each phase builds systematically upon the verified foundation established in preceding phases.
+
+---
+
+## 13. Implementation Baseline Matrix
+
+| Capability | v1.0.0 MVP (Frozen Baseline) | Post-MVP (Planned Evolution) |
+| :--- | :--- | :--- |
+| **Resume Evidence Extraction** | Implemented (Regex, PyMuPDF, Taxonomy Cache) | Extend (LLM ambiguous resolution) |
+| **GitHub Evidence Extraction** | Implemented (Manifest & CI inspection) | Extend (Deeper AST inspection) |
+| **Industry Skill Demand** | Implemented (Structured baseline data) | Real-time market data ingestion (P1) |
+| **Skill Gap Classification** | Implemented (Deterministic rule-based) | AI explanation & contextual reasoning (P2) |
+| **Priority Scoring** | Implemented (Deterministic formula) | AI explanation & contextual reasoning (P2) |
+| **RAG Retrieval Engine** | Not implemented | Planned (pgvector semantic retrieval) |
+| **Local Qwen 3 8B LLM** | Not implemented | Planned (Local open-weight reasoning) (P2) |
+| **Career Chatbot** | Not implemented | Planned (Evidence-grounded dialogue) (P3) |
+| **Personalized Roadmap** | Not implemented | Planned (DAG prerequisite sequencing) (P4) |
+| **GitHub Verification Loop**| Not implemented | Planned (Continuous milestone verification) (P5) |

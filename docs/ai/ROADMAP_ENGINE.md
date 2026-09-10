@@ -2,162 +2,375 @@
 
 ## 1. Purpose & Core Philosophy
 
-The Roadmap Engine transforms prioritized skill gaps into an actionable, structured, and personalized learning trajectory.
+The Career Roadmap Engine is a planned post-MVP intelligence component designed to transform prioritized skill gaps into structured, actionable, and personalized learning trajectories.
 
-### Core Principles
+### Core Philosophy
 
-1. **Prerequisite-First Sequencing**: High-demand skills are never scheduled before their foundational prerequisites are satisfied.
-2. **Zero Redundancy**: Skills already proven via verified GitHub evidence are omitted or condensed into accelerated review checkpoints.
-3. **Paced for Reality**: Milestones adapt dynamically to the user's declared weekly availability ($5$, $10$, or $20\text{ hours/week}$).
-4. **Action-Oriented Milestones**: Every milestone culminates in a practical project challenge designed for automated GitHub verification.
-
----
-
-## 2. Skill Dependency Graph (DAG)
-
-Technical proficiencies are modeled as a Directed Acyclic Graph (DAG) stored in the `skill_dependencies` table:
+The roadmap is derived strictly from **empirically verified skill gaps**, rather than generic or subjective career advice:
 
 ```text
-            ┌───────────────┐
-            │    Python     │
-            └───────┬───────┘
-                    │
-            ┌───────▼───────┐
-            │    FastAPI    │
-            └───────┬───────┘
-                    │
-    ┌───────────────┼───────────────┐
-    ▼                               ▼
-┌───────────────┐           ┌───────────────┐
-│  PostgreSQL   │           │    Docker     │
-└───────┬───────┘           └───────┬───────┘
-        │                           │
-        └───────────────┬───────────┘
-                        ▼
-            ┌───────────────────────┐
-            │ Kubernetes Orchestr.  │
-            └───────────────────────┘
+Candidate Evidence (Resume Claims + GitHub Demonstrated)
+       +
+Industry Demand (Demand Score + Growth Rate)
+       ↓
+Skill Gap Classification (STRONG / PARTIAL / MISSING)
+       ↓
+Deterministic Priority Engine (HIGH / MEDIUM / LOW)
+       ↓
+Personalized Roadmap (Planned P4)
+       ↓
+Learning + Project Actions
+       ↓
+GitHub Verification (Planned P5)
+       ↓
+Updated Candidate Evidence
 ```
 
-- **Nodes**: Canonical skills from `skills`.
-- **Edges**: Directed prerequisite relationships (`skill_id` depends on `prerequisite_skill_id`).
-- **Dependency Types**:
-  - `Hard`: Mandatory prerequisite; downstream skill cannot be learned without it.
-  - `Soft`: Recommended complementary skill; improves comprehension but does not strictly block sequencing.
+### Distinction of Responsibility
+- **v1.0.0 MVP**: Determines **what** the candidate is missing and **which** gaps should be prioritized based on market demand and verified code evidence.
+- **Future Roadmap Engine (P4)**: Determines **how** the candidate should close those gaps through sequenced milestones, curated learning resources, and hands-on project implementations.
 
 ---
 
-## 3. Sequencing Algorithm
+## 2. v1.0.0 MVP Boundary
 
-The sequencing engine uses a modified Topological Sort incorporating priority weighting:
+> [!IMPORTANT]
+> **A career roadmap generation engine is NOT implemented in the v1.0.0 MVP.**
+> The frozen v1.0.0 MVP focuses authoritatively on skill gap identification and deterministic priority scoring. All roadmap generation, milestone sequencing, and dynamic replanning belong to post-MVP development.
 
-```text
-[Input: Prioritized Skill Gaps {S}]
-               │
-               ▼
-[Filter Out Demonstrated Skills (Evidence >= 0.70)]
-               │
-               ▼
-[Extract Subgraph of Required Skills & Missing Prerequisites]
-               │
-               ▼
-[Topological Sort with Priority-Weighted In-Degree Resolution]
-               │
-               ▼
-[Partition into Workload-Balanced Milestones]
-               │
-               ▼
-[Attach Curated Resources & Project Challenges]
-```
+### What v1.0.0 MVP Implements
+- **Resume Evidence Extraction**: Claimed skills extracted from PDFs and DOCX files.
+- **GitHub Evidence Extraction**: Concrete code artifacts extracted from manifests, Dockerfiles, and CI workflows.
+- **Structured Industry Demand**: Regional demand scores, growth signals, and sample sizes.
+- **Deterministic Skill Gap Classification**: Mathematical categorization into `STRONG`, `PARTIAL`, or `MISSING`.
+- **Deterministic Priority Scoring**: Weighted formula combining gap deficit, market demand, and YoY growth.
+- **Auditable Evidence Trail**: End-to-end provenance linking every conclusion to source database records.
 
-### In-Degree & Priority Resolution
-When multiple candidate skills have zero unresolved prerequisites (in-degree $= 0$ in the active subgraph), the tie is broken by the **Priority Score** $P(s)$:
-
-$$P(s) = \alpha \cdot \text{DemandScore}(s) + \beta \cdot \text{GrowthRate}(s) + \gamma \cdot \text{Deficit}(s)$$
-
-This guarantees that among immediately learnable technologies, the highest-leverage industry skills appear earliest in the sequence.
+### What v1.0.0 MVP Does NOT Implement
+- Roadmap generation algorithms
+- Roadmap persistence tables (e.g. `roadmaps`, `roadmap_milestones`, `skill_dependencies`, `learning_resources` do **not** exist in the database)
+- Skill dependency graphs (DAG)
+- Topological roadmap sequencing
+- Learning resource recommendations
+- Project challenge generation
+- Weekly workload pacing or schedule adaptation
+- Roadmap progress tracking
+- Automated project verification loops
+- Adaptive roadmap replanning
 
 ---
 
-## 4. Milestone Architecture
+## 3. Inputs to the Future Roadmap Engine
 
-Milestones structure learning into sequential phases:
+The planned roadmap engine will operate as a consumer of verified SkillForge intelligence, integrating six primary input dimensions:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│ Milestone 1: Core API Engineering (Est. 2 Weeks @ 10h/week) │
-├─────────────────────────────────────────────────────────────┤
-│ Target Skills: FastAPI, Pydantic, REST Architecture          │
-├─────────────────────────────────────────────────────────────┤
-│ Curated Learning Resources:                                 │
-│ • Official FastAPI Tutorial (Doc)                          │
-│ • Building Resilient Microservices (Course Module)          │
-├─────────────────────────────────────────────────────────────┤
-│ Practical Project Challenge:                                │
-│ "Build a multi-resource REST API with JWT authentication"   │
-├─────────────────────────────────────────────────────────────┤
-│ GitHub Verification Criteria:                               │
-│ • requirements.txt contains 'fastapi' & 'pydantic'          │
-│ • At least 4 API route endpoints defined                    │
-│ • Automated test suite using pytest passing in repo         │
+│                 CURRENT MVP OUTPUTS (FACTS)                 │
+├──────────────────────────┬──────────────────────────────────┤
+│ 1. Candidate Evidence    │ • Resume claims (user_claimed_skills)
+│                          │ • Demonstrated skills (demonstrated_skills)
+│                          │ • Multi-repo confidence scores
+│                          │ • Direct repository artifacts    │
+├──────────────────────────┼──────────────────────────────────┤
+│ 2. Target Job Role       │ • Selected career target (e.g. Backend Eng)
+│                          │ • Role-specific skill benchmarks │
+├──────────────────────────┼──────────────────────────────────┤
+│ 3. Industry Demand       │ • Demand score (demand_score)
+│                          │ • YoY growth rate (growth_rate)  │
+├──────────────────────────┼──────────────────────────────────┤
+│ 4. Skill Gap State       │ • STRONG (Evidence ≥ 0.85)
+│                          │ • PARTIAL (Claimed or lower evidence)
+│                          │ • MISSING (Neither claimed nor shown) │
+├──────────────────────────┼──────────────────────────────────┤
+│ 5. Priority Score        │ • Deterministic priority_score
+│                          │ • Priority tier (HIGH, MEDIUM, LOW) │
+└──────────────────────────┴──────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│          FUTURE PERSONALIZATION CONTEXT (POST-MVP)          │
+├──────────────────────────┬──────────────────────────────────┤
+│ 6. Candidate Context     │ • Declared weekly study availability
+│                          │ • Current seniority & experience
+│                          │ • Preferred learning modalities
+│                          │ • Completed roadmap milestones    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Milestone Lifecycle
+The roadmap engine never recalculates skill gaps or priority scores; it consumes the authoritative outputs established by the deterministic engines.
+
+---
+
+## 4. Planned Roadmap Generation
+
+Planned for Phase 4 (**P4**), roadmap generation will construct an ordered trajectory of milestones targeted specifically at high-priority gaps.
+
+### Conceptual Generation Pipeline
+```text
+Verified Skill Gaps + Priority Rankings
+        ↓
+Filter Out Demonstrated Skills (STRONG gaps omitted or set to review)
+        ↓
+Identify Missing Skills & Incomplete Evidence (PARTIAL & MISSING)
+        ↓
+Resolve Prerequisite Ordering (Planned Skill Sequencing)
+        ↓
+Cluster Skills into Thematic Milestones (e.g. Core API → Containers → CI/CD)
+        ↓
+Attach Curated Learning Resources & Project Rubrics
+        ↓
+Generate Personalized Action Plan
+```
+
+### Conceptual Output Structure
+```text
+Roadmap
+├── Target Role: Backend Engineer
+├── Candidate Context: Intermediate, 10 hours/week
+├── Analyzed Skill Gaps: Docker (MISSING, HIGH), PostgreSQL (PARTIAL, HIGH)
+├── Ordered Milestones:
+│   ├── Milestone 1: Relational Data Modeling & Query Optimization
+│   │   ├── Target Skills: PostgreSQL, SQL
+│   │   ├── Learning Objectives: Indexes, transactions, connection pooling
+│   │   ├── Curated Resources: Official documentation, query tuning guide
+│   │   ├── Hands-on Project: Implement connection-pooled transactional service
+│   │   └── Verification Criteria: SQLAlchemy models, migration files
+│   └── Milestone 2: Production Containerization
+│       ├── Target Skills: Docker, Docker Compose
+│       ├── Learning Objectives: Multi-stage builds, service orchestration
+│       ├── Curated Resources: Dockerfile best practices, Compose specification
+│       ├── Hands-on Project: Containerize the Milestone 1 API with database
+│       └── Verification Criteria: Valid Dockerfile, docker-compose.yml
+└── Progress / Verification State: ACTIVE
+```
+*(Conceptual example illustrating planned milestone relationships — not an active API contract).*
+
+---
+
+## 5. Planned Skill Sequencing
+
+Technical skills often exhibit natural prerequisite hierarchies. In post-MVP development, skill dependencies may be modeled to ensure candidates build foundational competencies before attempting advanced tooling.
+
+### Conceptual Prerequisite Hierarchy
+```text
+Skill A (Foundational: e.g. Python)
+   ↓
+Skill B (Framework: e.g. FastAPI)
+   ↓
+Skill C (Infrastructure: e.g. Docker)
+   ↓
+Skill D (Orchestration: e.g. Kubernetes)
+```
+
+### Potential Dependency Classifications
+- **Hard Prerequisite**: Mandatory foundational knowledge. Downstream skills should not be scheduled until this skill is at least partially established.
+- **Recommended Prerequisite**: Helpful complementary knowledge that accelerates learning but does not strictly block progression.
+
+### Sequencing Algorithm (Candidate Future Implementation)
+Future sequencing will combine:
+1. **Prerequisite Constraints**: Ensuring foundational nodes precede dependent nodes.
+2. **Deterministic Priority Scores**: When multiple skills have their prerequisites satisfied, scheduling the skill with the highest deterministic priority first.
+3. **Candidate Evidence**: Skipping or accelerating skills already supported by existing repository evidence.
+
+> [!NOTE]
+> The roadmap engine will **not** invent an independent priority formula. It will directly consume the authoritative priority score generated by the deterministic priority engine.
+
+---
+
+## 6. Planned Milestone Architecture
+
+Milestones divide the candidate's learning journey into manageable, goal-oriented units designed to culminate in observable engineering deliverables.
+
+### Anatomy of a Planned Milestone
+Each milestone will bundle six core elements:
+1. **Target Skill(s)**: One to three closely related skills selected from prioritized gaps.
+2. **Learning Objectives**: Specific, observable competencies the candidate should develop.
+3. **Curated Resources**: High-quality documentation and guides mapped to the target skills.
+4. **Practical Project**: A realistic engineering challenge applying the target skills.
+5. **Verification Criteria**: Explicit file patterns, manifests, and test requirements that can be evaluated via GitHub.
+6. **Completion State**: Lifecycle tracking (`NOT_STARTED` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `VERIFIED`).
+
+---
+
+## 7. Planned Learning Resources & Projects
+
+SkillForge emphasizes active, project-based learning over passive tutorial consumption.
+
+### Curated Learning Resources (P4)
+Future learning resources will be curated and linked to canonical skills:
+- **Official Documentation**: Authoritative framework and language manuals.
+- **Architectural Tutorials**: Focused guides explaining design patterns and production deployment.
+- **Interactive Labs**: Hands-on sandbox exercises.
+
+Resource recommendations will be retrieved via the planned RAG layer (P3/P4), ensuring materials are grounded, relevant, and authoritative. RAG retrieves resources; it does **not** evaluate candidate proficiency or calculate priority scores.
+
+### Project-Based Milestone Cycle
+Every milestone is designed around hands-on software development:
+```text
+Skill Gap Identified
+        ↓
+Focused Learning (Docs & Tutorials)
+        ↓
+Hands-on Project Development
+        ↓
+Commit & Push to GitHub
+        ↓
+Automated GitHub Re-analysis (P5)
+        ↓
+Demonstrated Skill Evidence Elevated
+```
+
+Candidates do not merely read about technologies; they implement them in code repositories.
+
+---
+
+## 8. Future GitHub Verification Loop
+
+Scheduled as Phase 5 (**P5**), the GitHub Verification Loop connects project completion directly back to candidate evidence.
+
+### Verification Flow
+```text
+Recommended Project Specification
+        ↓
+Candidate Implements Project Locally
+        ↓
+Candidate Pushes Commits to GitHub
+        ↓
+GitHub Intelligence Engine Re-analyzes Repository
+        ↓
+New Artifact Evidence Detected (Manifests, Dockerfiles, CI Workflows)
+        ↓
+ProjectEvidence Records Created / Updated
+        ↓
+Demonstrated Skill Score Recomputed (Bounded Noisy-OR)
+        ↓
+Skill Gap Engine Re-evaluates Gap Status (e.g. PARTIAL → STRONG)
+        ↓
+Roadmap Milestone Marked VERIFIED
+        ↓
+Downstream Dependent Milestones Unlocked
+```
+
+### Architectural Reuse
+The verification loop will **reuse the existing deterministic GitHub Intelligence Engine** (`github_analyzer.py` and `demonstrated_skill_service.py`) rather than introducing a separate, ad-hoc validation tool. This guarantees that evidence evaluated during milestone verification conforms to the exact same standards applied during initial repository onboarding.
+
+---
+
+## 9. Dynamic Re-planning
+
+A career roadmap is an evolving strategy that adapts to candidate progress and industry movement.
+
+### Future Re-planning Triggers
+The roadmap engine will recalculate remaining milestones when:
+- **Milestone Completed**: A candidate pushes code that verifies a target skill, unlocking downstream milestones.
+- **External Evidence Added**: A candidate connects a new repository demonstrating skills outside the active milestone.
+- **Market Demand Shifts (P1)**: The continuous market ingestion pipeline updates regional demand scores or growth trajectories.
+- **Target Role Changed**: The candidate selects a new target career role.
+- **Pacing Adjusted**: The candidate updates their available weekly study commitment.
+
+### Market-Driven Re-planning Pipeline
+```text
+Real-Time Market Ingestion (P1)
+        ↓
+Updated Regional Skill Demand & Growth Signals
+        ↓
+Deterministic Priority Engine Recomputes Priority Scores
+        ↓
+Roadmap Engine Evaluates Unstarted Milestones
+        ↓
+Remaining Trajectory Re-ordered to Reflect Current Market Demand
+```
+
+---
+
+## 10. Post-MVP Roadmap Alignment
+
+The Career Roadmap Engine aligns directly with the locked post-MVP sequence:
 
 ```text
-NOT_STARTED ──► IN_PROGRESS ──► PROJECT_SUBMITTED ──► VERIFIED
-                                         │ (Criteria missing)
-                                         └──► REVISION_REQUESTED
+P1: Real-Time Industry Demand
+        ↓ (Supplies continuously updated market demand and growth rates)
+P2: Local Qwen 3 8B AI Layer
+        ↓ (Provides local, private reasoning and explanation capabilities)
+P3: Evidence-Grounded Career Chatbot
+        ↓ (Enables candidates to discuss gaps and explore learning advice)
+P4: Personalized Roadmap + Resources
+        ↓ (Generates sequenced milestones, resource links, and project specs)
+P5: GitHub Verification Loop
+          (Closes the loop by validating completed projects through GitHub)
 ```
+
+### Phase Responsibilities
+- **P1**: Provides fresh, empirical market signals so roadmap priorities stay synchronized with current industry hiring.
+- **P2**: Deploys the local open-weight Qwen 3 8B model to generate contextual milestone descriptions and explain prerequisite relationships.
+- **P3**: Integrates the RAG retrieval pipeline to retrieve curated tutorials, reference guides, and project rubrics.
+- **P4**: Implements the core roadmap engine, dependency graph, milestone data model, and adaptive scheduling.
+- **P5**: Automates milestone verification by re-analyzing candidate repositories upon code submission.
 
 ---
 
-## 5. Dynamic Re-planning & Feedback Loop
+## 11. AI Boundary & Invariants
 
-The roadmap is an adaptive plan rather than a static document:
+To guarantee architectural integrity and prevent hallucination, the roadmap engine operates within strict boundaries:
 
-1. **Milestone Verification**: When the user completes the project and pushes to GitHub, the verification service scans the commits.
-2. **Evidence Elevation**: The validated skill moves to *Demonstrated* in the user's skill profile.
-3. **Graph Recalculation**: Downstream dependent milestones are unlocked.
-4. **Market Shift Updates**: If industry demand for a secondary skill surges significantly over time, subsequent unstarted milestones adjust their priority ordering automatically.
+> **"The LLM never decides what is true. It only reasons over what SkillForge has already verified."**
+
+> **"Deterministic systems decide what is true. AI explains, reasons over, and personalizes verified evidence."**
+
+### Permitted AI Roles
+The future AI layer (Qwen 3 8B) may:
+- Personalize milestone narrative descriptions to match candidate interests.
+- Explain *why* a specific prerequisite or milestone is sequenced before another.
+- Summarize documentation chapters and learning objectives.
+- Suggest creative variations on recommended project challenges.
+
+### Prohibited AI Roles
+The AI layer must **never**:
+- Independently decide whether a candidate possesses a skill.
+- Alter a skill gap classification (`STRONG`, `PARTIAL`, `MISSING`).
+- Fabricate or modify industry demand percentages or growth rates.
+- Compute or override the deterministic priority score.
+- Mark a milestone as verified without verified repository artifacts.
 
 ---
 
-## 6. Data Representation
+## 12. MVP vs Post-MVP Capability Matrix
 
-```json
-{
-  "roadmap_id": "8f3b145e-990a-4bf7-96a1-6a2c340dfa12",
-  "target_role": "Backend Engineer",
-  "total_estimated_weeks": 8,
-  "weekly_hours_commitment": 10,
-  "current_status": "ACTIVE",
-  "milestones": [
-    {
-      "sequence_order": 1,
-      "title": "Containerization & Development Environments",
-      "target_skills": ["Docker", "Docker Compose"],
-      "estimated_hours": 15,
-      "status": "IN_PROGRESS",
-      "learning_resources": [
-        {
-          "title": "Docker Official Getting Started Guide",
-          "resource_type": "documentation",
-          "url": "https://docs.docker.com/get-started/",
-          "estimated_minutes": 120
-        }
-      ],
-      "project_challenge": {
-        "title": "Containerize a Full-Stack Web Application",
-        "description": "Create a multi-stage Dockerfile and docker-compose.yml orchestrating API and database services.",
-        "verification_rubric": {
-          "required_files": ["Dockerfile", "docker-compose.yml"],
-          "prohibited_patterns": ["ADD .", "latest"],
-          "expected_services": ["web", "db"]
-        }
-      }
-    }
-  ]
-}
-```
+| Capability | v1.0.0 MVP (Frozen Baseline) | Post-MVP (Planned Evolution) |
+| :--- | :--- | :--- |
+| **Resume Evidence Extraction** | Implemented (Regex, parsing, normalization) | Maintained (Roadmap input) |
+| **GitHub Evidence Extraction** | Implemented (Manifest & CI inspection) | Maintained (Verification loop input) |
+| **Industry Skill Demand** | Implemented (Structured baseline data) | Real-time market ingestion (P1) |
+| **Skill Gap Classification** | Implemented (Deterministic rule-based) | Maintained (Roadmap input) |
+| **Priority Scoring Engine** | Implemented (Deterministic formula) | Maintained (Roadmap ordering input) |
+| **Evidence Audit Trail** | Implemented (Direct repo & file linkages) | Maintained (Milestone verification basis) |
+| **Skill Dependency Graph (DAG)**| Not implemented | Planned (P4) |
+| **Roadmap Generation** | Not implemented | Planned (P4) |
+| **Curated Learning Resources** | Not implemented | Planned (P4) |
+| **Project Challenge Specs** | Not implemented | Planned (P4) |
+| **Weekly Workload Pacing** | Not implemented | Planned (P4) |
+| **Milestone Progress Tracking**| Not implemented | Planned (P4) |
+| **Dynamic Re-planning** | Not implemented | Planned (P4) |
+| **GitHub Verification Loop** | Not implemented | Planned (P5) |
+| **AI Milestone Explanation** | Not implemented | Planned (Local Qwen 3 8B) (P2/P4) |
+
+---
+
+## 13. Architectural Invariants
+
+The Career Roadmap architecture enforces thirteen immutable principles:
+
+1. **MVP Scope Boundary**: The v1.0.0 MVP identifies skill gaps and calculates priority scores; it does not generate, persist, or track roadmaps.
+2. **Upstream Dependency**: Roadmap generation strictly consumes deterministic SkillForge intelligence.
+3. **Single Priority Authority**: The roadmap engine consumes existing deterministic priority scores and never creates a competing priority formula.
+4. **Dependency Graph is Post-MVP**: Skill prerequisite modeling belongs to Phase 4.
+5. **Learning Resources are Post-MVP**: Curated educational materials belong to Phase 4.
+6. **Project Challenges are Post-MVP**: Practical engineering challenge specifications belong to Phase 4.
+7. **Verification Loop is Post-MVP**: Automated GitHub milestone verification belongs to Phase 5.
+8. **Real-Time Adaptation Depends on P1**: Roadmap replanning driven by market shifts depends on the P1 real-time demand engine.
+9. **RAG Retrieves Context**: RAG discovers resources and context; it does not compute demand or classify gaps.
+10. **Grounded AI Generation**: All AI explanations and project suggestions must be grounded in verified SkillForge facts.
+11. **Candidate Evidence Isolation**: Personalization and evidence remain strictly scoped to the active candidate.
+12. **Observable Usage Over Mastery**: GitHub evidence demonstrates observable technical usage, not engineering mastery.
+13. **Verification Reuse**: Milestone verification reuses the authoritative GitHub Intelligence Engine.

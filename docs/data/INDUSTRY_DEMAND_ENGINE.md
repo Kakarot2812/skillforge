@@ -1,240 +1,287 @@
-# Industry Demand Engine
+# SkillForge AI — Industry Demand Engine
 
-## 1. Purpose
+## 1. Purpose & Core Principles
 
-The Industry Demand Engine determines which technical skills are currently relevant to specific career roles and how demand is changing over time.
+The Industry Demand Engine determines which technical skills are currently required for specific career roles and how demand changes over time.
 
-The system must avoid hard-coded lists of "trending skills."
+### Core Architectural Principle
+> **"The system must avoid hard-coded lists of 'trending skills.'
+> Demand must be evidence-driven, contextual, and mathematically verifiable."**
 
----
-
-## 2. Input
-
-The engine can consume permitted and appropriately licensed market data containing information such as:
-
-- Job title
-- Job description
-- Required skills
-- Location
-- Industry
-- Date
-- Experience level
-
-Additional market reports may provide contextual signals but should not replace structured job-market data.
+SkillForge AI strictly separates the authoritative numerical demand calculation from generative text models. The Large Language Model (LLM) is prohibited from calculating, inventing, or modifying industry demand scores.
 
 ---
 
-## 3. Processing Pipeline
+# Part 1: v1.0.0 MVP — Frozen Demand Engine
 
+## 2. v1.0.0 MVP — Frozen Baseline
+
+In the frozen v1.0.0 MVP, the demand engine consumes **structured industry skill-demand baseline data** stored in PostgreSQL table `skill_demand` (`backend/app/db/models.py`).
+
+The MVP demand engine does **not** have a live job-market web crawler or continuous ingestion pipeline. Instead, it provides a deterministic analytical access and aggregation layer over structured, verified market records.
+
+### Conceptual MVP Demand Flow
 ```text
-Raw Job Data
-     ↓
-Data Cleaning
-     ↓
-Deduplication
-     ↓
-Job Classification
-     ↓
-Skill Extraction
-     ↓
-Skill Normalization
-     ↓
-Skill Mapping
-     ↓
-Historical Aggregation
-     ↓
-Demand Calculation
-     ↓
-Trend Calculation
-     ↓
-Demand API
-```
-
----
-
-## 4. Skill Extraction
-
-Skills may be extracted using a hybrid approach:
-
-1. Skill dictionary/rules
-2. NLP
-3. Embeddings
-4. LLM for ambiguous cases
-
-The LLM should not be the sole source of truth.
-
----
-
-## 5. Skill Normalization
-
-Different expressions representing the same skill should map to a canonical skill.
-
-Example:
-
-```text
-Amazon Web Services
-AWS
-AWS Cloud
-Amazon AWS
-
+Structured Skill Demand Baseline (PostgreSQL: skill_demand)
         ↓
-
-AWS
-```
-
-Another example:
-
-```text
-K8s
-Kubernetes
-Kubernetes orchestration
-
+Role / Skill / Location Filtering
         ↓
-
-Kubernetes
-```
-
-Embeddings can assist semantic matching.
-
----
-
-## 6. Demand Metrics
-
-For each skill, the engine should maintain:
-
-- Number of relevant jobs
-- Percentage of relevant jobs
-- Recent demand
-- Historical demand
-- Growth rate
-- Role relevance
-- Location relevance
-
----
-
-## 7. Trend Detection
-
-The system should track demand over time.
-
-Example:
-
-```text
-Month     Docker Demand
-
-January      31%
-February     33%
-March        36%
-April        39%
-May          43%
-```
-
-This allows the system to identify:
-
-- High demand
-- Stable demand
-- Growing demand
-- Declining demand
-
----
-
-## 8. Role-Specific Demand
-
-Demand should always be evaluated in context.
-
-Example:
-
-```text
-Backend Engineer
+Demand Metrics & SQL Aggregations
         ↓
-Relevant Jobs
+Trend & Growth Signal Classification
         ↓
-Skill Demand
+Demand API (/api/v1/demand, /api/v1/intelligence)
+        ↓
+Skill Gap Engine (/api/v1/gaps)
+        ↓
+Priority Engine
 ```
 
-The platform should not claim that a skill is universally valuable merely because it appears frequently in unrelated job categories.
+---
+
+## 3. MVP Demand Data & Storage
+
+- **Storage Model**: Stored in the `skill_demand` table, foreign-keyed to `job_roles` and canonical `skills`.
+- **Nature of Data**: Structured baseline data reflecting real-world job posting distributions across canonical roles.
+- **Not Real-Time**: MVP demand is **not** continuously streamed or ingested from live job boards. It must never be described as real-time.
+- **Freshness**: Every demand record explicitly tracks its data update date (`data_updated_at`, e.g., `"2026-09-01"`).
+- **Data Integrity Constraints**:
+  - `demand_score`: Check constraint enforces $0.0 \le \text{demand\_score} \le 1.0$.
+  - `sample_size`: Check constraint enforces $\text{sample\_size} > 0$.
+  - Uniqueness: Unique constraint enforces `(role_id, skill_id, location)`.
 
 ---
 
-## 9. Location
+## 4. MVP Demand Calculation & Intelligence Algorithms
 
-The engine should eventually support location-specific analysis.
+The implemented demand engine provides three deterministic calculation mechanisms:
 
-Potential locations:
+### 4.1 Stored Demand & Role Aggregations
+Demand scores are stored directly in `skill_demand` as normalized ratios ($0.0 \le \text{score} \le 1.0$) representing the proportion of role openings demanding a given skill. The service (`demand_service.py`) calculates SQL-level role aggregates:
+- $\text{Average Demand} = \text{AVG}(\text{demand\_score})$
+- $\text{Highest Demand} = \text{MAX}(\text{demand\_score})$
+- $\text{Lowest Demand} = \text{MIN}(\text{demand\_score})$
+- $\text{Average Growth Rate} = \text{AVG}(\text{growth\_rate})$
 
-- India
-- Delhi NCR
-- Bengaluru
-- Hyderabad
-- Mumbai
-- Pune
+### 4.2 Global Sample-Size-Weighted Skill Demand Ranking
+When ranking skills across the entire market without filtering to a single role, the service (`demand_intelligence_service.py`) calculates sample-size-weighted demand to prevent smaller niche roles from skewing rankings:
+$$\text{Weighted Demand} = \frac{\sum_{i=1}^{N} (\text{demand\_score}_i \cdot \text{sample\_size}_i)}{\sum_{i=1}^{N} \text{sample\_size}_i}$$
 
-Location filtering will be implemented after the core MVP demand pipeline is working.
+### 4.3 Deterministic Growth & Trend Classification
+Market trajectory classification is rule-based and deterministic:
+$$\text{Trend} = \begin{cases} \text{RISING} & \text{if } \text{growth\_rate} > 0.05 \\ \text{DECLINING} & \text{if } \text{growth\_rate} < -0.05 \\ \text{STABLE} & \text{if } -0.05 \le \text{growth\_rate} \le 0.05 \end{cases}$$
+
+### 4.4 Priority Signal Transformation
+In the Skill Gap Engine, the growth rate is normalized into a bounded $[0.0, 1.0]$ signal:
+$$\text{growth\_signal} = \text{clamp}\left(\frac{\text{growth\_rate} + 1.0}{2.0}, 0.0, 1.0\right)$$
+$$\text{priority\_score} = \text{gap\_severity\_weight} \cdot (0.70 \cdot \text{demand\_score} + 0.30 \cdot \text{growth\_signal})$$
 
 ---
 
-## 10. Data Freshness
+## 5. Role-Specific Demand & Intelligence
 
-Every demand result must contain a freshness indicator.
-
-Example:
+Demand is always evaluated in the context of the target job role. A skill's high demand in one domain does not imply relevance in another.
 
 ```text
-Market data:
-Updated: 1 September 2026
+Target Role (e.g. Backend Engineer)
+        ↓
+Relevant Skill Demand (from skill_demand)
+        ↓
+Candidate Skill Gap & Priority Calculation
 ```
 
-The system must never imply that historical data is real-time.
+The implemented MVP provides:
+- **Role Demand Profile**: Breakdown of required skills and benchmarks for a specific role.
+- **Cross-Role Profile**: How a specific skill is demanded across multiple career tracks (`GET /api/v1/intelligence/skills/{skill_id}/roles`).
+- **Role Comparison**: Deterministic comparison between 2 and 5 canonical roles identifying shared skills and role-specific specializations (`POST /api/v1/intelligence/roles/compare`).
+- **Role Market Signals**: Breakdown of rising, stable, and declining skills, plus top demanded and fastest growing skills (`GET /api/v1/intelligence/roles/{role_id}/signals`).
 
 ---
 
-## 11. RAG Relationship
+## 6. Location Support in MVP
 
-RAG does not determine the numerical demand score.
-
-Instead:
-
-```text
-Structured Market Data
-        ↓
-Demand Engine
-        ↓
-Demand Score
-```
-
-RAG can provide contextual explanations:
-
-```text
-Demand Score
-      +
-Industry Reports
-      ↓
-LLM Explanation
-```
+- **Supported Parameter**: The API and database accept a `location` parameter (validated: 1–64 characters, non-blank).
+- **Current MVP Baseline**: The frozen MVP baseline dataset is seeded for national geographic scope (`location = 'India'`).
+- **Future Geographic Extension**: City-level filtering (e.g., Delhi NCR, Bengaluru, Hyderabad, Mumbai, Pune) is planned for post-MVP phases once regional ingestion pipelines are operational.
 
 ---
 
-## 12. Output
+## 7. Data Freshness Principle
 
-Example:
+> **"The system must never imply that historical data is real-time."**
+
+- In the frozen MVP, data freshness reflects the date when the structured baseline dataset was compiled and updated (`data_updated_at: "2026-09-01"`).
+- API responses explicitly serialize `data_freshness: "2026-09-01"` in their metadata envelopes.
+
+---
+
+## 8. RAG & LLM Relationship
+
+RAG (Retrieval-Augmented Generation) does **not** calculate, modify, or update industry demand scores.
+
+### Authoritative Architecture Flow
+```text
+Structured Market Data (PostgreSQL)
+        ↓
+Deterministic Demand Logic
+        ↓
+Demand Result & Metrics
+```
+
+### Contextual Explanation Flow (Future Layer)
+```text
+Deterministic Demand Result
+           +
+Retrieved Market Evidence
+           ↓
+Local Qwen 3 8B LLM
+           ↓
+Grounded Natural-Language Explanation
+```
+
+> **"RAG retrieves evidence.**
+> **The deterministic demand engine determines the authoritative market signal."**
+
+---
+
+## 9. Implemented MVP Output Example
+
+Actual response structure from `GET /api/v1/demand/{role_id}?location=India`:
 
 ```json
 {
-  "role": "Backend Engineer",
-  "location": "India",
-  "data_updated": "2026-09-01",
-  "skills": [
-    {
-      "skill": "Docker",
-      "demand": 0.51,
-      "trend": 0.12
+  "data": {
+    "role": {
+      "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+      "title": "Backend Engineer",
+      "slug": "backend-engineer",
+      "category": "Engineering",
+      "description": "Designs, implements, and maintains server-side systems."
     },
-    {
-      "skill": "AWS",
-      "demand": 0.47,
-      "trend": 0.09
-    }
-  ]
+    "skills": [
+      {
+        "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+        "skill_name": "Python",
+        "canonical_slug": "python",
+        "category": "Programming Languages",
+        "demand_score": 0.78,
+        "growth_rate": 0.08,
+        "sample_size": 14200,
+        "location": "India",
+        "data_updated_at": "2026-09-01"
+      }
+    ]
+  },
+  "meta": {
+    "total": 1,
+    "location": "India",
+    "data_freshness": "2026-09-01",
+    "total_demanded_skills": 1,
+    "average_demand_score": 0.78,
+    "highest_demand_score": 0.78,
+    "lowest_demand_score": 0.78,
+    "average_growth_rate": 0.08,
+    "top_skill": "Python"
+  }
 }
 ```
 
-The exact schema may evolve during implementation.
+---
+
+# Part 2: Post-MVP Planned Evolution
+
+> [!NOTE]
+> All pipelines, models, and processes in Part 2 are **PLANNED FOR POST-MVP EVOLUTION (P1)** on the `post-mvp-foundation` branch. They are not implemented in the frozen `v1.0.0-mvp` release.
+
+---
+
+## 10. P1 — Planned Real-Time Industry Demand
+
+In Phase 1 of post-MVP development, the static structured baseline evolves into a continuously refreshed market data pipeline.
+
+### Conceptual Ingestion & Processing Pipeline
+```text
+Market Sources (Permitted / Licensed Job Postings)
+        ↓
+Market Data Ingestion
+        ↓
+Data Cleaning & Normalization
+        ↓
+Deduplication
+        ↓
+Job Role Classification
+        ↓
+Skill Extraction
+        ↓
+Canonical Skill Normalization (Taxonomy Matcher)
+        ↓
+Deterministic Demand Calculation
+        ↓
+Demand Database (PostgreSQL: skill_demand)
+        ↓
+Demand API
+        ↓
+Skill Gap & Priority Engines
+```
+
+The real-time capability comes from **continuously ingesting updated market data and recalculating deterministic demand metrics**, not from prompting an LLM.
+
+---
+
+## 11. P1 Market Evidence & Provenance
+
+Future market records will retain provenance and lineage metadata sufficient to audit:
+- **Source Lineage**: Which job posting feed or licensed data provider supplied the observation?
+- **Collection Timestamp**: When was the source data scraped or received?
+- **Population Scope**: What job title, industry sector, and geographic region was represented?
+- **Extracted Mentions**: Which raw text phrases were extracted?
+- **Normalization Path**: How was the raw mention mapped to the canonical `skill_id`?
+- **Calculation Version**: Which demand calculation formula and run batch generated the final metric?
+
+---
+
+## 12. Future Skill Extraction Design
+
+For post-MVP ingestion, skill extraction may utilize a multi-layered hybrid architecture:
+1. **Canonical Dictionary & Rules**: High-precision regex and alias dictionary matching.
+2. **NLP & Entity Recognition**: Named entity recognition for technical terminology.
+3. **Semantic Embeddings**: Vector similarity matching against canonical skill descriptions.
+4. **LLM for Ambiguous Mentions**: LLM assistance strictly for resolving edge-case syntax and novel industry phrasing.
+
+*Guardrail*: Any LLM-assisted extraction remains subject to deterministic taxonomy validation. The LLM will **never** directly assign demand scores or growth rates.
+
+---
+
+## 13. Post-MVP Data Flow Architecture
+
+```text
+                    MARKET DATA
+                         ↓
+               Deterministic Engine
+                         ↓
+                  Market Signal
+                         ↓
+              ┌──────────┴──────────┐
+              ↓                     ↓
+        Skill Gap Engine       Market Evidence
+              ↓                     ↓
+         Priority             Retrieval / RAG
+                                      ↓
+                                Qwen 3 8B
+                                      ↓
+                              Human Explanation
+```
+
+The deterministic path remains the authoritative source of truth. The AI layer is reserved strictly for human-facing explanation and reasoning.
+
+---
+
+## 14. Architectural Invariants
+
+1. **Evidence-Driven**: Industry demand must be derived from verifiable market observations, never speculative lists.
+2. **Contextual Relevance**: Demand is evaluated relative to specific career tracks and market geographies.
+3. **Structured MVP Baseline**: The frozen MVP uses structured baseline data; continuous live ingestion is a post-MVP capability.
+4. **Deterministic Calculation**: Demand scores, growth classifications, and priority ranks are computed mathematically.
+5. **RAG Decoupling**: RAG does not calculate authoritative demand.
+6. **No LLM Overrides**: LLM-generated text cannot alter or override deterministic market metrics.
+7. **Traceable Provenance**: Market evidence in the future ingestion pipeline must retain audit lineage.

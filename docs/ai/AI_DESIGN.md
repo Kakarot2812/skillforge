@@ -322,7 +322,26 @@ Each phase builds systematically upon the verified foundation established in pre
 | **Skill Gap Classification** | Implemented (Deterministic rule-based) | AI explanation & contextual reasoning (P2) |
 | **Priority Scoring** | Implemented (Deterministic formula) | AI explanation & contextual reasoning (P2) |
 | **RAG Retrieval Engine** | Not implemented | Planned (pgvector semantic retrieval) |
-| **Local Qwen 3 8B LLM** | Not implemented | Planned (Local open-weight reasoning) (P2) |
+| **Local Qwen 3 8B LLM** | Not implemented | Checkpoint P2-A client foundation implemented; reasoning deferred to P2-B+ |
 | **Career Chatbot** | Not implemented | Planned (Evidence-grounded dialogue) (P3) |
 | **Personalized Roadmap** | Not implemented | Planned (DAG prerequisite sequencing) (P4) |
 | **GitHub Verification Loop**| Not implemented | Planned (Continuous milestone verification) (P5) |
+
+---
+
+## 14. Checkpoint P2-A Status: Local Qwen 3 8B / Ollama Foundation
+
+Checkpoint P2-A establishes the isolated backend communication foundation for the locally running Qwen 3 8B model via Ollama.
+
+### Core Architectural Invariants
+- **Local Model Runtime**: Ollama operates entirely locally on the host machine (`OLLAMA_BASE_URL=http://localhost:11434`, default model `OLLAMA_MODEL=qwen3:8b`).
+- **Zero Cloud Model Dependency**: No external AI APIs, cloud tokens, or API keys are required or supported.
+- **Strict Non-Authoritative Role**: In strict compliance with *"The LLM never decides what is true"*, Qwen is technically and architecturally prohibited from deciding:
+  - Skill possession or evidence validity
+  - `STRONG`, `PARTIAL`, or `MISSING` skill gap status
+  - Market `demand_score`, `growth_rate`, or `growth_class`
+  - Candidate readiness score or `priority_score`
+  - Database truth
+- **Decoupled Application Startup**: FastAPI starts and operates completely independently of Ollama availability. If the local Ollama daemon is offline or stopped, all deterministic SkillForge functionality (resumes, GitHub evidence, market demand, skill gaps, priorities) remains 100% operational.
+- **Stateless Infrastructure Layer**: Checkpoint P2-A introduces zero database models, migrations, or database writes.
+- **Future AI Layers**: Later checkpoints (P2-B through P2-E) will pass verified deterministic facts from PostgreSQL into structured prompt contexts for natural-language explanation and reasoning.

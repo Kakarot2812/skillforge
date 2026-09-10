@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     ADZUNA_APP_KEY: Optional[str] = None
     ADZUNA_API_BASE_URL: str = "https://api.adzuna.com/v1/api"
 
+    # Local Ollama / Qwen 3 8B Settings (Post-MVP P2 AI Foundation)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen3:8b"
+    OLLAMA_TIMEOUT_SECONDS: float = 60.0
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

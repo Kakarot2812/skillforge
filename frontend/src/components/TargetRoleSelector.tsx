@@ -52,18 +52,18 @@ export default function TargetRoleSelector({
           </div>
         </div>
         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-          Canonical Roles
+          Career Tracks
         </span>
       </div>
 
       <div className="mt-4 space-y-2.5">
         <div className="flex items-center justify-between">
           <label className="text-xs font-medium text-neutral-400">Select Target Role</label>
-          <span className="text-[11px] text-neutral-500 font-mono">5 Canonical Roles</span>
+          <span className="text-[11px] text-neutral-500 font-mono">5 Career Tracks</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {loading ? (
-            <div className="col-span-2 text-xs text-neutral-500 p-4 text-center">Loading canonical roles...</div>
+            <div className="col-span-2 text-xs text-neutral-500 p-4 text-center">Loading target roles...</div>
           ) : (
             roles.map((role) => {
               const isSelected = selectedRoleId === role.role_id;
@@ -93,7 +93,7 @@ export default function TargetRoleSelector({
 
       <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-xs text-neutral-500">
         <span>Selected Track: <strong className="text-neutral-300 font-medium">{activeRole?.title || "None"}</strong></span>
-        <span className="text-[11px] text-emerald-400/80 font-medium">Synchronized with Skill Gap Engine (Phase 5)</span>
+        <span className="text-[11px] text-emerald-400/80 font-medium">Synchronized with Career Intelligence</span>
       </div>
     </div>
   );

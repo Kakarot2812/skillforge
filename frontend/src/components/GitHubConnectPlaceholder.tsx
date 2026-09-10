@@ -70,6 +70,12 @@ export default function GitHubConnectPlaceholder({
   const [selectedSkillDetail, setSelectedSkillDetail] = useState<DemonstratedSkillDetailData | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  // Safe ref for onGitHubChange to prevent infinite render loops
+  const onGitHubChangeRef = React.useRef(onGitHubChange);
+  React.useEffect(() => {
+    onGitHubChangeRef.current = onGitHubChange;
+  }, [onGitHubChange]);
+
   // Refresh demonstrated skills helper strictly scoped to active GitHub username
   const reloadDemonstratedSkills = async (activeUser?: string) => {
     const userToQuery = activeUser || connectResult?.github_username || username.trim();
@@ -104,22 +110,50 @@ export default function GitHubConnectPlaceholder({
         setUsername(cleanUser);
         setIsConnecting(true);
         try {
+          let repoList: GitHubRepositoryItem[] = [];
+          let totalCount = 0;
+
           const [repoRes, demRes] = await Promise.all([
             fetchGitHubRepositories(20, 0, cleanUser),
             fetchDemonstratedSkills(undefined, undefined, undefined, 20, 0, cleanUser),
           ]);
+
           if (repoRes.success && repoRes.data) {
-            setRepositories(repoRes.data.data);
-            setConnectResult({
-              github_username: cleanUser,
-              connected: true,
-              discovered_repositories: repoRes.data.meta.total,
-              connected_at: new Date().toISOString(),
-            });
-            onGitHubChange?.(cleanUser);
+            repoList = repoRes.data.data;
+            totalCount = repoRes.data.meta.total;
           }
+
+          // If local DB has 0 discovered repositories for this user (e.g. DB reset or cache cleared),
+          // automatically perform GitHub connection/discovery to restore the repositories
+          if (repoList.length === 0) {
+            const connectRes = await connectGitHub(cleanUser);
+            if (connectRes.success && connectRes.data) {
+              if (connectRes.data.repositories && connectRes.data.repositories.length > 0) {
+                repoList = connectRes.data.repositories;
+                totalCount = connectRes.data.discovered_repositories;
+              } else {
+                const freshRepoRes = await fetchGitHubRepositories(20, 0, cleanUser);
+                if (freshRepoRes.success && freshRepoRes.data) {
+                  repoList = freshRepoRes.data.data;
+                  totalCount = freshRepoRes.data.meta.total;
+                }
+              }
+            }
+          }
+
+          setRepositories(repoList);
+          setConnectResult({
+            github_username: cleanUser,
+            connected: true,
+            discovered_repositories: totalCount,
+            connected_at: new Date().toISOString(),
+          });
+          onGitHubChangeRef.current?.(cleanUser);
+
           if (demRes.success && demRes.data) {
             setDemonstratedSkills(demRes.data.data);
+          } else {
+            await reloadDemonstratedSkills(cleanUser);
           }
         } finally {
           setIsConnecting(false);
@@ -128,11 +162,37 @@ export default function GitHubConnectPlaceholder({
         // Disconnected state: ensure no residual data
         setRepositories([]);
         setDemonstratedSkills([]);
-        onGitHubChange?.(null);
+        onGitHubChangeRef.current?.(null);
       }
     }
     loadInitial();
-  }, [onGitHubChange]);
+  }, []);
+
+  const handleSyncRepositories = async () => {
+    const cleanUser = connectResult?.github_username || username.trim();
+    if (!cleanUser) return;
+    setIsConnecting(true);
+    setErrorMessage(null);
+    try {
+      const res = await connectGitHub(cleanUser, token.trim() || undefined);
+      if (res.success && res.data) {
+        setConnectResult(res.data);
+        if (res.data.repositories && res.data.repositories.length > 0) {
+          setRepositories(res.data.repositories);
+        } else {
+          const repoRes = await fetchGitHubRepositories(20, 0, cleanUser);
+          if (repoRes.success && repoRes.data) {
+            setRepositories(repoRes.data.data);
+          }
+        }
+        await reloadDemonstratedSkills(cleanUser);
+      } else {
+        setErrorMessage(res.error || "Failed to sync repositories from GitHub");
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,12 +292,12 @@ export default function GitHubConnectPlaceholder({
             <div>
               <h3 className="text-sm font-semibold text-neutral-200">GitHub Intelligence</h3>
               <p className="text-xs text-neutral-500">
-                Phase 3 • Repository Evidence & Demonstrated Skill Intelligence
+                Repository Evidence & Demonstrated Skills
               </p>
             </div>
           </div>
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-            Phase 3 Complete
+            {connectResult ? `@${connectResult.github_username}` : "Code Evidence"}
           </span>
         </div>
 
@@ -257,12 +317,24 @@ export default function GitHubConnectPlaceholder({
               </div>
 
               {/* Repositories List with Evidence Analysis */}
-              {repositories.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-emerald-500/20">
-                  <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>Discovered Repositories</span>
-                    <span className="text-[10px] font-mono">Artifact Analysis Ready</span>
+              <div className="space-y-2 pt-2 border-t border-emerald-500/20">
+                <div className="flex items-center justify-between text-xs text-neutral-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-neutral-200">Discovered Repositories</span>
+                    <span className="text-[10px] font-mono text-emerald-400">({repositories.length})</span>
                   </div>
+                  <button
+                    onClick={handleSyncRepositories}
+                    disabled={isConnecting}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    title="Sync repositories from GitHub"
+                  >
+                    <RotateCcw className={`h-2.5 w-2.5 ${isConnecting ? "animate-spin" : ""}`} />
+                    <span>Sync</span>
+                  </button>
+                </div>
+
+                {repositories.length > 0 ? (
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                     {repositories.map((repo) => {
                       const analysis = analysisResults[repo.repo_id];
@@ -331,8 +403,31 @@ export default function GitHubConnectPlaceholder({
                       );
                     })}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="p-3 text-center rounded-lg bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-400 space-y-2">
+                    <p className="text-[11px] text-neutral-400">
+                      No repositories currently indexed for @{connectResult.github_username}.
+                    </p>
+                    <button
+                      onClick={handleSyncRepositories}
+                      disabled={isConnecting}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Fetching...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          <span>Fetch Repositories from GitHub</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Checkpoint 3: Aggregated Demonstrated Skills Panel */}
@@ -447,15 +542,14 @@ export default function GitHubConnectPlaceholder({
               </div>
             )}
 
-            {/* Checkpoint 3 Notice */}
             <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
               <div className="flex items-center gap-1.5 font-medium text-emerald-400">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Deterministic Evidence Intelligence</span>
+                <span>Evidence-Based Analysis</span>
               </div>
               <p className="leading-relaxed">
-                Demonstrated skills are deterministically aggregated in <code className="text-emerald-300">demonstrated_skills</code> using bounded multi-repository noisy-OR math.
-                <strong className="text-purple-300 font-normal"> No LLM involvement in quantitative skill scoring.</strong>
+                Demonstrated skills are verified directly from repository artifacts, dependencies, and code configuration across projects.
+                <strong className="text-purple-300 font-normal"> Skills are evaluated strictly from verified evidence.</strong>
               </p>
             </div>
 
@@ -544,8 +638,8 @@ export default function GitHubConnectPlaceholder({
 
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500">
-        <span>GET /api/v1/skills/demonstrated • GET /api/v1/skills/demonstrated/{'{id}'}</span>
-        <span className="text-emerald-400 font-medium font-mono">Phase 3 Complete</span>
+        <span>Evidence Source: GitHub Repositories</span>
+        <span className="text-neutral-400 font-medium">{connectResult ? "Account Connected" : "Not Connected"}</span>
       </div>
     </div>
   );

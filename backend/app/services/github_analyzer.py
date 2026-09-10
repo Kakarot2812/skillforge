@@ -101,6 +101,9 @@ class GitHubAnalyzerService:
                 detail=f"Failed to communicate with GitHub API for repository '{full_name}'.",
             )
 
+        if res.status_code == 409:
+            # Empty repository on GitHub returns 409 Conflict
+            return []
         if res.status_code == 404:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

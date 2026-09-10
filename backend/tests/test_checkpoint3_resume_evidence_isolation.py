@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
@@ -388,6 +389,22 @@ def test_current_candidate_integration_cv_pdf():
     """
     cv_resume_id = uuid.UUID("12045a8f-2097-46d7-a380-4cce843210ca")
     db = SessionLocal()
+    cv_resume = db.query(Resume).filter(Resume.file_name == "CV_.pdf", Resume.user_id.is_(None)).order_by(Resume.created_at.desc()).first()
+    if not cv_resume:
+        cv_resume = Resume(
+            id=cv_resume_id,
+            file_name="CV_.pdf",
+            file_type="pdf",
+            file_size=1024,
+            storage_path="/resumes/cv.pdf",
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(cv_resume)
+        db.commit()
+    else:
+        cv_resume.created_at = datetime.now(timezone.utc)
+        db.commit()
+    cv_resume_id = cv_resume.id
     role = db.query(JobRole).filter(JobRole.slug == "frontend-engineer").first()
     role_id = role.id
     html_skill = db.query(Skill).filter(Skill.slug == "html").first()

@@ -44,6 +44,57 @@ def aggregate_repository_scores(repo_scores: List[float]) -> float:
     return min(1.0, max(0.0, round(combined, 2)))
 
 
+def is_repo_owned_by_user(repo_dict: Dict[str, Any], username: Optional[str]) -> bool:
+    """
+    Canonical source-of-truth helper determining whether a repository summary entry
+    belongs to the specified candidate GitHub username.
+
+    Safely and case-insensitively inspects:
+    1. repo_url (e.g., https://github.com/Kakarot2812/skillforge, git@github.com:Kakarot2812/skillforge.git)
+    2. full_name (e.g., Kakarot2812/skillforge)
+    3. owner (e.g., Kakarot2812)
+    4. repo_name (e.g., Kakarot2812/skillforge - only when prefixed with the username)
+
+    Prevents substring collision: 'Kakarot2812' will NOT match 'Kakarot2812-other/repo'.
+    A short repo_name alone without user prefix or surrounding ownership context is not considered ownership proof.
+    """
+    if not username or not isinstance(username, str) or not username.strip():
+        return False
+
+    clean_u = username.strip().lstrip("@").lower()
+    if not clean_u:
+        return False
+
+    # 1. Inspect repo_url
+    repo_url = (repo_dict.get("repo_url") or "").strip().lower()
+    if repo_url:
+        if (
+            f"github.com/{clean_u}/" in repo_url
+            or f"github.com:{clean_u}/" in repo_url
+            or f"/{clean_u}/" in repo_url
+            or repo_url.endswith(f"/{clean_u}")
+        ):
+            return True
+
+    # 2. Inspect full_name (e.g. "Kakarot2812/skillforge")
+    full_name = (repo_dict.get("full_name") or "").strip().lower()
+    if full_name:
+        if full_name.startswith(f"{clean_u}/") or f"/{clean_u}/" in full_name:
+            return True
+
+    # 3. Inspect owner field if explicitly stored
+    owner = (repo_dict.get("owner") or "").strip().lower()
+    if owner and owner == clean_u:
+        return True
+
+    # 4. Inspect repo_name if it was stored with owner prefix (e.g. "Kakarot2812/skillforge")
+    rname = (repo_dict.get("repo_name") or "").strip().lower()
+    if rname and (rname.startswith(f"{clean_u}/") or f"/{clean_u}/" in rname):
+        return True
+
+    return False
+
+
 class DemonstratedSkillService:
     """
     Service layer providing deterministic, auditable aggregation of project_evidence
@@ -113,11 +164,21 @@ class DemonstratedSkillService:
             sample_repo = items[0][1]
             repo_name = sample_repo.repo_name if sample_repo else "unknown-repo"
             repo_url = sample_repo.repo_url if sample_repo else None
+            full_name = sample_repo.full_name if sample_repo else None
+            owner = None
+            if full_name and "/" in full_name:
+                owner = full_name.split("/")[0]
+            elif repo_url and "github.com/" in repo_url:
+                parts = repo_url.split("github.com/")[-1].split("/")
+                if len(parts) >= 2:
+                    owner = parts[0]
 
             repo_summaries.append(
                 {
                     "repository_id": str(repo_id_key) if repo_id_key else None,
                     "repo_name": repo_name,
+                    "full_name": full_name,
+                    "owner": owner,
                     "repo_url": repo_url,
                     "max_confidence": round(max_repo_score, 2),
                     "evidence_count": len(items),
@@ -243,6 +304,7 @@ class DemonstratedSkillService:
                 .filter(
                     (GitHubRepository.full_name.ilike(f"{safe_u}/%"))
                     | (GitHubRepository.repo_url.ilike(f"%github.com/{safe_u}/%"))
+                    | (GitHubRepository.repo_url.ilike(f"%/{safe_u}/%"))
                 )
                 .distinct()
             )
@@ -281,22 +343,35 @@ class DemonstratedSkillService:
             meta = dem.skill_metadata or {}
             raw_repos = meta.get("repositories", [])
             if username:
-                safe_u = username.strip().lower()
-                raw_repos = [
-                    r for r in raw_repos
-                    if (r.get("repo_url") and f"github.com/{safe_u}/" in r["repo_url"].lower())
-                    or (r.get("repo_name") and safe_u in (r.get("repo_url") or "").lower())
-                ]
+                raw_repos = [r for r in raw_repos if is_repo_owned_by_user(r, username)]
+                repo_scores = []
+                for r in raw_repos:
+                    s = r.get("max_confidence")
+                    if s is None:
+                        s = r.get("confidence_score")
+                    if s is None:
+                        s = dem.confidence_score
+                    repo_scores.append(float(s) if s is not None else 0.0)
+                user_conf = aggregate_repository_scores(repo_scores)
+                user_level = compute_evidence_level(user_conf)
+                user_ev_count = sum(r.get("evidence_count", 1) for r in raw_repos)
+                user_repo_count = len(raw_repos)
+            else:
+                user_conf = dem.confidence_score
+                user_level = dem.evidence_level
+                user_ev_count = dem.evidence_count
+                user_repo_count = dem.repository_count
+
             items.append(
                 {
                     "skill_id": str(skill.id),
                     "skill_name": skill.name,
                     "slug": skill.slug,
                     "category": skill.category,
-                    "confidence_score": dem.confidence_score,
-                    "evidence_level": dem.evidence_level,
-                    "evidence_count": dem.evidence_count,
-                    "repository_count": len(raw_repos) if username else dem.repository_count,
+                    "confidence_score": user_conf,
+                    "evidence_level": user_level,
+                    "evidence_count": user_ev_count,
+                    "repository_count": user_repo_count,
                     "last_verified_at": dem.last_verified_at.isoformat() if dem.last_verified_at else None,
                     "repositories": raw_repos,
                     "evidence_types": meta.get("evidence_types", []),

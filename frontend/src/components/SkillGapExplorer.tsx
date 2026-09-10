@@ -311,7 +311,7 @@ export default function SkillGapExplorer({
       return (
         <span
           className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full"
-          title="Demonstrated in GitHub code artifacts (Confidence >= 85%)"
+          title="Verified repository evidence (Confidence >= 85%)"
         >
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
           STRONG
@@ -376,12 +376,9 @@ export default function SkillGapExplorer({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-white tracking-tight">
-                Skill Gap & Evidence Engine
+                Skill Gap & Priorities
               </h2>
-              <span className="px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-full font-mono">
-                Phase 5 CP5 Complete
-              </span>
-              <span className="px-2 py-0.5 text-[10px] font-mono text-neutral-400 bg-neutral-800/80 rounded border border-neutral-700/60">
+              <span className="px-2.5 py-0.5 text-[10px] font-mono text-neutral-400 bg-neutral-800/80 rounded border border-neutral-700/60">
                 Location: India
               </span>
             </div>
@@ -409,7 +406,7 @@ export default function SkillGapExplorer({
               className="w-full bg-neutral-950/80 text-neutral-100 text-xs pl-8 pr-8 py-2.5 rounded-xl border border-neutral-700/80 focus:outline-none focus:border-amber-500 cursor-pointer transition-colors shadow-inner"
             >
               {loadingRoles ? (
-                <option>Loading canonical roles...</option>
+                <option>Loading career tracks...</option>
               ) : (
                 roles.map((r) => (
                   <option key={r.role_id} value={r.role_id}>
@@ -496,7 +493,7 @@ export default function SkillGapExplorer({
                     Market / Role Preview • {selectedRole?.title || "Selected Role"}
                   </h3>
                   <p className="text-[11px] text-neutral-500">
-                    Canonical competencies demanded in industry (Location: India) • Pure Market Data
+                    Standard industry competencies demanded (Location: India) • Pure Market Data
                   </p>
                 </div>
               </div>
@@ -519,7 +516,7 @@ export default function SkillGapExplorer({
                   {marketMeta?.total_demanded_skills ?? marketSkills.length}
                 </div>
                 <div className="text-[10px] text-neutral-500 mt-1">
-                  Canonical skills demanded
+                  Skills demanded
                 </div>
               </div>
 
@@ -731,7 +728,7 @@ export default function SkillGapExplorer({
                     {summary.strong_count}
                   </div>
                   <div className="text-[10px] text-neutral-500 mt-1">
-                    GitHub code proof (&ge;85%)
+                    Verified repository evidence (&ge;85%)
                   </div>
                 </div>
 
@@ -967,7 +964,7 @@ export default function SkillGapExplorer({
                     <th className="py-3 px-3 text-center">Gap Status</th>
                     <th className="py-3 px-3 text-right">Market Demand</th>
                     <th className="py-3 px-3 text-right">YoY Growth</th>
-                    <th className="py-3 px-4">Deterministic Explanation</th>
+                    <th className="py-3 px-4">Priority Explanation</th>
                     <th className="py-3 px-4 text-center">Audit Evidence</th>
                   </tr>
                 </thead>
@@ -1185,7 +1182,7 @@ export default function SkillGapExplorer({
                     )}
                   </div>
                   <p className="text-[11px] text-neutral-400 mt-0.5 font-mono">
-                    Deterministic Audit Trail &bull; Scoring Version {evidenceData?.reasoning.scoring_version || "v1"}
+                    Evidence Audit Trail &bull; Model {evidenceData?.reasoning.scoring_version || "v1"}
                   </p>
                 </div>
               </div>
@@ -1337,7 +1334,7 @@ export default function SkillGapExplorer({
                         <span>Market Evidence (Target Role Requirements)</span>
                       </h4>
                       <span className="text-[11px] font-mono text-neutral-500">
-                        Canonical industry demand
+                        Industry demand benchmark
                       </span>
                     </div>
 
@@ -1386,8 +1383,8 @@ export default function SkillGapExplorer({
                       <p className="text-xs text-neutral-200 leading-relaxed font-mono">
                         {evidenceData.reasoning.priority_reason}
                       </p>
-                      <div className="text-[10px] text-neutral-500 font-mono pt-1">
-                        Formula: severity_weight &times; (0.70 &times; demand_score + 0.30 &times; growth_signal)
+                      <div className="text-[10px] text-neutral-400 font-mono pt-1">
+                        Priority Calculation: Skill gap severity &times; (70% Market Demand + 30% Growth Trend)
                       </div>
                     </div>
                   )}
@@ -1397,9 +1394,9 @@ export default function SkillGapExplorer({
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-neutral-800 bg-neutral-900/95 flex items-center justify-between">
-              <div className="text-[11px] text-neutral-500 font-mono hidden sm:flex items-center gap-1.5">
+              <div className="text-[11px] text-neutral-400 font-mono hidden sm:flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Audited via Deterministic Evidence Chain</span>
+                <span>Audited via Multi-Source Evidence Chain</span>
               </div>
               <button
                 onClick={handleCloseEvidence}
@@ -1419,11 +1416,11 @@ export default function SkillGapExplorer({
         <span className="flex items-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
           <span>
-            <strong>Deterministic Guarantee:</strong> Prioritization formula: <code className="text-neutral-300 font-mono bg-neutral-950 px-1.5 py-0.5 rounded border border-neutral-800">severity &times; (0.70 &times; demand + 0.30 &times; growth_signal)</code>. Scoring version: <code className="text-neutral-300 font-mono">v1</code>.
+            <strong>Evidence-Based Prioritization:</strong> Priority is calculated from skill-gap severity, market demand (70%), and industry growth signals (30%).
           </span>
         </span>
-        <span className="font-mono text-[10px] text-neutral-600">
-          No LLMs are used for evidence analysis, gap classification, or priority ranking.
+        <span className="font-mono text-[10px] text-neutral-500">
+          Evaluated deterministically from verified resume, repository, and job market records.
         </span>
       </div>
     </div>

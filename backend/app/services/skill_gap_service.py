@@ -11,6 +11,31 @@ from app.schemas.skill_gap import (
     PrioritizedGapItem,
     PrioritizedGapsSummary,
 )
+from app.services.demonstrated_skill_service import (
+    is_repo_owned_by_user,
+    aggregate_repository_scores,
+    compute_evidence_level,
+)
+
+
+class CandidateDemonstratedSkill:
+    """Lightweight candidate-scoped projection of a DemonstratedSkill."""
+    def __init__(
+        self,
+        skill_id: uuid.UUID,
+        confidence_score: float,
+        evidence_level: str,
+        evidence_count: int,
+        repository_count: int,
+        skill_metadata: Optional[Dict[str, Any]] = None,
+    ):
+        self.skill_id = skill_id
+        self.confidence_score = confidence_score
+        self.evidence_level = evidence_level
+        self.evidence_count = evidence_count
+        self.repository_count = repository_count
+        self.skill_metadata = skill_metadata or {}
+
 
 # Named constant adhering to demonstrated_skill_service.compute_evidence_level HIGH tier
 STRONG_DEMONSTRATED_THRESHOLD = 0.85
@@ -247,20 +272,34 @@ class SkillGapService:
             all_demos = demo_query.all()
             if github_username and github_username.strip():
                 clean_handle = github_username.strip().lstrip("@").lower()
-                filtered_demos = []
+                demonstrated_map = {}
                 for ds in all_demos:
                     repos = (ds.skill_metadata or {}).get("repositories", [])
-                    if not repos:
-                        filtered_demos.append(ds)
-                    elif any(
-                        (r.get("repo_name", "").lower().startswith(f"{clean_handle}/") or
-                         f"/{clean_handle}/" in r.get("repo_name", "").lower() or
-                         clean_handle in r.get("repo_name", "").lower() or
-                         r.get("owner", "").lower() == clean_handle)
-                        for r in repos
-                    ):
-                        filtered_demos.append(ds)
-                demonstrated_map = {ds.skill_id: ds for ds in filtered_demos}
+                    matching_repos = [r for r in repos if is_repo_owned_by_user(r, clean_handle)]
+                    if matching_repos:
+                        repo_scores = []
+                        for r in matching_repos:
+                            s = r.get("max_confidence")
+                            if s is None:
+                                s = r.get("confidence_score")
+                            if s is None:
+                                s = ds.confidence_score
+                            repo_scores.append(float(s) if s is not None else 0.0)
+                        cand_score = aggregate_repository_scores(repo_scores)
+                        cand_level = compute_evidence_level(cand_score)
+                        cand_ev_count = sum(r.get("evidence_count", 1) for r in matching_repos)
+                        cand_repo_count = len(matching_repos)
+                        demonstrated_map[ds.skill_id] = CandidateDemonstratedSkill(
+                            skill_id=ds.skill_id,
+                            confidence_score=cand_score,
+                            evidence_level=cand_level,
+                            evidence_count=cand_ev_count,
+                            repository_count=cand_repo_count,
+                            skill_metadata={
+                                "repositories": matching_repos,
+                                "evidence_types": (ds.skill_metadata or {}).get("evidence_types", []),
+                            },
+                        )
             else:
                 demonstrated_map = {ds.skill_id: ds for ds in all_demos}
 

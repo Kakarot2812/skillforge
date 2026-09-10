@@ -99,6 +99,9 @@ def test_single_repo_multiple_evidence_no_inflation():
     finally:
         db.delete(repo)
         db.commit()
+        demonstrated_skill_service.recompute_demonstrated_skill(
+            db=db, skill_id=fastapi_skill.id, user_id=None
+        )
         db.close()
 
 
@@ -166,6 +169,9 @@ def test_multi_repository_independent_confirmation():
         db.delete(r1)
         db.delete(r2)
         db.commit()
+        demonstrated_skill_service.recompute_demonstrated_skill(
+            db=db, skill_id=docker_skill.id, user_id=None
+        )
         db.close()
 
 

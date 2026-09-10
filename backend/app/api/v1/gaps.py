@@ -361,6 +361,9 @@ def analyze_skill_gaps(
             role_id=payload.target_role_id,
             user_id=effective_user_id,
             location=clean_location,
+            include_resume=payload.include_resume,
+            include_github=payload.include_github,
+            github_username=payload.username,
             resume_id=payload.resume_id,
         )
     except KeyError as e:

@@ -303,7 +303,55 @@ The real-time capability comes from **continuously ingesting updated market data
   - Employs PostgreSQL-native `ON CONFLICT (source, skill_id) DO UPDATE`.
   - Purges stale records (`reconcile=True`) if skills are no longer demanded in current jobs.
 - **Strict MVP Isolation**: The frozen 49-record MVP `skill_demand` table, `job_roles`, candidate skill-gaps, and priority calculations are **NOT** modified or connected to live demand at this stage.
-- **Deferred to P1-F**: Historical time-series comparisons, growth rate calculations, and 24-hour automated refresh are deferred to Checkpoint P1-F.
+
+### Checkpoint P1-F Status: Historical Market Demand Growth + Deterministic 24-Hour Refresh
+- **Core Principle**: *"The LLM never decides what is true."* 100% deterministic mathematical calculations with zero LLMs, Qwen, embeddings, vector similarity, or semantic inference.
+- **Historical Snapshot Semantics (`market_skill_demand_snapshots`)**:
+  - Implemented via migration `0015_market_skill_demand_snapshots.py`.
+  - Captures immutable point-in-time snapshots of live `market_skill_demand` metrics per source (`source, skill_id, snapshot_at`).
+  - Strict immutability: snapshots are never mutated, updated, or deleted by normal operations.
+  - Submitting an identical snapshot at the same timestamp is idempotent (`inserted=0, unchanged=N`).
+  - Submitting conflicting snapshot values for an existing `(source, skill_id, snapshot_at)` raises `MarketDemandSnapshotConflictError` to safeguard historical truth.
+- **Deterministic Growth Formula (`market_skill_demand_growth`)**:
+  $$\text{growth\_rate} = \frac{\text{current\_demand\_score} - \text{previous\_demand\_score}}{\text{previous\_demand\_score}} \quad (\text{rounded to 4 decimal places})$$
+- **Zero-Base Emergence Rule**:
+  - If $\text{previous\_demand\_score} = 0.0$ and $\text{current\_demand\_score} > 0.0 \implies \text{growth\_rate} = 1.0$ (+100% emergence).
+  - If $\text{previous\_demand\_score} = 0.0$ and $\text{current\_demand\_score} = 0.0 \implies \text{growth\_rate} = 0.0$ (stable baseline).
+  - If $\text{previous\_demand\_score} > 0.0$, standard division formula applies. Division by zero is strictly guarded.
+- **Deterministic Growth Classification Thresholds**:
+  - `growth_rate > 0.05` $\implies$ `RISING` (e.g., `0.06`, `0.05001`)
+  - `-0.05 <= growth_rate <= 0.05` $\implies$ `STABLE` (e.g., `0.05`, `0.00`, `-0.05`)
+  - `growth_rate < -0.05` $\implies$ `DECLINING` (e.g., `-0.05001`, `-0.06`)
+- **Comparison Constraints**:
+  - Growth strictly compares the **CURRENT snapshot** against the **IMMEDIATELY PRECEDING snapshot** for the **SAME source** and **SAME canonical skill ID**.
+  - Cross-source comparison is strictly prohibited.
+  - If no previous snapshot exists for a skill or system, growth is not fabricated: `previous_snapshot_id = None`, `previous_demand_score = 0.0`, `growth_rate = 0.0`, `growth_class = 'STABLE'`.
+- **Callable 24-Hour Refresh Orchestration (`refresh_market_demand`)**:
+  - Executable by external infrastructure (crons, workers). No infinite loops (`while True: sleep(86400)`).
+  - **24-Hour Refresh Policy**: If `force=False` and the latest snapshot for the source is $< 24$ hours old, refresh skips execution immediately without making network calls.
+  - **Strict Refresh Ordering**:
+    1. Check 24-hour policy against latest snapshot.
+    2. Skip if within 24 hours (unless `force=True`).
+    3. Ingest raw postings via `AdzunaIngestionService` (P1-B).
+    4. Clean, validate, and deduplicate postings (P1-B).
+    5. Persist jobs via `MarketJobRepository` (P1-C).
+    6. Extract canonical skills via `MarketSkillExtractionService` (P1-D).
+    7. Aggregate demand via `MarketDemandAggregator` (P1-E).
+    8. Capture immutable snapshot via `MarketDemandSnapshotService` (P1-F).
+    9. Calculate pairwise growth via `MarketDemandGrowthService` (P1-F).
+    10. Materialize latest growth in `market_skill_demand_growth` (P1-F).
+    11. Return operational audit metrics (`MarketDemandRefreshResult`).
+- **Atomic Failure Safety & Last-Known-Good Preservation**:
+  - If upstream API fetching or network errors occur, transaction rolls back immediately; previous market jobs, demand records, historical snapshots, and growth remain completely intact.
+  - If later extraction, aggregation, or calculation stages fail, database session rolls back to preserve the last known-good state.
+  - Historical snapshots are never deleted as part of failure handling.
+  - Audit metrics and logs strictly redact and omit API keys, tokens, and authorization headers.
+- **Strict MVP Isolation**:
+  - The baseline MVP `skill_demand` table remains frozen at exactly 49 records.
+  - Existing MVP demand scores, sample sizes, and growth rates are unaltered.
+  - Candidate `skill_gaps` and candidate readiness priorities are not connected to live market demand at this stage.
+- **Important System Clarification**:
+  > **"Historical market-demand data is not automatically real-time."** Market demand and growth reflect discrete historical sampling windows governed by scheduled 24-hour ingestion batches.
 
 ---
 

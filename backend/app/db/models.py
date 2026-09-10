@@ -456,3 +456,81 @@ class MarketSkillDemand(Base):
     def __repr__(self) -> str:
         return f"<MarketSkillDemand source={self.source} skill={self.skill_id} jobs={self.job_count}/{self.sample_size} score={self.demand_score}>"
 
+
+class MarketSkillDemandSnapshot(Base):
+    """
+    Immutable historical snapshot of aggregated market demand for a canonical skill.
+    Post-MVP Phase 1, Checkpoint P1-F.
+
+    Captures the demand state at an exact snapshot timestamp:
+    - job_count: Unique jobs demanding the skill at snapshot time.
+    - sample_size: Total jobs evaluated at snapshot time.
+    - demand_share: Unrounded proportion (job_count / sample_size).
+    - demand_score: Normalized demand score in [0.0, 1.0].
+    - snapshot_at: Historical timestamp of this snapshot observation.
+
+    Strictly immutable once written; historical records are never overwritten.
+    """
+    __tablename__ = "market_skill_demand_snapshots"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(64), nullable=False, default="adzuna", index=True)
+    job_count = Column(Integer, nullable=False)
+    sample_size = Column(Integer, nullable=False)
+    demand_share = Column(Float, nullable=False)
+    demand_score = Column(Float, nullable=False)
+    snapshot_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("source", "skill_id", "snapshot_at", name="uq_market_skill_demand_snapshots_source_skill_time"),
+        CheckConstraint("demand_score >= 0.0 AND demand_score <= 1.0", name="chk_market_skill_demand_snapshots_score_range"),
+        CheckConstraint("demand_share >= 0.0 AND demand_share <= 1.0", name="chk_market_skill_demand_snapshots_share_range"),
+        CheckConstraint("job_count >= 0", name="chk_market_skill_demand_snapshots_job_count_non_negative"),
+        CheckConstraint("sample_size >= 0", name="chk_market_skill_demand_snapshots_sample_size_non_negative"),
+    )
+
+    skill = relationship("Skill")
+
+    def __repr__(self) -> str:
+        return f"<MarketSkillDemandSnapshot source={self.source} skill={self.skill_id} at={self.snapshot_at} score={self.demand_score}>"
+
+
+class MarketSkillDemandGrowth(Base):
+    """
+    Materialized latest growth comparison between the current and immediately preceding snapshot.
+    Post-MVP Phase 1, Checkpoint P1-F.
+
+    Represents the live growth state for a canonical skill within a source scope:
+    - previous_snapshot_id: Preceding snapshot reference (or NULL if first snapshot).
+    - current_snapshot_id: Latest snapshot reference.
+    - previous_demand_score: Score from preceding snapshot (or 0.0).
+    - current_demand_score: Score from latest snapshot.
+    - growth_rate: Deterministic rate of change.
+    - growth_class: Deterministic classification ('RISING', 'STABLE', 'DECLINING').
+    - computed_at: Timestamp when growth was evaluated.
+    """
+    __tablename__ = "market_skill_demand_growth"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(64), nullable=False, default="adzuna", index=True)
+    previous_snapshot_id = Column(UUID(as_uuid=True), ForeignKey("market_skill_demand_snapshots.id", ondelete="SET NULL"), nullable=True)
+    current_snapshot_id = Column(UUID(as_uuid=True), ForeignKey("market_skill_demand_snapshots.id", ondelete="CASCADE"), nullable=False)
+    previous_demand_score = Column(Float, nullable=False)
+    current_demand_score = Column(Float, nullable=False)
+    growth_rate = Column(Float, nullable=False)
+    growth_class = Column(String(16), nullable=False, index=True)
+    computed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("source", "skill_id", name="uq_market_skill_demand_growth_source_skill"),
+    )
+
+    skill = relationship("Skill")
+    previous_snapshot = relationship("MarketSkillDemandSnapshot", foreign_keys=[previous_snapshot_id])
+    current_snapshot = relationship("MarketSkillDemandSnapshot", foreign_keys=[current_snapshot_id])
+
+    def __repr__(self) -> str:
+        return f"<MarketSkillDemandGrowth source={self.source} skill={self.skill_id} rate={self.growth_rate} class={self.growth_class}>"

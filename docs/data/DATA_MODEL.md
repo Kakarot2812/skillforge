@@ -612,7 +612,75 @@ Stores live computed market-demand snapshots aggregated deterministically from p
   Both are bounded in $[0.0, 1.0]$ and guarded against division by zero.
 - **Natural Key & Recomputation**: `(source, skill_id)` uniquely identifies a skill demand record within a provider snapshot. Recomputation replaces/upserts snapshot records idempotently.
 - **Reconciliation**: Skills no longer demanded in the current snapshot are automatically purged (`reconcile=True`).
-- **Scope Boundary**: Strictly isolated from the 49-record MVP `skill_demand` table; historical growth rate calculation and 24-hour automated refresh are deferred to Checkpoint P1-F.
+- **Scope Boundary**: Strictly isolated from the 49-record MVP `skill_demand` table; historical growth rate calculation and 24-hour automated refresh are implemented in Checkpoint P1-F.
+
+#### Checkpoint P1-F Implemented Tables: `market_skill_demand_snapshots` & `market_skill_demand_growth`
+Provides the immutable historical snapshot layer and current materialized growth engine on top of P1-E demand aggregation.
+
+##### 1. Table: `market_skill_demand_snapshots`
+Stores immutable, point-in-time snapshots of computed market skill demand metrics.
+
+- **Table Name**: `market_skill_demand_snapshots`
+- **Participation**: Historical snapshot layer capturing point-in-time market demand metrics.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE market_skill_demand_snapshots (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      source VARCHAR(64) NOT NULL DEFAULT 'adzuna',
+      job_count INTEGER NOT NULL,
+      sample_size INTEGER NOT NULL,
+      demand_share FLOAT NOT NULL,
+      demand_score FLOAT NOT NULL,
+      snapshot_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_market_skill_demand_snapshots_source_skill_time UNIQUE (source, skill_id, snapshot_at),
+      CONSTRAINT chk_market_skill_demand_snapshots_score_range CHECK (demand_score >= 0.0 AND demand_score <= 1.0),
+      CONSTRAINT chk_market_skill_demand_snapshots_share_range CHECK (demand_share >= 0.0 AND demand_share <= 1.0),
+      CONSTRAINT chk_market_skill_demand_snapshots_job_count_non_negative CHECK (job_count >= 0),
+      CONSTRAINT chk_market_skill_demand_snapshots_sample_size_non_negative CHECK (sample_size >= 0)
+  );
+  CREATE INDEX ix_market_skill_demand_snapshots_skill_id ON market_skill_demand_snapshots(skill_id);
+  CREATE INDEX ix_market_skill_demand_snapshots_source ON market_skill_demand_snapshots(source);
+  CREATE INDEX ix_market_skill_demand_snapshots_snapshot_at ON market_skill_demand_snapshots(snapshot_at);
+  CREATE INDEX ix_market_skill_demand_snapshots_source_time ON market_skill_demand_snapshots(source, snapshot_at);
+  ```
+- **Natural Identity**: `(source, skill_id, snapshot_at)` uniquely identifies a historical demand snapshot row.
+- **Immutability & Idempotency**: Snapshots are strictly immutable. Submitting an identical snapshot at the same timestamp is idempotent (`inserted=0, unchanged=N`); conflicting data submissions for an existing timestamp are rejected (`MarketDemandSnapshotConflictError`).
+- **Source Isolation**: Preserves provider provenance via `source` (e.g. `'adzuna'`).
+- **Foreign Keys**: `skill_id` references canonical `skills(id)` with cascade deletion.
+
+##### 2. Table: `market_skill_demand_growth`
+Stores the current materialized growth rate and trend classification between comparable historical snapshots.
+
+- **Table Name**: `market_skill_demand_growth`
+- **Participation**: Current materialized growth intelligence comparing the latest snapshot to the immediately preceding snapshot.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE market_skill_demand_growth (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      source VARCHAR(64) NOT NULL DEFAULT 'adzuna',
+      previous_snapshot_id UUID REFERENCES market_skill_demand_snapshots(id) ON DELETE SET NULL,
+      current_snapshot_id UUID NOT NULL REFERENCES market_skill_demand_snapshots(id) ON DELETE CASCADE,
+      previous_demand_score FLOAT NOT NULL,
+      current_demand_score FLOAT NOT NULL,
+      growth_rate FLOAT NOT NULL,
+      growth_class VARCHAR(16) NOT NULL,
+      computed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_market_skill_demand_growth_source_skill UNIQUE (source, skill_id)
+  );
+  CREATE INDEX ix_market_skill_demand_growth_skill_id ON market_skill_demand_growth(skill_id);
+  CREATE INDEX ix_market_skill_demand_growth_source ON market_skill_demand_growth(source);
+  CREATE INDEX ix_market_skill_demand_growth_growth_class ON market_skill_demand_growth(growth_class);
+  ```
+- **Natural Key & Materialization**: `(source, skill_id)` uniquely identifies the current growth state for a canonical skill within a data source. The growth table updates as newer snapshots arrive.
+- **Auditability**: References `previous_snapshot_id` and `current_snapshot_id` to ensure growth calculations are fully reproducible and auditable.
+- **Deterministic Classification**: `growth_class` is classified strictly by `growth_rate`:
+  - `growth_rate > 0.05` $\rightarrow$ `'RISING'`
+  - `-0.05 <= growth_rate <= 0.05` $\rightarrow$ `'STABLE'`
+  - `growth_rate < -0.05` $\rightarrow$ `'DECLINING'`
+- **Strict Scope Boundary**: Completely isolated from the frozen MVP `skill_demand` table (strictly 49 rows), `job_roles`, candidate `skill_gaps`, and candidate readiness priorities.
 
 ### P2 & P3 — Local Qwen 3 8B AI Layer & Chatbot Concepts
 - **Retrieved Evidence Context**: Snapshots of verified candidate facts and market metrics passed into the local LLM prompt.

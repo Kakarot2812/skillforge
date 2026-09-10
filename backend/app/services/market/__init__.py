@@ -3,7 +3,13 @@ Market intelligence services for SkillForge AI.
 Post-MVP Phase 1 (P1) market integration foundation.
 """
 
-from app.db.models import MarketJob, MarketJobSkill, MarketSkillDemand
+from app.db.models import (
+    MarketJob,
+    MarketJobSkill,
+    MarketSkillDemand,
+    MarketSkillDemandGrowth,
+    MarketSkillDemandSnapshot,
+)
 from app.services.market.cleaning import (
     clean_adzuna_job,
     clean_multiline_text,
@@ -21,9 +27,18 @@ from app.services.market.clients.adzuna_client import (
 )
 from app.services.market.demand import (
     MarketDemandAggregator,
+    MarketDemandGrowthService,
+    MarketDemandRefreshService,
+    MarketDemandSnapshotConflictError,
+    MarketDemandSnapshotService,
+    MarketSkillDemandGrowthRepository,
     MarketSkillDemandRepository,
+    MarketSkillDemandSnapshotRepository,
     aggregate_market_demand,
     calculate_demand_metrics,
+    calculate_growth_rate,
+    classify_growth_rate,
+    refresh_market_demand,
 )
 from app.services.market.extraction import (
     DeterministicSkillMatcher,
@@ -40,6 +55,9 @@ from app.services.market.ingestion.adzuna_ingestion import (
 from app.services.market.models import (
     AdzunaIngestionResult,
     MarketDemandAggregationMetrics,
+    MarketDemandGrowthRecord,
+    MarketDemandRefreshResult,
+    MarketDemandSnapshotRecord,
     MarketJobSkillEvidence,
     MarketSkillDemandRecord,
     MarketSkillExtractionMetrics,
@@ -98,5 +116,19 @@ __all__ = [
     "MarketDemandAggregator",
     "aggregate_market_demand",
     "calculate_demand_metrics",
+    # Historical Snapshots & Growth (P1-F)
+    "MarketSkillDemandSnapshot",
+    "MarketSkillDemandGrowth",
+    "MarketDemandSnapshotRecord",
+    "MarketDemandGrowthRecord",
+    "MarketDemandRefreshResult",
+    "MarketDemandSnapshotConflictError",
+    "MarketDemandSnapshotService",
+    "MarketSkillDemandSnapshotRepository",
+    "MarketDemandGrowthService",
+    "MarketSkillDemandGrowthRepository",
+    "calculate_growth_rate",
+    "classify_growth_rate",
+    "MarketDemandRefreshService",
+    "refresh_market_demand",
 ]
-

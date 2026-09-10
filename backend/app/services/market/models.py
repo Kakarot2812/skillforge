@@ -247,3 +247,142 @@ class MarketDemandAggregationMetrics:
             "computed_at": self.computed_at.isoformat() if self.computed_at else None,
         }
 
+
+@dataclass
+class MarketDemandSnapshotRecord:
+    """
+    Normalized representation of a historical market demand snapshot.
+    Post-MVP Phase 1, Checkpoint P1-F.
+
+    Captures an immutable point-in-time record of demand metrics for a canonical skill:
+    - id: Unique snapshot record identifier (UUID)
+    - skill_id: Canonical UUID from skills table
+    - canonical_skill_name: Canonical skill name
+    - source: Data provider identifier (default 'adzuna')
+    - job_count: Unique jobs demanding the skill at snapshot time
+    - sample_size: Total jobs in market sample at snapshot time
+    - demand_share: Raw proportion (job_count / sample_size)
+    - demand_score: Clamped normalized score in [0.0, 1.0]
+    - snapshot_at: Timestamp representing the point-in-time snapshot
+    - created_at: Timestamp when record was persisted
+    """
+
+    skill_id: Any
+    canonical_skill_name: Optional[str] = None
+    source: str = "adzuna"
+    job_count: int = 0
+    sample_size: int = 0
+    demand_share: float = 0.0
+    demand_score: float = 0.0
+    snapshot_at: Optional[Any] = None
+    created_at: Optional[Any] = None
+    id: Optional[Any] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": str(self.id) if self.id else None,
+            "skill_id": str(self.skill_id),
+            "canonical_skill_name": self.canonical_skill_name,
+            "source": self.source,
+            "job_count": self.job_count,
+            "sample_size": self.sample_size,
+            "demand_share": self.demand_share,
+            "demand_score": self.demand_score,
+            "snapshot_at": self.snapshot_at.isoformat() if hasattr(self.snapshot_at, "isoformat") and self.snapshot_at else str(self.snapshot_at) if self.snapshot_at else None,
+            "created_at": self.created_at.isoformat() if hasattr(self.created_at, "isoformat") and self.created_at else str(self.created_at) if self.created_at else None,
+        }
+
+
+@dataclass
+class MarketDemandGrowthRecord:
+    """
+    Normalized representation of a computed growth metric between two snapshots.
+    Post-MVP Phase 1, Checkpoint P1-F.
+
+    - id: Unique growth record identifier (UUID)
+    - skill_id: Canonical UUID from skills table
+    - canonical_skill_name: Canonical skill name
+    - source: Data provider identifier (default 'adzuna')
+    - previous_snapshot_id: UUID of immediately preceding snapshot (or None if first snapshot)
+    - current_snapshot_id: UUID of current snapshot
+    - previous_demand_score: Demand score from preceding snapshot (or 0.0)
+    - current_demand_score: Demand score from current snapshot
+    - growth_rate: Deterministically computed growth rate rounded to 4 decimals
+    - growth_class: Deterministic classification ('RISING', 'STABLE', 'DECLINING')
+    - computed_at: Timestamp when growth was calculated
+    """
+
+    skill_id: Any
+    current_snapshot_id: Any
+    canonical_skill_name: Optional[str] = None
+    source: str = "adzuna"
+    previous_snapshot_id: Optional[Any] = None
+    previous_demand_score: float = 0.0
+    current_demand_score: float = 0.0
+    growth_rate: float = 0.0
+    growth_class: str = "STABLE"
+    computed_at: Optional[Any] = None
+    id: Optional[Any] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": str(self.id) if self.id else None,
+            "skill_id": str(self.skill_id),
+            "canonical_skill_name": self.canonical_skill_name,
+            "source": self.source,
+            "previous_snapshot_id": str(self.previous_snapshot_id) if self.previous_snapshot_id else None,
+            "current_snapshot_id": str(self.current_snapshot_id),
+            "previous_demand_score": self.previous_demand_score,
+            "current_demand_score": self.current_demand_score,
+            "growth_rate": self.growth_rate,
+            "growth_class": self.growth_class,
+            "computed_at": self.computed_at.isoformat() if hasattr(self.computed_at, "isoformat") and self.computed_at else str(self.computed_at) if self.computed_at else None,
+        }
+
+
+@dataclass
+class MarketDemandRefreshResult:
+    """
+    Audit metrics and operational summary for a 24-hour market demand refresh run.
+    Post-MVP Phase 1, Checkpoint P1-F.
+    Guaranteed free of credentials, API keys, tokens, or authorization headers.
+    """
+
+    source: str = "adzuna"
+    refreshed: bool = False
+    reason: str = "completed"
+    started_at: Optional[Any] = None
+    completed_at: Optional[Any] = None
+    snapshot_at: Optional[Any] = None
+    last_snapshot_at: Optional[Any] = None
+    jobs_ingested: int = 0
+    jobs_persisted: int = 0
+    skills_extracted: int = 0
+    demand_records_aggregated: int = 0
+    snapshot_records_created: int = 0
+    growth_records_computed: int = 0
+    growth_breakdown: Dict[str, int] = field(default_factory=dict)
+    error: Optional[str] = None
+
+    def to_summary_dict(self) -> Dict[str, Any]:
+        """Returns safe summary audit dictionary without credentials or headers."""
+        return {
+            "source": self.source,
+            "refreshed": self.refreshed,
+            "reason": self.reason,
+            "started_at": self.started_at.isoformat() if hasattr(self.started_at, "isoformat") and self.started_at else str(self.started_at) if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if hasattr(self.completed_at, "isoformat") and self.completed_at else str(self.completed_at) if self.completed_at else None,
+            "snapshot_at": self.snapshot_at.isoformat() if hasattr(self.snapshot_at, "isoformat") and self.snapshot_at else str(self.snapshot_at) if self.snapshot_at else None,
+            "last_snapshot_at": self.last_snapshot_at.isoformat() if hasattr(self.last_snapshot_at, "isoformat") and self.last_snapshot_at else str(self.last_snapshot_at) if self.last_snapshot_at else None,
+            "metrics": {
+                "jobs_ingested": self.jobs_ingested,
+                "jobs_persisted": self.jobs_persisted,
+                "skills_extracted": self.skills_extracted,
+                "demand_records_aggregated": self.demand_records_aggregated,
+                "snapshot_records_created": self.snapshot_records_created,
+                "growth_records_computed": self.growth_records_computed,
+            },
+            "growth_breakdown": dict(self.growth_breakdown),
+            "error": self.error,
+        }
+

@@ -192,14 +192,38 @@ The taxonomy itself does **not** assign gap classifications (`STRONG`, `PARTIAL`
 
 ---
 
-# Part 2: Post-MVP Planned Evolution
+# Part 2: Post-MVP Foundation Progress & Planned Evolution
 
 > [!NOTE]
-> All capabilities, models, and graph structures in Part 2 are **PLANNED FOR POST-MVP EVOLUTION** on the `post-mvp-foundation` branch. They are not implemented in the frozen `v1.0.0-mvp` release.
+> Post-MVP Phase 1 (P1) is currently under active development on the `post-mvp-foundation` branch.
+> Checkpoints P1-A, P1-B, P1-C, and P1-D are implemented. The frozen `v1.0.0-mvp` baseline remains intact.
 
 ---
 
-## 9. Planned Semantic Normalization Pipeline
+## 9. Checkpoint P1-D Implemented: Deterministic Market Skill Extraction
+
+Checkpoint P1-D implements the first persistent market-data skill extraction pipeline (`backend/app/services/market/extraction/`).
+
+### Core Principles
+- **"The LLM Never Decides What is True"**: P1-D uses strictly deterministic taxonomy matching; no LLMs, Qwen, embeddings, vector similarity, or semantic model inference are used.
+- **Single Canonical Taxonomy**: Reuses the exact canonical skills (`skills`) and aliases (`skill_aliases`) from the PostgreSQL database without introducing a second taxonomy or inventing aliases.
+- **Boundary Safety & False-Positive Prevention**:
+  - Uses token-boundary assertions `(?<![a-zA-Z0-9#+])` and `(?![a-zA-Z0-9#+])` that prevent false positives from sub-word matches (e.g., `"Go"` does not match `"good"`, `"algorithm"`, or `"going"`; `"C"` does not match in `"cloud"` or `"basic"`).
+  - Programming symbols (`C++`, `C#`) preserve trailing `+` and `#` symbols.
+  - Short skills like `"Go"` enforce strict case and word-boundary safety (`\bGo\b`, `\bGO\b`, `golang`, `go-lang`), rejecting the common English verb `"go"`.
+- **Longest-Match-First Overlap Resolution**: Multi-word and longer phrases (e.g. `"React Native"` vs `"React"`, `"Docker Compose"` vs `"Docker"`) are compiled and matched by length descending, claiming character spans and preventing nested duplicate extractions.
+- **Title vs Description Precedence**: Mentions in the job `title` are prioritized over `description` mentions for provenance, while description text is scanned for additional complementary skills.
+- **Per-Job Deduplication**: Exactly one relationship per canonical `skill_id` is created per market job posting.
+- **Verbatim Evidence**: Verbatim context snippets are extracted directly from the raw job posting text around match spans without LLM rewriting.
+- **Dedicated Persistence (`market_job_skills`)**:
+  - Relationships are persisted in `market_job_skills` table with unique constraint `(market_job_id, skill_id)`.
+  - Employs PostgreSQL-native `ON CONFLICT (market_job_id, skill_id) DO UPDATE` for idempotent persistence.
+  - Supports deterministic reconciliation to purge stale skills when job descriptions change.
+- **Scope Boundary**: P1-D produces verified `market_job_skills` evidence. Demand aggregation, growth rates, and demand score recalculation are strictly deferred to Checkpoint P1-E. The MVP `skill_demand` table remains untouched.
+
+---
+
+## 10. Planned Semantic Normalization Pipeline
 
 In future phases, the deterministic normalizer may be augmented with a semantic fallback layer for unmapped or novel industry technologies:
 

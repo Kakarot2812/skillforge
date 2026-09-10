@@ -344,4 +344,115 @@ class SkillGap(Base):
         return f"<SkillGap user={self.user_id} role={self.role_id} skill={self.skill_id} status={self.status}>"
 
 
+class MarketJob(Base):
+    """
+    Persistent representation of an ingested market job posting.
+    Post-MVP Phase 1, Checkpoint P1-C.
+
+    Stores normalized job postings ingested from external providers (e.g., Adzuna)
+    prior to downstream role classification and skill extraction.
+    Isolated from the MVP skill_demand table.
+    """
+    __tablename__ = "market_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source = Column(String(64), nullable=False, index=True)
+    external_job_id = Column(String(255), nullable=False)
+    title = Column(String(512), nullable=False)
+    description = Column(Text, nullable=True)
+    company_name = Column(String(255), nullable=True)
+    location = Column(String(255), nullable=True)
+    category = Column(String(128), nullable=True)
+    contract_type = Column(String(64), nullable=True)
+    contract_time = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    redirect_url = Column(String(1024), nullable=True)
+    raw_data = Column(JSONB, nullable=False, default=dict)
+    ingested_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_job_id", name="uq_market_jobs_source_external_job_id"),
+    )
+
+    extracted_skills = relationship("MarketJobSkill", back_populates="market_job", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<MarketJob {self.source}:{self.external_job_id} '{self.title}'>"
+
+
+class MarketJobSkill(Base):
+    """
+    Association between an ingested market job posting and an extracted canonical skill.
+    Post-MVP Phase 1, Checkpoint P1-D.
+
+    Records deterministic taxonomy matches, retaining evidence text snippets
+    and matched alias metadata for auditing and provenance.
+    """
+    __tablename__ = "market_job_skills"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    market_job_id = Column(UUID(as_uuid=True), ForeignKey("market_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    matched_alias = Column(String(128), nullable=False)
+    source_field = Column(String(32), nullable=False)  # 'title' or 'description'
+    evidence_text = Column(Text, nullable=True)
+    extraction_method = Column(String(64), nullable=False, default="deterministic_taxonomy_match")
+    confidence_score = Column(Float, nullable=False, default=1.0)
+    extracted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("market_job_id", "skill_id", name="uq_market_job_skills_job_skill"),
+    )
+
+    market_job = relationship("MarketJob", back_populates="extracted_skills")
+    skill = relationship("Skill")
+
+    def __repr__(self) -> str:
+        return f"<MarketJobSkill job={self.market_job_id} skill={self.skill_id} alias='{self.matched_alias}'>"
+
+
+class MarketSkillDemand(Base):
+    """
+    Computed market-demand snapshot aggregated from persisted market jobs and extracted skills.
+    Post-MVP Phase 1, Checkpoint P1-E.
+
+    Represents live demand computed empirically from current market jobs:
+    - job_count: Number of unique market jobs demanding the canonical skill.
+    - sample_size: Total number of market jobs in the analyzed source scope.
+    - demand_share: Raw ratio (job_count / sample_size).
+    - demand_score: Normalized demand score in [0.0, 1.0] mathematically compatible
+      with SkillForge demand intelligence.
+    - computed_at: Timestamp when this demand snapshot was aggregated.
+
+    Strictly isolated from frozen MVP skill_demand records.
+    """
+    __tablename__ = "market_skill_demand"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(64), nullable=False, default="adzuna", index=True)
+    job_count = Column(Integer, nullable=False, default=0)
+    sample_size = Column(Integer, nullable=False)
+    demand_share = Column(Float, nullable=False)
+    demand_score = Column(Float, nullable=False, index=True)
+    computed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("source", "skill_id", name="uq_market_skill_demand_source_skill"),
+        CheckConstraint("demand_score >= 0.0 AND demand_score <= 1.0", name="chk_market_skill_demand_score_range"),
+        CheckConstraint("demand_share >= 0.0 AND demand_share <= 1.0", name="chk_market_skill_demand_share_range"),
+        CheckConstraint("job_count >= 0", name="chk_market_skill_demand_job_count_non_negative"),
+        CheckConstraint("sample_size >= 0", name="chk_market_skill_demand_sample_size_non_negative"),
+    )
+
+    skill = relationship("Skill")
+
+    def __repr__(self) -> str:
+        return f"<MarketSkillDemand source={self.source} skill={self.skill_id} jobs={self.job_count}/{self.sample_size} score={self.demand_score}>"
 

@@ -514,11 +514,105 @@ In the frozen v1.0.0 MVP:
 The post-MVP roadmap introduces new capabilities that will eventually require dedicated data models:
 
 ### P1 — Real-Time Industry Demand Concepts
-- **Market Source**: Metadata representing external job market sources, licensing agreements, and feed endpoints.
-- **Ingestion Batch**: Audit records tracking ingestion runs, raw record counts, error logs, and execution timestamps.
-- **Normalized Market Posting**: Staging records for deduplicated, cleaned job postings with canonical role associations.
-- **Extracted Skill Signal**: Raw skill mentions and co-occurrences extracted from ingested job postings.
-- **Demand Calculation Run**: Versioned calculations linking refreshed `demand_score` values to specific ingestion batches.
+
+#### Checkpoint P1-C Implemented Table: `market_jobs`
+Stores normalized, deduplicated external job postings ingested from market data providers (Adzuna).
+
+- **Table Name**: `market_jobs`
+- **Participation**: Staging and provenance repository for raw/normalized market job postings before role classification or skill extraction.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE market_jobs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      source VARCHAR(64) NOT NULL,
+      external_job_id VARCHAR(255) NOT NULL,
+      title VARCHAR(512) NOT NULL,
+      description TEXT,
+      company_name VARCHAR(255),
+      location VARCHAR(255),
+      category VARCHAR(128),
+      contract_type VARCHAR(64),
+      contract_time VARCHAR(64),
+      created_at TIMESTAMPTZ,
+      redirect_url VARCHAR(1024),
+      raw_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      ingested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_market_jobs_source_external_job_id UNIQUE (source, external_job_id)
+  );
+  CREATE INDEX ix_market_jobs_source ON market_jobs(source);
+  CREATE INDEX ix_market_jobs_ingested_at ON market_jobs(ingested_at);
+  CREATE INDEX ix_market_jobs_created_at ON market_jobs(created_at);
+  ```
+- **Natural Identity & Uniqueness**: `(source, external_job_id)` is the unique constraint preventing cross-run and cross-query duplication.
+- **Idempotent Upsert**: PostgreSQL native `ON CONFLICT (source, external_job_id) DO UPDATE` with `COALESCE` ensuring non-destructive updates without overwriting existing data with empty values.
+- **Provenance & Lineage**: `raw_data` retains the complete provider payload (e.g. Adzuna JSON) for auditable extraction lineage without storing API secrets.
+- **Timestamps**: `created_at` records upstream provider posting time; `ingested_at` records local intake timestamp; `updated_at` records record modification timestamp.
+- **Scope Boundary**: Strictly isolated from the MVP `skill_demand` table; skill extraction and demand recalculation happen in subsequent post-MVP checkpoints.
+
+#### Checkpoint P1-D Implemented Table: `market_job_skills`
+Stores canonical skill evidence extracted deterministically from persisted market job text.
+
+- **Table Name**: `market_job_skills`
+- **Participation**: Relational evidence bridge associating raw market jobs (`market_jobs`) with canonical taxonomy skills (`skills`).
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE market_job_skills (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      market_job_id UUID NOT NULL REFERENCES market_jobs(id) ON DELETE CASCADE,
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      matched_alias VARCHAR(128) NOT NULL,
+      source_field VARCHAR(32) NOT NULL,
+      evidence_text TEXT,
+      extraction_method VARCHAR(64) NOT NULL DEFAULT 'deterministic_taxonomy_match',
+      confidence_score FLOAT NOT NULL DEFAULT 1.0,
+      extracted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_market_job_skills_job_skill UNIQUE (market_job_id, skill_id)
+  );
+  CREATE INDEX ix_market_job_skills_market_job_id ON market_job_skills(market_job_id);
+  CREATE INDEX ix_market_job_skills_skill_id ON market_job_skills(skill_id);
+  ```
+- **Natural Identity & Uniqueness**: `(market_job_id, skill_id)` ensures one market job receives at most one relationship per canonical skill.
+- **Idempotent Persistence & Reconciliation**: PostgreSQL-native `ON CONFLICT (market_job_id, skill_id) DO UPDATE` updates matched metadata if changes occur. If job text changes, stale skills no longer detected are purged deterministically.
+- **Provenance**: `matched_alias` records the exact taxonomy phrase/alias matched; `source_field` records whether extracted from `'title'` or `'description'`; `evidence_text` records the verbatim text context snippet.
+- **Foreign Keys**: Cascades deletion if a parent `market_job` or `skill` is removed.
+- **Scope Boundary**: Strictly isolated from MVP `skill_demand` records; demand metric aggregation and growth calculations are deferred to Checkpoint P1-E.
+
+#### Checkpoint P1-E Implemented Table: `market_skill_demand`
+Stores live computed market-demand snapshots aggregated deterministically from persisted market jobs and extracted skills.
+
+- **Table Name**: `market_skill_demand`
+- **Participation**: Live market-demand layer computed empirically from active `market_jobs` and `market_job_skills` records.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE market_skill_demand (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      source VARCHAR(64) NOT NULL DEFAULT 'adzuna',
+      job_count INTEGER NOT NULL DEFAULT 0,
+      sample_size INTEGER NOT NULL,
+      demand_share FLOAT NOT NULL,
+      demand_score FLOAT NOT NULL,
+      computed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_market_skill_demand_source_skill UNIQUE (source, skill_id),
+      CONSTRAINT chk_market_skill_demand_score_range CHECK (demand_score >= 0.0 AND demand_score <= 1.0),
+      CONSTRAINT chk_market_skill_demand_share_range CHECK (demand_share >= 0.0 AND demand_share <= 1.0),
+      CONSTRAINT chk_market_skill_demand_job_count_non_negative CHECK (job_count >= 0),
+      CONSTRAINT chk_market_skill_demand_sample_size_non_negative CHECK (sample_size >= 0)
+  );
+  CREATE INDEX ix_market_skill_demand_skill_id ON market_skill_demand(skill_id);
+  CREATE INDEX ix_market_skill_demand_source ON market_skill_demand(source);
+  CREATE INDEX ix_market_skill_demand_demand_score ON market_skill_demand(demand_score);
+  ```
+- **Aggregation Inputs**: `market_jobs` JOIN `market_job_skills` on `market_jobs.id = market_job_skills.market_job_id`.
+- **Unique-Job Counting Rule**: Uses SQL `COUNT(DISTINCT market_job_id)` per canonical skill; repeated mentions within a single job never inflate `job_count`.
+- **Demand Metric Formulas**:
+  $$\text{demand\_share} = \frac{\text{job\_count}}{\text{sample\_size}}$$
+  $$\text{demand\_score} = \text{round}(\text{demand\_share}, 4)$$
+  Both are bounded in $[0.0, 1.0]$ and guarded against division by zero.
+- **Natural Key & Recomputation**: `(source, skill_id)` uniquely identifies a skill demand record within a provider snapshot. Recomputation replaces/upserts snapshot records idempotently.
+- **Reconciliation**: Skills no longer demanded in the current snapshot are automatically purged (`reconcile=True`).
+- **Scope Boundary**: Strictly isolated from the 49-record MVP `skill_demand` table; historical growth rate calculation and 24-hour automated refresh are deferred to Checkpoint P1-F.
 
 ### P2 & P3 — Local Qwen 3 8B AI Layer & Chatbot Concepts
 - **Retrieved Evidence Context**: Snapshots of verified candidate facts and market metrics passed into the local LLM prompt.

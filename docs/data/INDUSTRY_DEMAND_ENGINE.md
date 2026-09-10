@@ -226,6 +226,85 @@ Skill Gap & Priority Engines
 
 The real-time capability comes from **continuously ingesting updated market data and recalculating deterministic demand metrics**, not from prompting an LLM.
 
+### Checkpoint P1-A Status: Adzuna Integration Foundation
+- **Adzuna API Client Foundation**: Implemented an isolated, secure client (`AdzunaClient`) supporting basic job-search requests with India-focused market parameterization (`country="in"`).
+
+### Checkpoint P1-B Status: Adzuna Ingestion + Cleaning & Deduplication
+- **Adzuna Ingestion Service (`AdzunaIngestionService`)**: Orchestrates multi-query market job ingestion on top of `AdzunaClient` without direct HTTP calls.
+- **Initial Supported Role Queries**:
+  1. `backend developer`
+  2. `full stack developer`
+  3. `frontend developer`
+  4. `devops engineer`
+  5. `machine learning engineer`
+  *(Target market: India `in`, with configurable page limits and results per page)*.
+- **Deterministic Cleaning & Normalization**:
+  - Trims and collapses inline whitespace across titles, company names, locations, categories, and contract types.
+  - Normalizes carriage returns and excessive vertical whitespace in job descriptions while preserving paragraph structure without LLM rewriting.
+  - Normalizes empty or whitespace-only optional fields to `None`.
+  - Discards malformed records lacking a usable `external_job_id` or `title`.
+  - Maps to in-memory `NormalizedMarketJob` data contract preserving raw upstream payload in `raw_data`.
+- **Deterministic Deduplication**:
+  - Primary deduplication key: `(source, external_job_id)`.
+  - Resolves cross-query and cross-page duplicates deterministically by retaining the first valid occurrence in ingestion sequence.
+  - Tracks audit metrics via `AdzunaIngestionResult` (`pages_fetched`, `raw_jobs_seen`, `valid_jobs`, `cleaned_jobs`, `duplicates_removed`, `final_jobs`).
+- **Scope Boundary**: Output in P1-B was strictly in-memory; database persistence is introduced in P1-C; skill extraction, canonical taxonomy mapping, and demand metric recalculation happen in subsequent checkpoints (P1-D+); 24-hour automated refresh and ATS connectors (Greenhouse/Lever/Ashby) remain unintegrated. The frozen v1.0.0 MVP baseline data and deterministic demand engine remain active and unaffected.
+
+### Checkpoint P1-C Status: Market Job PostgreSQL Persistence
+- **Dedicated Persistent Table (`market_jobs`)**: Created via Alembic migration `0012_market_jobs`. Strictly isolated from MVP `skill_demand`.
+- **Identity & Uniqueness**: Mandatory database-level unique constraint `uq_market_jobs_source_external_job_id` on `(source, external_job_id)` ensuring complete idempotency across repeated ingestion batches and cross-query overlap.
+- **PostgreSQL-Native Upsert (`MarketJobRepository`)**:
+  - Employs `INSERT INTO market_jobs ... ON CONFLICT (source, external_job_id) DO UPDATE SET ... WHERE ...`.
+  - Non-destructive `COALESCE` update strategy: incoming valid data updates existing records without overwriting useful fields with empty/null values.
+  - Returns granular audit metrics: `attempted`, `inserted`, `updated`, `unchanged`, and `failed`.
+- **Lineage & Provenance**: `raw_data` column (`JSONB`) preserves the complete provider response dictionary for downstream auditability without storing API credentials.
+- **Ingestion Pipeline Orchestration (`AdzunaMarketPipeline`)**: Thin orchestration layer bridging P1-B multi-query ingestion with P1-C PostgreSQL persistence, emitting `MarketPipelineResult`.
+- **Scope Boundary**: Persists raw/normalized market jobs only; skill extraction, canonical taxonomy mapping, and demand score recalculation are **NOT** part of P1-C (scheduled for P1-D+); 24-hour automated scheduler and ATS integrations (Greenhouse, Lever, Ashby) remain unintegrated. The frozen v1.0.0 MVP baseline data and deterministic demand engine remain active and unaffected.
+
+### Checkpoint P1-D Status: Deterministic Skill Extraction + Canonical Normalization
+- **Strictly Deterministic Extraction**: Adheres to the core principle: *"The LLM never decides what is true."* No LLM, embeddings, vector search, or semantic inference are used.
+- **Canonical Taxonomy Reuse**: Uses existing canonical `skills` and `skill_aliases` tables. No secondary taxonomy or unauthorized aliases are created.
+- **Boundary-Aware Matching (`DeterministicSkillMatcher`)**:
+  - Word boundary assertions `(?<![a-zA-Z0-9#+])` and `(?![a-zA-Z0-9#+])` prevent substring false positives (`"Go"` does not match `"good"` or `"algorithm"`; `"C"` does not match in `"cloud"` or `"basic"`).
+  - Short skills like `"Go"` enforce strict case and word-boundary rules (`\bGo\b`, `\bGO\b`, `golang`, `go-lang`), rejecting the English verb `"go"`.
+  - Multi-word and longer phrases are matched in descending order of length, preventing nested or overlapping duplicate matches (e.g. `"React Native"` vs `"React"`, `"Docker Compose"` vs `"Docker"`).
+- **Verbatim Evidence**: Extracts verbatim contextual snippet spans directly from raw job text snapped to word boundaries without LLM rewriting.
+- **Dedicated Persistent Table (`market_job_skills`)**: Created via Alembic migration `0013_market_job_skills`.
+  - Unique constraint `uq_market_job_skills_job_skill` on `(market_job_id, skill_id)` enforces at most one canonical relationship per job.
+  - Foreign keys with `ON DELETE CASCADE` to both `market_jobs` and `skills`.
+- **Idempotent Persistence & Reconciliation (`MarketJobSkillRepository`)**:
+  - PostgreSQL-native `ON CONFLICT (market_job_id, skill_id) DO UPDATE`.
+  - Automatic reconciliation purges stale extracted skills when job descriptions change.
+- **Batch Processing Orchestration (`MarketSkillExtractionService`)**:
+  - Controlled batch processing with configurable `batch_size` and `max_jobs`.
+  - Returns comprehensive audit metrics: `jobs_processed`, `jobs_with_skills`, `jobs_without_skills`, `skills_matched`, `unique_skill_relationships`, `persistence_inserts`, `persistence_updates`, `persistence_unchanged`, `persistence_deletions`, and `top_skills`.
+- **Scope Boundary**: Strictly isolated from the MVP `skill_demand` table; demand aggregation, growth rate calculation, and dynamic demand scores are **NOT** part of P1-D (scheduled for Checkpoint P1-E).
+
+### Checkpoint P1-E Status: Deterministic Market Demand Aggregation
+- **Strictly Deterministic Aggregation**: Adheres to the core SkillForge principle: *"The LLM never decides what is true."* Uses zero LLMs, Qwen, embeddings, vector similarity, or semantic model inference.
+- **Dedicated Persistent Snapshot Table (`market_skill_demand`)**: Created via Alembic migration `0014_market_skill_demand`.
+  - Primary Key: `id UUID DEFAULT gen_random_uuid()`
+  - Unique Constraint: `uq_market_skill_demand_source_skill` on `(source, skill_id)`.
+  - Foreign Key: `skill_id REFERENCES skills(id) ON DELETE CASCADE`.
+  - Check Constraints enforce $[0.0, 1.0]$ bounds for `demand_score` and `demand_share`, and non-negative integers for `job_count` and `sample_size`.
+- **Exact Aggregation Inputs**:
+  $$\text{market\_jobs} \bowtie \text{market\_job\_skills} \bowtie \text{skills}$$
+  Evaluates all market jobs matching the source scope (`source = 'adzuna'`).
+- **Unique-Job Counting Rule**:
+  $$\text{job\_count} = \text{COUNT}(\text{DISTINCT } \text{market\_job\_id})$$
+  Repeated skill mentions within a single job posting count exactly once.
+- **Demand Metric Formulas**:
+  $$\text{demand\_share} = \begin{cases} \frac{\text{job\_count}}{\text{sample\_size}} & \text{if } \text{sample\_size} > 0 \\ 0.0 & \text{if } \text{sample\_size} = 0 \end{cases}$$
+  $$\text{demand\_score} = \text{round}(\text{demand\_share}, 4)$$
+  Mathematically compatible with SkillForge demand intelligence scoring.
+- **Source Dimension**: Preserved explicitly (`source = 'adzuna'`). Future sources (e.g. ATS connectors) will aggregate independently without source collision.
+- **Snapshot Semantics & Recomputability (`MarketSkillDemandRepository`)**:
+  - Recomputing over the same market jobs dataset produces identical values.
+  - Employs PostgreSQL-native `ON CONFLICT (source, skill_id) DO UPDATE`.
+  - Purges stale records (`reconcile=True`) if skills are no longer demanded in current jobs.
+- **Strict MVP Isolation**: The frozen 49-record MVP `skill_demand` table, `job_roles`, candidate skill-gaps, and priority calculations are **NOT** modified or connected to live demand at this stage.
+- **Deferred to P1-F**: Historical time-series comparisons, growth rate calculations, and 24-hour automated refresh are deferred to Checkpoint P1-F.
+
 ---
 
 ## 11. P1 Market Evidence & Provenance

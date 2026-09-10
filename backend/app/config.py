@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     
     # CORS Origins
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    # Adzuna API Settings (Post-MVP P1 Market Ingestion Foundation)
+    ADZUNA_APP_ID: Optional[str] = None
+    ADZUNA_APP_KEY: Optional[str] = None
+    ADZUNA_API_BASE_URL: str = "https://api.adzuna.com/v1/api"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

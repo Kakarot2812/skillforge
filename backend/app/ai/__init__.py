@@ -3,6 +3,21 @@ AI and LLM integration package for SkillForge AI.
 Post-MVP Phase 2 (P2) local intelligence foundation.
 """
 
+from app.ai.chatbot import (
+    CAREER_CHATBOT_SYSTEM_PROMPT,
+    CareerChatError,
+    CareerChatGenerationError,
+    CareerChatRequest,
+    CareerChatResponse,
+    CareerChatService,
+    CareerChatServiceUnavailableError,
+    CareerChatTimeoutError,
+    CareerChatValidationError,
+    ChatResponseStatus,
+    ChatUsageStats,
+    build_career_chat_messages,
+    serialize_verified_context,
+)
 from app.ai.context import (
     DEFAULT_VERIFIED_CONTEXT_SYSTEM_PROMPT,
     AIExplanationRequest,
@@ -71,4 +86,18 @@ __all__ = [
     "ContextValidationError",
     "ContextImmutabilityError",
     "ProvenanceError",
+    # Evidence-Grounded Career Chatbot (P2-C)
+    "CareerChatService",
+    "CareerChatRequest",
+    "CareerChatResponse",
+    "ChatResponseStatus",
+    "ChatUsageStats",
+    "CAREER_CHATBOT_SYSTEM_PROMPT",
+    "serialize_verified_context",
+    "build_career_chat_messages",
+    "CareerChatError",
+    "CareerChatValidationError",
+    "CareerChatServiceUnavailableError",
+    "CareerChatTimeoutError",
+    "CareerChatGenerationError",
 ]

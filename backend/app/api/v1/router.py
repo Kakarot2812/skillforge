@@ -8,6 +8,7 @@ from app.api.v1.roles import router as roles_router
 from app.api.v1.demand import router as demand_router
 from app.api.v1.demand_intelligence import router as intelligence_router
 from app.api.v1.gaps import router as gaps_router
+from app.api.v1.ai import router as ai_router
 
 api_router = APIRouter()
 
@@ -37,5 +38,8 @@ api_router.include_router(intelligence_router, prefix="/intelligence")
 
 # Mount Skill Gap Foundation routes under /api/v1/gaps
 api_router.include_router(gaps_router, prefix="/gaps")
+
+# Mount Evidence-Grounded AI Career Intelligence routes under /api/v1/ai
+api_router.include_router(ai_router, prefix="/ai")
 
 

@@ -322,8 +322,8 @@ Each phase builds systematically upon the verified foundation established in pre
 | **Skill Gap Classification** | Implemented (Deterministic rule-based) | AI explanation & contextual reasoning (P2) |
 | **Priority Scoring** | Implemented (Deterministic formula) | AI explanation & contextual reasoning (P2) |
 | **RAG Retrieval Engine** | Not implemented | Planned (pgvector semantic retrieval) |
-| **Local Qwen 3 8B LLM** | Not implemented | Checkpoint P2-A client foundation implemented; Checkpoint P2-B verified context contract implemented; reasoning deferred to P2-C+ |
-| **Career Chatbot** | Not implemented | Planned (Evidence-grounded dialogue) (P3) |
+| **Local Qwen 3 8B LLM** | Not implemented | P2-A client foundation, P2-B verified context contract, and P2-C evidence-grounded chatbot implemented; RAG deferred to P3 |
+| **Career Chatbot** | Not implemented | Checkpoint P2-C evidence-grounded explanation service implemented (`/api/v1/ai/chat`); interactive dialogue / memory deferred to P3 |
 | **Personalized Roadmap** | Not implemented | Planned (DAG prerequisite sequencing) (P4) |
 | **GitHub Verification Loop**| Not implemented | Planned (Continuous milestone verification) (P5) |
 
@@ -393,3 +393,58 @@ AIGeneratedExplanation (status="EXPLANATORY")
    - No automatic persistence of prompts or AI outputs.
 8. **Deferred Capabilities**:
    - Checkpoint P2-B does **not** implement P2-C explanation logic, RAG retrieval/vector databases, chatbot dialogue, conversational memory, or roadmap generation.
+
+---
+
+## 16. Checkpoint P2-C Status: Evidence-Grounded Career Chatbot
+
+Checkpoint P2-C establishes the first **Evidence-Grounded Career Chatbot** service and API endpoint (`POST /api/v1/ai/chat`) on top of the verified context contract (P2-B) and local Qwen 3 8B inference (P2-A).
+
+### Architectural Pipeline
+```text
+Existing Deterministic Intelligence (PostgreSQL / Evidence Engines)
+                      │
+                      ▼
+               VerifiedContext (P2-B)
+                      │
+                      ▼
+           CareerChatService (P2-C)
+                      │
+                      ├── [Deterministic Validation Gate: validate_verified_context]
+                      │
+                      ├── [Deterministic Evidence Sufficiency Gate]
+                      │          │
+                      │          ├── Insufficient ──► CareerChatResponse(status="INSUFFICIENT_EVIDENCE") [No LLM Call]
+                      │          │
+                      │          └── Sufficient
+                      │                   │
+                      │                   ▼
+                      ├── [Deterministic Prompt Serialization: serialize_verified_context]
+                      │                   │
+                      │                   ▼
+                      └── [QwenClient.chat invocation]
+                                          │
+                                          ▼
+                         CareerChatResponse (status="EXPLANATORY")
+```
+
+### Core Invariants Enforced in Code
+1. **Evidence-Grounded Role**:
+   - The chatbot explains, reasons over, and personalizes existing verified facts from `VerifiedContext`.
+   - It is strictly barred from asserting new authoritative facts (`verified_skill`, `skill_classification`, `demand_score`, `priority_score`).
+2. **Deterministic Evidence Sufficiency Gate**:
+   - The service deterministically verifies whether the context contains the necessary facts before invoking Qwen.
+   - If a question asks about candidate weakness in a skill that has market data but no candidate evidence, the service returns `status="INSUFFICIENT_EVIDENCE"` without calling Qwen (Rule 5: Market facts alone never imply candidate skill possession or weakness).
+   - If a query asks about an unknown skill not present in the context, it returns `status="INSUFFICIENT_EVIDENCE"` immediately without calling Qwen.
+3. **No General-Purpose Chatbot / Zero Persistence**:
+   - The service is strictly stateless: 0 conversation history, 0 chat sessions, 0 persistent memory.
+   - Each request receives a fresh, independent prompt containing only the verified context and user query.
+4. **Zero Untyped Dictionaries**:
+   - Replaces untyped dictionaries with strongly typed models: `CareerChatRequest`, `CareerChatResponse`, `ChatResponseStatus`, `ChatUsageStats`.
+5. **Distinct Failure Classification**:
+   - Clearly distinguishes between `INSUFFICIENT_EVIDENCE` (deterministic fact absence), `CareerChatServiceUnavailableError` (503: Ollama offline), `CareerChatTimeoutError` (504: generation timeout), and `CareerChatGenerationError` (502: API error). Infrastructure errors are never masked as lack of evidence.
+6. **Stateless API Endpoint**:
+   - `POST /api/v1/ai/chat` consumes an already-constructed and validated `VerifiedContext`.
+   - Never constructs `VerifiedContext` from raw resume text, GitHub repositories, job postings, or arbitrary client JSON.
+7. **Deferred Capabilities**:
+   - Checkpoint P2-C does not implement RAG retrieval, pgvector embeddings, conversational history, autonomous tool calling, or roadmap generation.

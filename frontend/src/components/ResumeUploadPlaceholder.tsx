@@ -12,7 +12,14 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { uploadResume, deleteResume, fetchResumes, ResumeUploadResult, ResumeListItem } from "@/lib/api";
+import {
+  uploadResume,
+  deleteResume,
+  fetchResumeDetail,
+  ensureCandidateIdentity,
+  getCandidateUserId,
+  ResumeUploadResult,
+} from "@/lib/api";
 
 const MAX_SIZE_MB = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
@@ -28,14 +35,12 @@ export interface ResumeUploadPlaceholderProps {
   onResumeChange?: (hasResume: boolean, filename?: string, resumeId?: string) => void;
 }
 
-export default function ResumeUploadPlaceholder({
-  onResumeChange,
-}: ResumeUploadPlaceholderProps = {}) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUploadPlaceholderProps) {
   const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onResumeChangeRef = useRef(onResumeChange);
@@ -43,7 +48,21 @@ export default function ResumeUploadPlaceholder({
     onResumeChangeRef.current = onResumeChange;
   }, [onResumeChange]);
 
-  // Sync initial state from localStorage on client mount, verifying backend validity
+  // Listen for stale resume invalidation events across the dashboard
+  useEffect(() => {
+    const handleStaleResume = () => {
+      setUploadResult(null);
+      setSelectedFile(null);
+      setErrorMessage(null);
+      onResumeChangeRef.current?.(false);
+    };
+    window.addEventListener("skillforge:resume-stale", handleStaleResume);
+    return () => {
+      window.removeEventListener("skillforge:resume-stale", handleStaleResume);
+    };
+  }, []);
+
+  // Sync initial state from localStorage on client mount, verifying backend ownership
   React.useEffect(() => {
     async function verifyResumeState() {
       if (typeof window === "undefined") return;
@@ -54,33 +73,42 @@ export default function ResumeUploadPlaceholder({
         return;
       }
       try {
-        const res = await fetchResumes(20, 0);
-        if (res.success && res.data?.data) {
-          const matching = res.data.data.find((r: ResumeListItem) => r.resume_id === activeId);
-          if (matching) {
-            onResumeChangeRef.current?.(true, matching.filename || activeName || "Resume", matching.resume_id);
-            setUploadResult({
-              resume_id: matching.resume_id,
-              filename: matching.filename,
-              file_type: matching.file_type,
-              file_size: matching.file_size,
-              status: matching.status,
-              message: "Resume verified",
-              created_at: matching.created_at || new Date().toISOString(),
-              extracted_sections: matching.detected_sections,
-              claimed_skills: [],
-            });
-            return;
-          }
+        const candidateId = (await ensureCandidateIdentity()) || getCandidateUserId();
+        const res = await fetchResumeDetail(activeId, candidateId || undefined);
+
+        // If not found (404), access denied (403), or resume.user_id does not match active candidate identity:
+        if (
+          !res.success ||
+          !res.data ||
+          res.status === 403 ||
+          res.status === 404 ||
+          (candidateId && res.data.user_id !== candidateId)
+        ) {
+          localStorage.removeItem("skillforge_active_resume_id");
+          localStorage.removeItem("skillforge_active_resume_filename");
+          setUploadResult(null);
+          onResumeChangeRef.current?.(false);
+          return;
         }
-        // If not found on backend (deleted or wiped), purge stale state
+
+        onResumeChangeRef.current?.(true, res.data.filename || activeName || "Resume", res.data.resume_id);
+        setUploadResult({
+          resume_id: res.data.resume_id,
+          user_id: res.data.user_id,
+          filename: res.data.filename,
+          file_type: res.data.file_type,
+          file_size: res.data.file_size,
+          status: "uploaded",
+          message: "Resume verified",
+          created_at: res.data.created_at || new Date().toISOString(),
+          extracted_sections: res.data.detected_sections,
+          claimed_skills: res.data.claimed_skills || [],
+        });
+      } catch {
         localStorage.removeItem("skillforge_active_resume_id");
         localStorage.removeItem("skillforge_active_resume_filename");
+        setUploadResult(null);
         onResumeChangeRef.current?.(false);
-      } catch {
-        if (activeName) {
-          onResumeChangeRef.current?.(true, activeName, activeId || undefined);
-        }
       }
     }
     verifyResumeState();
@@ -145,7 +173,8 @@ export default function ResumeUploadPlaceholder({
     setIsUploading(true);
     setErrorMessage(null);
 
-    const result = await uploadResume(selectedFile);
+    const candidateId = (await ensureCandidateIdentity()) || getCandidateUserId();
+    const result = await uploadResume(selectedFile, candidateId || undefined);
     setIsUploading(false);
 
     if (result.success && result.data) {

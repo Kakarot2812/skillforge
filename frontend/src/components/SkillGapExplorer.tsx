@@ -120,7 +120,9 @@ export default function SkillGapExplorer({
   // Synchronize when parent passes a new selectedRoleId
   useEffect(() => {
     if (controlledRoleId && controlledRoleId !== selectedRoleId) {
-      setSelectedRoleId(controlledRoleId);
+      Promise.resolve().then(() => {
+        setSelectedRoleId(controlledRoleId);
+      });
     }
   }, [controlledRoleId, selectedRoleId]);
 
@@ -147,11 +149,18 @@ export default function SkillGapExplorer({
   }, []);
 
   // Fetch either market demand benchmark (when no profile) OR candidate-specific skill gaps
-  const loadRoleData = useCallback(async (roleId: string, ready: boolean) => {
+  const loadRoleData = useCallback(async (roleId: string, ready: boolean, overrideGhUser?: string | null) => {
     if (!roleId) return;
     setError(null);
 
-    if (!ready) {
+    const activeGh = overrideGhUser !== undefined
+      ? overrideGhUser
+      : (effectiveConnectedGitHub || (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null));
+    const activeResume = effectiveResumeId || (typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null);
+
+    const effectiveReady = ready || Boolean(activeResume || activeGh);
+
+    if (!effectiveReady) {
       // CASE A: Pure market requirements benchmark (No candidate profile)
       // Purge candidate analysis data to guarantee zero leakage
       setSummary(null);
@@ -176,10 +185,10 @@ export default function SkillGapExplorer({
 
     // CASE B, C, D: Candidate profile is active (Resume, GitHub, or both)
     setLoadingGaps(true);
-    const incResume = Boolean(effectiveHasResume);
-    const incGitHub = Boolean(effectiveHasGitHub);
-    const ghUser = effectiveConnectedGitHub || undefined;
-    const resResumeId = effectiveResumeId || undefined;
+    const incResume = Boolean(effectiveHasResume || activeResume);
+    const incGitHub = Boolean(effectiveHasGitHub || activeGh);
+    const ghUser = activeGh || undefined;
+    const resResumeId = activeResume || undefined;
 
     const [gapRes, prioRes] = await Promise.all([
       fetchSkillGaps(roleId, "India", undefined, incResume, incGitHub, ghUser, resResumeId),
@@ -204,17 +213,33 @@ export default function SkillGapExplorer({
     setLoadingGaps(false);
   }, [effectiveHasResume, effectiveHasGitHub, effectiveConnectedGitHub, effectiveResumeId]);
 
-  // Invalidate any open evidence modal when resume identity changes
-  useEffect(() => {
+  const handleCloseEvidence = useCallback(() => {
     setSelectedEvidenceSkillId(null);
     setEvidenceData(null);
     setEvidenceError(null);
+  }, []);
+
+  // Invalidate any open evidence modal when resume identity changes
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      setSelectedEvidenceSkillId(null);
+      setEvidenceData(null);
+      setEvidenceError(null);
+    });
   }, [effectiveResumeId]);
 
   useEffect(() => {
+    let isCancelled = false;
     if (selectedRoleId) {
-      loadRoleData(selectedRoleId, isCandidateReady);
+      Promise.resolve().then(() => {
+        if (!isCancelled) {
+          loadRoleData(selectedRoleId, isCandidateReady);
+        }
+      });
     }
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedRoleId, isCandidateReady, effectiveResumeId, loadRoleData]);
 
   // Handle ESC key to close modal
@@ -226,19 +251,24 @@ export default function SkillGapExplorer({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedEvidenceSkillId]);
+  }, [selectedEvidenceSkillId, handleCloseEvidence]);
 
   // Open evidence audit modal
-  const handleOpenEvidence = async (skillId: string) => {
+  const handleOpenEvidence = useCallback(async (skillId: string, overrideGhUser?: string | null) => {
     setSelectedEvidenceSkillId(skillId);
     setLoadingEvidence(true);
     setEvidenceError(null);
     setEvidenceData(null);
 
-    const incResume = Boolean(effectiveHasResume);
-    const incGitHub = Boolean(effectiveHasGitHub);
-    const ghUser = effectiveConnectedGitHub || undefined;
-    const resResumeId = effectiveResumeId || undefined;
+    const activeGh = overrideGhUser !== undefined
+      ? overrideGhUser
+      : (effectiveConnectedGitHub || (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null));
+    const activeResume = effectiveResumeId || (typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null);
+
+    const incResume = Boolean(effectiveHasResume || activeResume);
+    const incGitHub = Boolean(effectiveHasGitHub || activeGh);
+    const ghUser = activeGh || undefined;
+    const resResumeId = activeResume || undefined;
 
     const res = await fetchSkillGapEvidence(
       selectedRoleId,
@@ -256,13 +286,30 @@ export default function SkillGapExplorer({
       setEvidenceError(res.error || "Failed to load evidence audit.");
     }
     setLoadingEvidence(false);
-  };
+  }, [selectedRoleId, effectiveHasResume, effectiveHasGitHub, effectiveConnectedGitHub, effectiveResumeId]);
 
-  const handleCloseEvidence = () => {
-    setSelectedEvidenceSkillId(null);
-    setEvidenceData(null);
-    setEvidenceError(null);
-  };
+  // Synchronize skill gaps, prioritized gaps, and audit evidence when GitHub analysis or evidence updates
+  useEffect(() => {
+    const handleGitHubEvidenceUpdated = (event: Event) => {
+      const customEv = event as CustomEvent<{ repoId?: string; githubUsername?: string | null }>;
+      const ghUser = customEv.detail?.githubUsername !== undefined
+        ? customEv.detail.githubUsername
+        : (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null);
+      const activeResume = typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null;
+      const ready = Boolean(activeResume || ghUser);
+
+      if (selectedRoleId) {
+        loadRoleData(selectedRoleId, ready, ghUser);
+      }
+      if (selectedEvidenceSkillId) {
+        handleOpenEvidence(selectedEvidenceSkillId, ghUser);
+      }
+    };
+    window.addEventListener("skillforge:github-evidence-updated", handleGitHubEvidenceUpdated);
+    return () => {
+      window.removeEventListener("skillforge:github-evidence-updated", handleGitHubEvidenceUpdated);
+    };
+  }, [selectedRoleId, selectedEvidenceSkillId, loadRoleData, handleOpenEvidence]);
 
   // Filtered skills for Inventory tab
   const filteredSkills = useMemo(() => {
@@ -1177,7 +1224,7 @@ export default function SkillGapExplorer({
                     {evidenceData && (
                       <>
                         {getStatusBadge(evidenceData.status)}
-                        {evidenceData.priority_level && getPriorityBadge(evidenceData.priority_level as any)}
+                        {evidenceData.priority_level && getPriorityBadge(evidenceData.priority_level as "HIGH" | "MEDIUM" | "LOW")}
                       </>
                     )}
                   </div>

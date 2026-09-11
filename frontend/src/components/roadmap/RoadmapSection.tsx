@@ -81,6 +81,19 @@ export default function RoadmapSection({
     };
   }, [selectedRoleId, loadActiveRoadmap]);
 
+  // Synchronize active roadmap when GitHub evidence updates
+  useEffect(() => {
+    const handleGitHubEvidenceUpdated = () => {
+      if (selectedRoleId) {
+        loadActiveRoadmap(selectedRoleId);
+      }
+    };
+    window.addEventListener("skillforge:github-evidence-updated", handleGitHubEvidenceUpdated);
+    return () => {
+      window.removeEventListener("skillforge:github-evidence-updated", handleGitHubEvidenceUpdated);
+    };
+  }, [selectedRoleId, loadActiveRoadmap]);
+
   // Generate deterministic canonical roadmap
   const handleGenerateRoadmap = async () => {
     if (!selectedRoleId) return;
@@ -99,7 +112,25 @@ export default function RoadmapSection({
       if (res.success && res.data) {
         setRoadmap(res.data);
       } else {
-        setError(res.error || "Failed to generate deterministic roadmap.");
+        if (
+          res.status === 403 ||
+          res.error?.includes("Cross-user access denied: target resume")
+        ) {
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.removeItem("skillforge_active_resume_id");
+              localStorage.removeItem("skillforge_active_resume_filename");
+            } catch {
+              // ignore
+            }
+            window.dispatchEvent(new Event("skillforge:resume-stale"));
+          }
+          setError(
+            "The selected resume does not belong to your active candidate profile. The stale resume selection has been cleared. Please upload your resume to generate a personalized career roadmap."
+          );
+        } else {
+          setError(res.error || "Failed to generate deterministic roadmap.");
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unexpected error generating roadmap");

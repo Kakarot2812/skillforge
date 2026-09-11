@@ -8,6 +8,7 @@ from app.schemas.skill import PaginationMeta
 
 class ResumeUploadResponse(BaseModel):
     resume_id: UUID
+    user_id: Optional[UUID] = None
     filename: str
     file_type: str
     file_size: int
@@ -23,6 +24,7 @@ class ResumeUploadResponse(BaseModel):
 
 class ResumeListItem(BaseModel):
     resume_id: UUID
+    user_id: Optional[UUID] = None
     filename: str
     file_type: str
     file_size: int
@@ -41,6 +43,7 @@ class ResumeListResponse(BaseModel):
 
 class ResumeDetailResponse(BaseModel):
     resume_id: UUID
+    user_id: Optional[UUID] = None
     filename: str
     file_type: str
     file_size: int

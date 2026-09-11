@@ -4,10 +4,11 @@ import re
 import uuid
 import zipfile
 from pathlib import Path
-from typing import List
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.gaps import resolve_user_id, verify_user_exists
 from app.config import settings
 from app.db.database import get_db
 from app.db.models import Resume, UserClaimedSkill, Skill
@@ -99,12 +100,17 @@ def validate_docx_structure(content: bytes) -> None:
 )
 async def upload_resume(
     file: UploadFile = File(...),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> ResumeUploadResponse:
     """
     Ingests, validates, safely stores, extracts structured sections, and
     normalizes canonical skills from a candidate resume (PDF or DOCX).
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
+    verify_user_exists(db, effective_user_id)
+
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -216,7 +222,7 @@ async def upload_resume(
     # 7. Store Metadata in PostgreSQL (DATA_MODEL.md specification)
     resume_record = Resume(
         id=resume_id,
-        user_id=None,  # Nullable: auth not enforced in early checkpoints
+        user_id=effective_user_id,
         file_name=sanitized_name,
         file_type=file_type,
         file_size=total_bytes,
@@ -254,6 +260,7 @@ async def upload_resume(
 
     return ResumeUploadResponse(
         resume_id=resume_record.id,
+        user_id=resume_record.user_id,
         filename=resume_record.file_name,
         file_type=resume_record.file_type,
         file_size=resume_record.file_size,
@@ -274,12 +281,18 @@ async def upload_resume(
 def list_resumes(
     limit: int = Query(20, ge=1, le=100, description="Number of items to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> ResumeListResponse:
     """
     Returns paginated resume documents ordered by creation date descending.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
     query = db.query(Resume)
+    if effective_user_id is not None:
+        query = query.filter(Resume.user_id == effective_user_id)
+
     total = query.count()
     resumes = query.order_by(Resume.created_at.desc()).offset(offset).limit(limit).all()
 
@@ -290,6 +303,7 @@ def list_resumes(
         items.append(
             ResumeListItem(
                 resume_id=r.id,
+                user_id=r.user_id,
                 filename=r.file_name,
                 file_type=r.file_type,
                 file_size=r.file_size,
@@ -313,16 +327,30 @@ def list_resumes(
 )
 def get_resume(
     resume_id: uuid.UUID,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> ResumeDetailResponse:
     """
     Retrieves stored resume metadata, raw extracted text, and parsed section breakdown.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
     resume = db.query(Resume).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Resume with id '{resume_id}' not found.",
+        )
+
+    if effective_user_id is not None and resume.user_id != effective_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: target resume does not belong to authenticated user context.",
+        )
+    if effective_user_id is None and resume.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: target resume belongs to an authenticated user.",
         )
 
     parsed = resume.parsed_data or {}
@@ -351,6 +379,7 @@ def get_resume(
 
     return ResumeDetailResponse(
         resume_id=resume.id,
+        user_id=resume.user_id,
         filename=resume.file_name,
         file_type=resume.file_type,
         file_size=resume.file_size,
@@ -372,6 +401,8 @@ def get_resume(
 )
 def delete_resume(
     resume_id: uuid.UUID,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> Response:
     """
@@ -379,11 +410,23 @@ def delete_resume(
     and removes associated claimed skills (via cascade).
     Repeated calls return 404.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
     resume = db.query(Resume).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Resume with id '{resume_id}' not found.",
+        )
+
+    if effective_user_id is not None and resume.user_id != effective_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: target resume does not belong to authenticated user context.",
+        )
+    if effective_user_id is None and resume.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: target resume belongs to an authenticated user.",
         )
 
     # 1. Delete file from disk if it exists

@@ -1,7 +1,9 @@
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
+from app.api.v1.gaps import resolve_user_id
 
 from app.db.database import get_db
 from app.db.models import DemonstratedSkill, GitHubRepository, ProjectEvidence, Skill
@@ -66,9 +68,12 @@ def list_demonstrated_skills(
     skill_id: Optional[uuid.UUID] = Query(None, description="Filter by canonical skill ID"),
     evidence_level: Optional[str] = Query(None, description="Filter by evidence tier (HIGH, MEDIUM, LOW)"),
     user_id: Optional[uuid.UUID] = Query(None, description="Filter by user ID"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Candidate user context"),
     username: Optional[str] = Query(None, description="Filter by GitHub account username/owner"),
     db: Session = Depends(get_db),
 ) -> DemonstratedSkillListResponse:
+    effective_user_id = resolve_user_id(user_id, x_user_id)
+
     if evidence_level:
         clean_level = evidence_level.strip().upper()
         if clean_level not in ("HIGH", "MEDIUM", "LOW"):
@@ -80,7 +85,7 @@ def list_demonstrated_skills(
 
     raw_items, total = demonstrated_skill_service.get_demonstrated_skills(
         db=db,
-        user_id=user_id,
+        user_id=effective_user_id,
         username=username,
         repository_id=repository_id,
         skill_id=skill_id,
@@ -122,20 +127,23 @@ def list_demonstrated_skills(
 def get_demonstrated_skill_detail(
     skill_id: uuid.UUID,
     user_id: Optional[uuid.UUID] = Query(None, description="Filter by user ID"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Candidate user context"),
     db: Session = Depends(get_db),
 ) -> DemonstratedSkillDetailResponse:
     """
     Returns the aggregated demonstrated skill details along with all supporting
     auditable project evidence items linking directly to source repository artifacts.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
+
     # 1. Fetch demonstrated skill and canonical skill
     query = (
         db.query(DemonstratedSkill, Skill)
         .join(Skill, DemonstratedSkill.skill_id == Skill.id)
         .filter(DemonstratedSkill.skill_id == skill_id)
     )
-    if user_id:
-        query = query.filter(DemonstratedSkill.user_id == user_id)
+    if effective_user_id:
+        query = query.filter(DemonstratedSkill.user_id == effective_user_id)
     else:
         query = query.filter(DemonstratedSkill.user_id.is_(None))
 
@@ -156,8 +164,8 @@ def get_demonstrated_skill_detail(
         .outerjoin(GitHubRepository, ProjectEvidence.repo_id == GitHubRepository.id)
         .filter(ProjectEvidence.skill_id == skill_id)
     )
-    if user_id:
-        ev_query = ev_query.filter(ProjectEvidence.user_id == user_id)
+    if effective_user_id:
+        ev_query = ev_query.filter(ProjectEvidence.user_id == effective_user_id)
     else:
         ev_query = ev_query.filter(ProjectEvidence.user_id.is_(None))
 

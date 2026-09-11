@@ -52,7 +52,7 @@ class AIRoadmapExplanationService:
 
         options = {
             "temperature": float(temperature),
-            "num_predict": 1024,
+            "num_predict": 512,
         }
 
         try:

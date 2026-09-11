@@ -186,6 +186,13 @@ export default function GitHubConnectPlaceholder({
           }
         }
         await reloadDemonstratedSkills(cleanUser);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("skillforge:github-evidence-updated", {
+              detail: { githubUsername: cleanUser },
+            })
+          );
+        }
       } else {
         setErrorMessage(res.error || "Failed to sync repositories from GitHub");
       }
@@ -224,6 +231,13 @@ export default function GitHubConnectPlaceholder({
           }
         }
         await reloadDemonstratedSkills(cleanUser);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("skillforge:github-evidence-updated", {
+              detail: { githubUsername: cleanUser },
+            })
+          );
+        }
       } else {
         setErrorMessage(res.error || "Failed to connect to GitHub");
       }
@@ -244,7 +258,19 @@ export default function GitHubConnectPlaceholder({
         }));
         // Refresh demonstrated skills strictly scoped to current active user
         const activeUser = connectResult?.github_username || username.trim();
+        if (activeUser && typeof window !== "undefined") {
+          localStorage.setItem("skillforge_connected_github_user", activeUser);
+        }
         await reloadDemonstratedSkills(activeUser);
+
+        // Notify dashboard and skill-gap explorer that fresh GitHub evidence was analyzed
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("skillforge:github-evidence-updated", {
+              detail: { repoId, githubUsername: activeUser },
+            })
+          );
+        }
       } else {
         setErrorMessage(res.error || "Repository analysis failed");
       }
@@ -268,6 +294,11 @@ export default function GitHubConnectPlaceholder({
   const handleDisconnect = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("skillforge_connected_github_user");
+      window.dispatchEvent(
+        new CustomEvent("skillforge:github-evidence-updated", {
+          detail: { githubUsername: null },
+        })
+      );
     }
     setConnectResult(null);
     setUsername("");

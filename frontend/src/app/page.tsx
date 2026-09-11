@@ -12,6 +12,7 @@ import CareerAssistant from "@/components/assistant/CareerAssistant";
 import { Sparkles, CheckCircle2, TrendingUp, Compass, Award, Bot } from "lucide-react";
 
 import { ensureCandidateIdentity } from "@/lib/identity";
+import { fetchResumeDetail } from "@/lib/api";
 
 export default function DashboardPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
@@ -20,22 +21,77 @@ export default function DashboardPage() {
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [connectedGitHubUser, setConnectedGitHubUser] = useState<string | null>(null);
 
-  // Sync client-side state on mount from local storage and establish candidate identity
+  // Sync client-side state on mount from local storage, verifying candidate identity and resume ownership
   React.useEffect(() => {
+    let isCancelled = false;
     if (typeof window !== "undefined") {
       Promise.resolve().then(async () => {
-        await ensureCandidateIdentity();
+        const candidateId = await ensureCandidateIdentity();
+        if (isCancelled) return;
 
         const activeResume = localStorage.getItem("skillforge_active_resume_id");
         const activeFileName = localStorage.getItem("skillforge_active_resume_filename");
-        setHasResume(Boolean(activeResume));
-        setResumeFileName(activeFileName || null);
-        setResumeId(activeResume || null);
+
+        if (activeResume && candidateId) {
+          const detailRes = await fetchResumeDetail(activeResume, candidateId);
+          if (isCancelled) return;
+          if (
+            !detailRes.success ||
+            !detailRes.data ||
+            detailRes.status === 403 ||
+            detailRes.status === 404 ||
+            detailRes.data.user_id !== candidateId
+          ) {
+            localStorage.removeItem("skillforge_active_resume_id");
+            localStorage.removeItem("skillforge_active_resume_filename");
+            setHasResume(false);
+            setResumeFileName(null);
+            setResumeId(null);
+          } else {
+            setHasResume(true);
+            setResumeFileName(detailRes.data.filename || activeFileName);
+            setResumeId(activeResume);
+          }
+        } else {
+          setHasResume(false);
+          setResumeFileName(null);
+          setResumeId(null);
+        }
 
         const activeGitHub = localStorage.getItem("skillforge_connected_github_user");
         setConnectedGitHubUser(activeGitHub || null);
       });
     }
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Synchronize dashboard if stale resume rejection is detected anywhere
+  React.useEffect(() => {
+    const handleStaleResume = () => {
+      setHasResume(false);
+      setResumeFileName(null);
+      setResumeId(null);
+    };
+    window.addEventListener("skillforge:resume-stale", handleStaleResume);
+    return () => {
+      window.removeEventListener("skillforge:resume-stale", handleStaleResume);
+    };
+  }, []);
+
+  // Synchronize connected GitHub user if updated anywhere via event
+  React.useEffect(() => {
+    const handleGitHubUpdated = (event: Event) => {
+      const customEv = event as CustomEvent<{ githubUsername?: string | null }>;
+      if (customEv.detail && customEv.detail.githubUsername !== undefined) {
+        setConnectedGitHubUser(customEv.detail.githubUsername);
+      }
+    };
+    window.addEventListener("skillforge:github-evidence-updated", handleGitHubUpdated);
+    return () => {
+      window.removeEventListener("skillforge:github-evidence-updated", handleGitHubUpdated);
+    };
   }, []);
 
   // Memoized handlers to prevent infinite render loops in child components

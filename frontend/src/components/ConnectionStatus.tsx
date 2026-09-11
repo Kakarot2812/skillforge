@@ -26,9 +26,7 @@ export default function ConnectionStatus() {
     lastChecked: null,
   });
 
-  const runHealthChecks = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true }));
-
+  const checkHealth = useCallback(async () => {
     const backendResult = await checkBackendHealth();
     let dbResult: DbHealthResponse = {
       status: "error",
@@ -40,6 +38,12 @@ export default function ConnectionStatus() {
       dbResult = await checkDatabaseHealth();
     }
 
+    return { backendResult, dbResult };
+  }, []);
+
+  const handleManualRefresh = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }));
+    const { backendResult, dbResult } = await checkHealth();
     setState({
       loading: false,
       backendConnected: backendResult.connected,
@@ -50,14 +54,33 @@ export default function ConnectionStatus() {
       dbVersion: dbResult.database_version,
       lastChecked: new Date().toLocaleTimeString(),
     });
-  }, []);
+  }, [checkHealth]);
 
   useEffect(() => {
-    runHealthChecks();
-    // Poll every 15 seconds to keep connection verified
-    const interval = setInterval(runHealthChecks, 15000);
-    return () => clearInterval(interval);
-  }, [runHealthChecks]);
+    let isMounted = true;
+
+    const execute = async () => {
+      const { backendResult, dbResult } = await checkHealth();
+      if (!isMounted) return;
+      setState({
+        loading: false,
+        backendConnected: backendResult.connected,
+        backendStatus: backendResult.status,
+        latencyMs: backendResult.latencyMs,
+        dbConnected: dbResult.database === "connected",
+        pgvectorInstalled: dbResult.pgvector_installed,
+        dbVersion: dbResult.database_version,
+        lastChecked: new Date().toLocaleTimeString(),
+      });
+    };
+
+    void execute();
+    const interval = setInterval(execute, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [checkHealth]);
 
   return (
     <div className="w-full bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
@@ -78,7 +101,7 @@ export default function ConnectionStatus() {
         </div>
 
         <button
-          onClick={runHealthChecks}
+          onClick={handleManualRefresh}
           disabled={state.loading}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-800 text-neutral-200 text-xs font-medium transition-all duration-150 border border-neutral-700/80 disabled:opacity-50 disabled:cursor-not-allowed self-start sm:self-auto cursor-pointer"
           title="Re-run live health check"

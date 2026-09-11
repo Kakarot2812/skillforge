@@ -47,6 +47,7 @@ class QwenClient:
         model: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
         http_client: Optional[httpx.Client] = None,
+        think: Optional[bool] = None,
     ):
         raw_url = base_url if base_url is not None else settings.OLLAMA_BASE_URL
         if not raw_url or not isinstance(raw_url, str) or not raw_url.strip():
@@ -70,6 +71,8 @@ class QwenClient:
 
         self.timeout_seconds: float = float(raw_timeout)
 
+        self.think: Optional[bool] = think if think is not None else getattr(settings, "OLLAMA_THINK", False)
+
         self._owns_client: bool = http_client is None
         self._client: httpx.Client = http_client or httpx.Client(
             timeout=self.timeout_seconds
@@ -91,6 +94,7 @@ class QwenClient:
         messages: List[Union[QwenMessage, Dict[str, str]]],
         system: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        think: Optional[bool] = None,
     ) -> QwenChatResponse:
         """
         Executes a chat completion request against Ollama's /api/chat endpoint.
@@ -99,6 +103,7 @@ class QwenClient:
             messages: Sequence of message objects or dicts (role, content).
             system: Optional system instruction prepended to messages.
             options: Optional runtime parameters (temperature, num_predict, etc.).
+            think: Optional boolean to enable/disable reasoning/thinking mode (e.g. for Qwen).
 
         Returns:
             QwenChatResponse containing the generated response and execution metrics.
@@ -125,6 +130,9 @@ class QwenClient:
             "messages": formatted_messages,
             "stream": False,
         }
+        effective_think = think if think is not None else self.think
+        if effective_think is not None:
+            payload["think"] = effective_think
         if options:
             payload["options"] = dict(options)
 
@@ -161,6 +169,7 @@ class QwenClient:
         prompt: str,
         system: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        think: Optional[bool] = None,
     ) -> QwenGenerateResponse:
         """
         Executes a raw text generation request against Ollama's /api/generate endpoint.
@@ -169,6 +178,7 @@ class QwenClient:
             prompt: Text prompt to provide to the model.
             system: Optional system instruction.
             options: Optional runtime parameters.
+            think: Optional boolean to enable/disable reasoning/thinking mode (e.g. for Qwen).
 
         Returns:
             QwenGenerateResponse containing generated text and execution metrics.
@@ -181,6 +191,9 @@ class QwenClient:
             "prompt": prompt.strip(),
             "stream": False,
         }
+        effective_think = think if think is not None else self.think
+        if effective_think is not None:
+            payload["think"] = effective_think
         if system and system.strip():
             payload["system"] = system.strip()
         if options:

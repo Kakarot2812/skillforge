@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional, Set
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.gaps import resolve_user_id, verify_user_exists
 from app.db.database import get_db
 from app.db.models import GitHubRepository, Skill, ProjectEvidence
 from app.schemas.github import (
@@ -37,6 +38,8 @@ router = APIRouter(prefix="/github", tags=["GitHub Intelligence"])
 )
 def connect_github(
     payload: GitHubConnectRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> GitHubConnectResponse:
     """
@@ -44,11 +47,14 @@ def connect_github(
     and idempotently persists repository metadata into PostgreSQL.
     Tokens are strictly handled as volatile secrets and never returned.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
+    verify_user_exists(db, effective_user_id)
+
     clean_username = payload.github_username.strip()
     synced_records = github_service.sync_repositories(
         db=db,
         username=clean_username,
-        user_id=None,  # Nullable: auth not enforced in MVP phase
+        user_id=effective_user_id,
         token=payload.access_token,
     )
 
@@ -203,12 +209,18 @@ def get_repository(
 )
 def analyze_repository(
     payload: GitHubAnalyzeRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
 ) -> GitHubAnalyzeResponse:
     """
     Scans connected repository manifests, Dockerfiles, and CI workflows
     to extract concrete, auditable evidence of demonstrated skills.
     """
+    effective_user_id = resolve_user_id(user_id, x_user_id)
+    if effective_user_id is not None:
+        verify_user_exists(db, effective_user_id)
+
     repo_ids: List[uuid.UUID] = []
     if payload.repository_id:
         repo_ids.append(payload.repository_id)
@@ -224,7 +236,7 @@ def analyze_repository(
     all_evidence: List[ProjectEvidence] = []
     analyzed_repo_names: List[str] = []
     all_affected_skill_ids: Set[uuid.UUID] = set()
-    target_user_id = None
+    target_user_id = effective_user_id
 
     for r_id in repo_ids:
         repo = db.query(GitHubRepository).filter(GitHubRepository.id == r_id).first()
@@ -234,7 +246,14 @@ def analyze_repository(
                 detail=f"GitHub repository with id '{r_id}' not found.",
             )
 
-        target_user_id = repo.user_id
+        if effective_user_id is not None and repo.user_id != effective_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-user access denied: repository does not belong to authenticated user context.",
+            )
+
+        if target_user_id is None:
+            target_user_id = repo.user_id
 
         if repo.is_fork and not payload.include_forks:
             continue

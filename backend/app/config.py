@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen3:8b"
     OLLAMA_TIMEOUT_SECONDS: float = 60.0
+    OLLAMA_THINK: bool = False
 
     # RAG / Local Embedding Settings (Post-MVP P3 RAG Foundation)
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"

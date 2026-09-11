@@ -17,6 +17,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.ai.context.models import VerifiedContext
+from app.rag.models import RAGRetrievalResult
 
 
 class ChatResponseStatus(str, Enum):
@@ -107,6 +108,10 @@ class CareerChatResponse(BaseModel):
     referenced_skill_ids: Tuple[UUID, ...] = Field(
         default_factory=tuple,
         description="Canonical skill UUIDs from VerifiedContext referenced in the query/response",
+    )
+    retrieved_evidence: Tuple[RAGRetrievalResult, ...] = Field(
+        default_factory=tuple,
+        description="Retrieved supporting evidence chunks used for explanation",
     )
     usage: Optional[ChatUsageStats] = Field(
         default=None,

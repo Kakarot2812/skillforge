@@ -42,6 +42,13 @@ from app.ai.qwen.exceptions import (
     QwenResponseError,
     QwenTimeoutError,
 )
+from app.rag.exceptions import (
+    RAGEmbeddingError,
+    RAGRetrievalError,
+    RAGStorageError,
+)
+from app.rag.models import RAGRetrievalFilter, RAGRetrievalResult
+from app.rag.service import RAGService
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +74,14 @@ class CareerChatService:
     prompt assembly, and local Qwen execution.
     """
 
-    def __init__(self, qwen_client: Optional[QwenClient] = None):
+    def __init__(
+        self,
+        qwen_client: Optional[QwenClient] = None,
+        rag_service: Optional[RAGService] = None,
+    ):
         self._owns_client = qwen_client is None
         self.client = qwen_client or QwenClient()
+        self.rag_service = rag_service
 
     def __enter__(self) -> "CareerChatService":
         return self
@@ -259,13 +271,36 @@ class CareerChatService:
                 model=self.client.model,
                 status=ChatResponseStatus.INSUFFICIENT_EVIDENCE,
                 referenced_skill_ids=referenced_skill_ids,
+                retrieved_evidence=(),
                 usage=None,
             )
 
-        # Step 3: Prompt Construction
+        # Step 3: Retrieve Supporting Evidence (if RAG service configured)
+        retrieved_evidence: List[RAGRetrievalResult] = []
+        if self.rag_service is not None:
+            rag_filter = None
+            if len(referenced_skill_ids) == 1:
+                rag_filter = RAGRetrievalFilter(skill_id=referenced_skill_ids[0])
+            try:
+                retrieved_evidence = self.rag_service.retrieve(
+                    query=request.user_query,
+                    filters=rag_filter,
+                )
+            except RAGEmbeddingError as exc:
+                logger.error("RAG embedding error during chat retrieval: %s", exc)
+                raise CareerChatServiceUnavailableError(f"RAG embedding service error: {str(exc)}") from exc
+            except (RAGStorageError, RAGRetrievalError) as exc:
+                logger.error("RAG retrieval storage error: %s", exc)
+                raise CareerChatGenerationError(f"RAG evidence retrieval failed: {str(exc)}") from exc
+            except Exception as exc:
+                logger.error("Unexpected error during RAG retrieval: %s", exc)
+                raise CareerChatGenerationError(f"RAG retrieval failure: {str(exc)}") from exc
+
+        # Step 4: Prompt Construction with Verified Ground Truth + Supporting Evidence
         messages = build_career_chat_messages(
             context=request.verified_context,
             user_query=request.user_query,
+            retrieved_evidence=retrieved_evidence,
         )
 
         options: Dict[str, float] = {
@@ -273,7 +308,7 @@ class CareerChatService:
             "num_predict": int(request.max_tokens),
         }
 
-        # Step 4: Qwen Execution with typed exception mapping
+        # Step 5: Qwen Execution with typed exception mapping
         # Note: QwenTimeoutError is a subclass of QwenConnectionError, so catch it first!
         try:
             chat_resp = self.client.chat(
@@ -301,7 +336,7 @@ class CareerChatService:
                 f"Unexpected generation failure: {str(exc)}"
             ) from exc
 
-        # Step 5: Format strongly typed explanatory response
+        # Step 6: Format strongly typed explanatory response
         usage_stats = ChatUsageStats(
             total_duration=chat_resp.total_duration,
             load_duration=chat_resp.load_duration,
@@ -314,5 +349,6 @@ class CareerChatService:
             model=chat_resp.model,
             status=ChatResponseStatus.EXPLANATORY,
             referenced_skill_ids=referenced_skill_ids,
+            retrieved_evidence=tuple(retrieved_evidence),
             usage=usage_stats,
         )

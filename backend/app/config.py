@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "qwen3:8b"
     OLLAMA_TIMEOUT_SECONDS: float = 60.0
 
+    # RAG / Local Embedding Settings (Post-MVP P3 RAG Foundation)
+    EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSION: int = 384
+    RAG_DEFAULT_TOP_K: int = 5
+    RAG_MAX_TOP_K: int = 10
+    RAG_CHUNK_SIZE: int = 500
+    RAG_CHUNK_OVERLAP: int = 50
+    RAG_MAX_DOCUMENT_CONTENT_LENGTH: int = 50000
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

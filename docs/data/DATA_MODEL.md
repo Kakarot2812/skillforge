@@ -682,6 +682,62 @@ Stores the current materialized growth rate and trend classification between com
   - `growth_rate < -0.05` $\rightarrow$ `'DECLINING'`
 - **Strict Scope Boundary**: Completely isolated from the frozen MVP `skill_demand` table (strictly 49 rows), `job_roles`, candidate `skill_gaps`, and candidate readiness priorities.
 
+#### Checkpoint P3 Implemented Tables: `rag_documents` & `rag_chunks`
+Provides the evidence retrieval layer storing approved evidence documents, deterministic chunks, and pgvector embeddings.
+
+##### 1. Table: `rag_documents`
+Stores explicitly approved, bounded evidence documents for RAG retrieval.
+
+- **Table Name**: `rag_documents`
+- **Participation**: Authoritative storage of approved evidence documents (market summaries, deterministic analysis explanations, bounded code snippets, approved learning resources).
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE rag_documents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      source_type VARCHAR(32) NOT NULL,
+      source_reference VARCHAR(512) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      document_metadata JSONB DEFAULT '{}'::jsonb NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+  CREATE INDEX ix_rag_documents_source_type ON rag_documents(source_type);
+  CREATE INDEX ix_rag_documents_source_reference ON rag_documents(source_reference);
+  ```
+- **Relationships**:
+  - `chunks` (`RAGChunk`): 1-to-many, cascades delete-orphan.
+- **Ingestion Boundary**: Strictly restricted to approved evidence. Arbitrary raw resume PDFs/DOCX, entire GitHub repositories, raw database dumps, and secrets are prohibited.
+
+##### 2. Table: `rag_chunks`
+Stores deterministically chunked text segments with pgvector embeddings for similarity retrieval.
+
+- **Table Name**: `rag_chunks`
+- **Participation**: Vector search target linking chunks to parent documents, provenance, and canonical skills.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE rag_chunks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      document_id UUID NOT NULL REFERENCES rag_documents(id) ON DELETE CASCADE,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      embedding VECTOR(384) NOT NULL,
+      skill_id UUID REFERENCES skills(id) ON DELETE SET NULL,
+      source_type VARCHAR(32) NOT NULL,
+      source_reference VARCHAR(512) NOT NULL,
+      chunk_metadata JSONB DEFAULT '{}'::jsonb NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_rag_chunks_document_chunk_index UNIQUE (document_id, chunk_index),
+      CONSTRAINT chk_rag_chunks_chunk_index_non_negative CHECK (chunk_index >= 0)
+  );
+  CREATE INDEX ix_rag_chunks_document_id ON rag_chunks(document_id);
+  CREATE INDEX ix_rag_chunks_skill_id ON rag_chunks(skill_id);
+  CREATE INDEX ix_rag_chunks_source_type ON rag_chunks(source_type);
+  CREATE INDEX ix_rag_chunks_source_reference ON rag_chunks(source_reference);
+  ```
+- **Dimension Consistency**: Vector dimension is strictly 384, consistent with `sentence-transformers/all-MiniLM-L6-v2` and `settings.EMBEDDING_DIMENSION`.
+- **Search Semantics**: Exact cosine distance (`<=>`), stable secondary tie-breaking ordering (`distance ASC, id ASC`), and authoritative metadata filtering.
+
 ### P2 & P3 — Local Qwen 3 8B AI Layer & Chatbot Concepts
 - **Retrieved Evidence Context**: Snapshots of verified candidate facts and market metrics passed into the local LLM prompt.
 - **Conversation Session**: Session history and dialogue turns for candidate career Q&A.

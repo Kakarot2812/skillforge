@@ -448,3 +448,109 @@ Existing Deterministic Intelligence (PostgreSQL / Evidence Engines)
    - Never constructs `VerifiedContext` from raw resume text, GitHub repositories, job postings, or arbitrary client JSON.
 7. **Deferred Capabilities**:
    - Checkpoint P2-C does not implement RAG retrieval, pgvector embeddings, conversational history, autonomous tool calling, or roadmap generation.
+
+---
+
+## 17. Checkpoint P3 Status: Evidence-Grounded RAG / Retrieval Layer
+
+Checkpoint P3 implements the isolated **Evidence-Grounded RAG / Retrieval Layer** on top of the deterministic intelligence foundation (P1, P2-A, P2-B, P2-C).
+
+### Architectural Pipeline
+
+```text
+Deterministic SkillForge Subsystems (PostgreSQL / Evidence Engines)
+                      │
+                      ▼
+               VerifiedContext (P2-B) [AUTHORITATIVE GROUND TRUTH]
+                      │
+                      ├── [Deterministic Validation Gate: validate_verified_context]
+                      │
+                      ├── [Deterministic Evidence Sufficiency Gate]
+                      │          │
+                      │          ├── Insufficient ──► CareerChatResponse(status="INSUFFICIENT_EVIDENCE") [No RAG, No LLM]
+                      │          │
+                      │          └── Sufficient
+                      │                   │
+                      │                   ├──────────────────────────────────┐
+                      │                   ▼                                  ▼
+                      │         RAG Retrieval Service              Verified Ground Truth
+                      │         (Local Sentence Transformers                 │
+                      │          + PostgreSQL pgvector)                      │
+                      │                   │                                  │
+                      │                   ▼                                  │
+                      │         Retrieved Evidence                           │
+                      │         [NON-AUTHORITATIVE]                          │
+                      │                   │                                  │
+                      │                   └────────────────┬─────────────────┘
+                      │                                    │
+                      │                                    ▼
+                      │                       Evidence-Grounded Prompt
+                      │                                    │
+                      │                                    ▼
+                      │                        Qwen 3 8B (Local Ollama)
+                      │                                    │
+                      │                                    ▼
+                      └────────────────────────► CareerChatResponse (status="EXPLANATORY")
+```
+
+### Core Architectural Invariants
+
+1. **"The LLM Never Decides What is True"**:
+   - Deterministic systems decide what is true.
+   - Retrieval finds relevant, pre-approved verified evidence.
+   - AI explains, reasons over, and personalizes verified evidence.
+   - Embeddings, vector similarity scores, and retrieved chunks NEVER determine skill possession, `STRONG`/`PARTIAL`/`MISSING` classifications, demonstrated scores, demand scores, growth rates, priority scores, evidence validity, or candidate readiness.
+
+2. **Strict Authority Hierarchy**:
+   $$\text{VerifiedContext (Authoritative)} > \text{Retrieved Supporting Evidence (Non-Authoritative)} > \text{LLM Reasoning}$$
+   - Retrieved supporting evidence is strictly non-authoritative.
+   - If retrieved evidence conflicts with `VerifiedContext`, `VerifiedContext` strictly takes precedence.
+   - Vector similarity or retrieval ranking does not establish truth.
+
+3. **Strict Ingestion Boundary (No Raw Dumps)**:
+   - RAG indexes only explicitly approved, bounded evidence documents (`RAGDocument`).
+   - Strictly prohibited from RAG indexing:
+     - Entire raw resume PDFs/DOCX files
+     - Entire GitHub repositories or source trees
+     - Raw SQL database dumps / pg_dump dumps
+     - Entire raw job board API responses
+     - Secrets, API keys, or access tokens
+   - Maximum document length bounded to 50,000 characters.
+
+4. **Deterministic Chunking**:
+   - `DeterministicChunker` produces byte-reproducible text chunks with configurable sliding window and overlap.
+   - Monotonic chunk indexing (0, 1, 2, ...).
+   - Word boundary snapping prevents awkward word truncation.
+   - Chunks strictly inherit source reference, source type, and canonical skill association.
+   - No empty chunks; zero LLM calls during chunking.
+
+5. **Local Embedding Model & Dimension Consistency**:
+   - Operates strictly locally using `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions).
+   - Zero external embedding APIs, zero cloud credentials.
+   - Strict consistency guarantee: `provider.dimension == settings.EMBEDDING_DIMENSION == vector(384)`.
+   - Dimension mismatches raise `RAGDimensionMismatchError` immediately.
+   - Unit tests utilize controllable `MockEmbeddingProvider` to verify similarity ranking and tie-breaking deterministically without relying on cloud or unverified heuristics.
+
+6. **PostgreSQL + pgvector Persistence**:
+   - Isolated tables `rag_documents` and `rag_chunks` created via reversible migration `0016_rag_evidence`.
+   - Zero modifications to existing MVP/P1 tables (`skill_demand`, `market_jobs`, `market_job_skills`, `market_skill_demand`, `market_skill_demand_snapshots`, `market_skill_demand_growth`, `skill_gaps`).
+   - Exact cosine distance search (`<=>`) with secondary tie-breaking ordering (`similarity DESC, chunk_id ASC`).
+   - Authoritative metadata filters (`source_type`, `skill_id`, `source_reference`). Similarity ranking never bypasses metadata constraints.
+
+7. **JSONB is Storage Only**:
+   - Application and domain layers use strictly typed Pydantic models (`RAGDocumentMetadata`, `RAGChunkMetadata`, `RAGRetrievalResult`) with `frozen=True` and `extra="forbid"`.
+   - Arbitrary `Dict[str, Any]` containers are strictly barred.
+   - Embedding vectors are never exposed in retrieval results.
+
+8. **P2-C Integration Boundary**:
+   - `CareerChatService(qwen_client, rag_service=None)` remains fully functional with RAG disabled.
+   - When RAG is enabled, the deterministic evidence sufficiency gate evaluates first. If the gate rejects the query, RAG is never called, and Qwen is never invoked.
+   - Retrieved evidence is formatted into a dedicated `=== RETRIEVED SUPPORTING EVIDENCE (NON-AUTHORITATIVE) ===` block.
+   - Returned via `CareerChatResponse.retrieved_evidence` for audit transparency without mutating `VerifiedContext`.
+
+9. **Retrieval Failure Semantics**:
+   - Retrieval miss (no matching chunks) returns an empty list `[]`; it is never treated as proof of absent skill or translated into `INSUFFICIENT_EVIDENCE`.
+   - Infrastructure errors (`RAGEmbeddingError`, `RAGStorageError`, `RAGRetrievalError`) are explicitly raised and mapped to typed service errors (503/502), never masked as absence of evidence.
+
+10. **Deferred Capabilities**:
+    - Checkpoint P3 does not implement personalized roadmaps (P4), learning resource recommendation engines (P4), GitHub verification loops (P5), chat history / conversation memory, autonomous agents, or web scraping.

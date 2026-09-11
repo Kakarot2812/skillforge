@@ -15,7 +15,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 
+from app.config import settings
 from app.db.database import Base
 
 
@@ -534,3 +536,68 @@ class MarketSkillDemandGrowth(Base):
 
     def __repr__(self) -> str:
         return f"<MarketSkillDemandGrowth source={self.source} skill={self.skill_id} rate={self.growth_rate} class={self.growth_class}>"
+
+
+class RAGDocument(Base):
+    """
+    Persistent representation of an approved evidence document for RAG retrieval.
+    Post-MVP Phase 2, Checkpoint P3.
+
+    Stores explicitly approved, bounded evidence documents (e.g. verified market summaries,
+    deterministic analysis explanations, bounded code artifact snippets).
+    Arbitrary raw resumes, entire GitHub repositories, and unrestricted database dumps
+    are strictly prohibited from entering this table.
+    """
+    __tablename__ = "rag_documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_type = Column(String(32), nullable=False, index=True)
+    source_reference = Column(String(512), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    document_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    chunks = relationship("RAGChunk", back_populates="document", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<RAGDocument {self.id} source_type={self.source_type} title='{self.title}'>"
+
+
+class RAGChunk(Base):
+    """
+    Persistent representation of a deterministically chunked evidence segment with pgvector embedding.
+    Post-MVP Phase 2, Checkpoint P3.
+
+    Stores bounded text chunks and their local embedding vectors for similarity retrieval.
+    Retains explicit provenance, source reference, and canonical skill association.
+    """
+    __tablename__ = "rag_chunks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("rag_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Vector(settings.EMBEDDING_DIMENSION), nullable=False)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="SET NULL"), nullable=True, index=True)
+    source_type = Column(String(32), nullable=False, index=True)
+    source_reference = Column(String(512), nullable=False, index=True)
+    chunk_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "chunk_index", name="uq_rag_chunks_document_chunk_index"),
+        CheckConstraint("chunk_index >= 0", name="chk_rag_chunks_chunk_index_non_negative"),
+    )
+
+    document = relationship("RAGDocument", back_populates="chunks")
+    skill = relationship("Skill")
+
+    def __repr__(self) -> str:
+        return f"<RAGChunk {self.id} doc={self.document_id} idx={self.chunk_index}>"

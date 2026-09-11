@@ -2070,3 +2070,380 @@ export async function sendCareerChat(
     includeAuth: false,
   });
 }
+
+// -----------------------------------------------------------------------------
+// Curated Technology Skill Roadmap Catalog (Additive Feature)
+// -----------------------------------------------------------------------------
+
+export type RoadmapSkillStatus = "NOT_STARTED" | "LEARNING" | "DONE" | "SKIPPED";
+export type PracticeProblemStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+
+export interface PracticeProblemItem {
+  problem_id: string;
+  title: string;
+  difficulty: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | string;
+  order: number;
+  objective: string;
+  problem_statement: string;
+  requirements: string[];
+  concepts_tested: string[];
+  expected_outcome: string;
+  optional_hints: string[];
+  user_status?: PracticeProblemStatus;
+}
+
+export interface LearningResourceItem {
+  id: string;
+  resource_type: "DOCUMENTATION" | "YOUTUBE";
+  title: string;
+  url: string;
+  description: string;
+}
+
+export interface RoadmapPrerequisiteItem {
+  skill_id: string;
+  skill_name: string;
+  skill_slug: string;
+  difficulty: string;
+}
+
+export interface RoadmapSkillItem {
+  id: string;
+  stage_id: string;
+  roadmap_id: string;
+  canonical_skill_id?: string | null;
+  name: string;
+  slug: string;
+  description: string;
+  difficulty: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | string;
+  skill_order: number;
+  key_topics: string[];
+  practice_project?: string | null;
+  practice_problems?: PracticeProblemItem[];
+  role_relevance?: string | null;
+  user_status: RoadmapSkillStatus;
+  prerequisites: RoadmapPrerequisiteItem[];
+  resources: LearningResourceItem[];
+
+  gap_status?: "STRONG" | "PARTIAL" | "MISSING" | null;
+  priority_level?: "HIGH" | "MEDIUM" | "LOW" | null;
+  priority_score?: number | null;
+  demand_score?: number | null;
+}
+
+export interface RoadmapStageItem {
+  id: string;
+  roadmap_id: string;
+  name: string;
+  description?: string | null;
+  stage_order: number;
+  total_skills: number;
+  completed_skills: number;
+  skills: RoadmapSkillItem[];
+}
+
+export interface RoadmapListItem {
+  id: string;
+  role_id?: string | null;
+  slug: string;
+  title: string;
+  domain: string;
+  category: string;
+  description: string;
+  version: string;
+  has_market_data: boolean;
+  total_stages: number;
+  total_skills: number;
+  last_reviewed: string;
+}
+
+export interface RoadmapSummary {
+  total_skills: number;
+  completed_skills: number;
+  learning_skills: number;
+  skipped_skills: number;
+  not_started_skills: number;
+  progress_percentage: number;
+  high_priority_gap_count: number;
+  medium_priority_gap_count: number;
+}
+
+export interface RoadmapDetailData {
+  roadmap: RoadmapListItem;
+  ordering: "curated" | "recommended";
+  summary: RoadmapSummary;
+  stages: RoadmapStageItem[];
+  recommended_skills?: RoadmapSkillItem[] | null;
+}
+
+export interface UserProgressItem {
+  id: string;
+  user_id: string;
+  roadmap_skill_id: string;
+  status: RoadmapSkillStatus;
+  updated_at: string;
+}
+
+/**
+ * Fetch catalog of all 12 roadmap domains from GET /api/v1/roadmaps.
+ */
+export async function fetchRoadmapsCatalog(): Promise<{
+  success: boolean;
+  data?: RoadmapListItem[];
+  total?: number;
+  error?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/roadmaps`);
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json.data, total: json.total };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch roadmaps catalog",
+    };
+  }
+}
+
+export const fetchRoadmaps = fetchRoadmapsCatalog;
+
+/**
+ * Fetch full roadmap details from GET /api/v1/roadmaps/{roadmap_id}.
+ */
+export async function fetchRoadmapDetail(
+  roadmapId: string,
+  options?: {
+    ordering?: "curated" | "recommended";
+    userId?: string;
+  }
+): Promise<{
+  success: boolean;
+  data?: RoadmapDetailData;
+  error?: string;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (options?.ordering) params.append("ordering", options.ordering);
+    const candidateId = options?.userId || getCandidateUserId();
+    if (candidateId) params.append("user_id", candidateId);
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (candidateId) {
+      headers["X-User-Id"] = candidateId;
+    }
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/roadmaps/${encodeURIComponent(roadmapId)}?${params.toString()}`,
+      { headers }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json.data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch roadmap detail",
+    };
+  }
+}
+
+/**
+ * Fetch single skill detail from GET /api/v1/roadmaps/{roadmap_id}/skills/{skill_id}.
+ */
+export async function fetchRoadmapSkillDetail(
+  roadmapId: string,
+  skillId: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: RoadmapSkillItem;
+  error?: string;
+}> {
+  try {
+    const candidateId = userId || getCandidateUserId();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (candidateId) {
+      headers["X-User-Id"] = candidateId;
+    }
+    const params = candidateId ? `?user_id=${encodeURIComponent(candidateId)}` : "";
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/skills/${encodeURIComponent(skillId)}${params}`,
+      { headers }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch skill detail",
+    };
+  }
+}
+
+export const fetchRoadmapSkill = fetchRoadmapSkillDetail;
+
+/**
+ * Fetch all roadmap progress for current user from GET /api/v1/users/me/roadmap-progress.
+ */
+export async function fetchCurrentUserProgress(
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: Record<string, RoadmapSkillStatus>;
+  error?: string;
+}> {
+  try {
+    const candidateId = userId || getCandidateUserId();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (candidateId) {
+      headers["X-User-Id"] = candidateId;
+    }
+    const params = candidateId ? `?user_id=${encodeURIComponent(candidateId)}` : "";
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/roadmap-progress${params}`, {
+      headers,
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch user progress",
+    };
+  }
+}
+
+/**
+ * Update roadmap skill status for current user via PUT /api/v1/users/me/roadmap-progress/{skill_id}.
+ */
+export async function updateSkillProgress(
+  skillId: string,
+  status: RoadmapSkillStatus,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: UserProgressItem;
+  error?: string;
+}> {
+  try {
+    let candidateId: string | null = userId || getCandidateUserId();
+    if (!candidateId && typeof window !== "undefined") {
+      candidateId = await ensureCandidateIdentity();
+    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (candidateId) {
+      headers["X-User-Id"] = candidateId;
+    }
+    const params = candidateId ? `?user_id=${encodeURIComponent(candidateId)}` : "";
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/users/me/roadmap-progress/${encodeURIComponent(skillId)}${params}`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ status }),
+      }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json.data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to update skill progress",
+    };
+  }
+}
+
+export const updateRoadmapSkillProgress = updateSkillProgress;
+
+/**
+ * Update user practice problem status (NOT_STARTED, IN_PROGRESS, COMPLETED).
+ */
+export async function updatePracticeProblemProgress(
+  skillId: string,
+  problemId: string,
+  status: PracticeProblemStatus,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: {
+    id: string;
+    user_id: string;
+    roadmap_skill_id: string;
+    problem_id: string;
+    status: PracticeProblemStatus;
+    completed_at?: string | null;
+    updated_at: string;
+  };
+  error?: string;
+}> {
+  try {
+    let candidateId: string | null = userId || getCandidateUserId();
+    if (!candidateId && typeof window !== "undefined") {
+      candidateId = await ensureCandidateIdentity();
+    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (candidateId) {
+      headers["X-User-Id"] = candidateId;
+    }
+    const params = candidateId ? `?user_id=${encodeURIComponent(candidateId)}` : "";
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/users/me/roadmap-progress/${encodeURIComponent(skillId)}/problems/${encodeURIComponent(problemId)}${params}`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ status }),
+      }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      return {
+        success: false,
+        error: errJson?.detail || `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const json = await res.json();
+    return { success: true, data: json.data };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to update practice problem progress",
+    };
+  }
+}

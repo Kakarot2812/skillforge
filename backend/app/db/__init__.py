@@ -16,6 +16,13 @@ from app.db.models import (
     MarketSkillDemand,
     MarketSkillDemandSnapshot,
     MarketSkillDemandGrowth,
+    Roadmap,
+    RoadmapStage,
+    RoadmapSkill,
+    RoadmapPrerequisite,
+    LearningResource,
+    UserRoadmapProgress,
+    UserPracticeProgress,
 )
 
 __all__ = [
@@ -39,4 +46,11 @@ __all__ = [
     "MarketSkillDemand",
     "MarketSkillDemandSnapshot",
     "MarketSkillDemandGrowth",
+    "Roadmap",
+    "RoadmapStage",
+    "RoadmapSkill",
+    "RoadmapPrerequisite",
+    "LearningResource",
+    "UserRoadmapProgress",
+    "UserPracticeProgress",
 ]

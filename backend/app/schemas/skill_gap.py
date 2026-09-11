@@ -58,6 +58,10 @@ class SkillGapAnalyzeRequest(BaseModel):
     target_role_id: UUID
     location: str = Field(default="India", min_length=1, max_length=64)
     user_id: Optional[UUID] = None
+    resume_id: Optional[UUID] = None
+    include_resume: bool = True
+    include_github: bool = True
+    username: Optional[str] = None
 
     @field_validator("location")
     @classmethod

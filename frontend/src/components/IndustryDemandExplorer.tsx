@@ -97,22 +97,19 @@ export default function IndustryDemandExplorer() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-white">
-              Phase 4: Industry Demand Engine
+              Industry Skill Demand
             </h2>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-              Phase 4 Complete
-            </span>
             <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
-              Deterministic Market Data
+              Market Demand
             </span>
             {auditReport && auditReport.status === "VALID" && (
               <span className="hidden sm:inline-flex px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
-                ✓ Integrity Verified ({auditReport.total_demand_records} Records)
+                ✓ Verified ({auditReport.total_demand_records} Market Records)
               </span>
             )}
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Empirical skill demand metrics derived mathematically from structured job market records.
+            Skill demand metrics derived from active industry hiring data and market signals.
           </p>
         </div>
         <div className="text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center gap-3">
@@ -277,10 +274,10 @@ export default function IndustryDemandExplorer() {
         </div>
       )}
 
-      {/* Architectural Guarantee Note */}
+      {/* Evidence Analysis Note */}
       <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
         <span>
-          🛡️ <strong>Integrity Guarantee</strong>: Industry demand scores are derived directly from PostgreSQL statistical aggregations. LLMs are never used to generate, modify, or infer demand scores.
+          🛡️ <strong>Evidence-Based Analysis</strong>: Industry demand scores are derived directly from structured market data aggregations. Skills are evaluated using verified market demand signals.
         </span>
       </div>
     </div>

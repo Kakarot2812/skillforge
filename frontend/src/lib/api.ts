@@ -1606,8 +1606,367 @@ export async function fetchSkillGapEvidence(
   }
 }
 
+// =============================================================================
+// Post-MVP Phase 2, Phase 4 & Phase 5 Foundations
+// =============================================================================
 
+export * from "./types/roadmap";
+export * from "./types/verification";
+export * from "./types/chat";
+export * from "./identity";
 
+import {
+  CanonicalRoadmapData,
+  RoadmapGenerateRequest,
+  AIRoadmapExplainRequest,
+  AIRoadmapExplainResponse,
+  ApprovedResourceListResponse,
+} from "./types/roadmap";
 
+import {
+  MilestoneVerifyRequest,
+  MilestoneVerificationResponse,
+  RoadmapBatchVerifyRequest,
+  RoadmapBatchVerificationResponse,
+} from "./types/verification";
 
+import {
+  CareerChatRequest,
+  CareerChatResponse,
+} from "./types/chat";
 
+import {
+  getCandidateUserId,
+  ensureCandidateIdentity,
+  clearCandidateUserId,
+  isValidUUID,
+} from "./identity";
+
+interface PostMvpRequestOptions {
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  body?: unknown;
+  headers?: Record<string, string>;
+  userId?: string;
+  patToken?: string;
+  includeAuth?: boolean;
+}
+
+/**
+ * Lightweight internal fetch wrapper for Post-MVP endpoints requiring candidate identity.
+ * Automatically injects `X-User-Id` and optional `Authorization: Bearer <token>` header.
+ * Ensures tokens are NEVER sent via body, URL, or query parameters.
+ */
+async function postMvpFetch<T>(
+  endpoint: string,
+  options: PostMvpRequestOptions = {}
+): Promise<{
+  success: boolean;
+  data?: T;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const {
+    method = "GET",
+    body,
+    headers: customHeaders = {},
+    userId,
+    patToken,
+    includeAuth = true,
+  } = options;
+
+  const headers: Record<string, string> = { ...customHeaders };
+
+  if (body !== undefined && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  // Inject candidate identity context if authenticated execution is required
+  if (includeAuth) {
+    let effectiveUserId: string | null | undefined = userId || getCandidateUserId();
+    if (!effectiveUserId && typeof window !== "undefined") {
+      effectiveUserId = (await ensureCandidateIdentity()) || undefined;
+    }
+    if (effectiveUserId && isValidUUID(effectiveUserId)) {
+      headers["X-User-Id"] = effectiveUserId;
+    }
+  }
+
+  // Personal Access Token: ONLY transmitted via Authorization Bearer header
+  if (patToken && patToken.trim()) {
+    headers["Authorization"] = `Bearer ${patToken.trim()}`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    if (!res.ok) {
+      let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+      try {
+        const errJson = await res.json();
+        errorMessage =
+          errJson?.error?.message ||
+          errJson?.detail ||
+          errorMessage;
+      } catch {
+        // fallback to default status message
+      }
+
+      // If backend reports candidate user not found, invalidate stale local identity
+      if (
+        res.status === 404 &&
+        typeof errorMessage === "string" &&
+        errorMessage.includes("User with id")
+      ) {
+        clearCandidateUserId();
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        status: res.status,
+      };
+    }
+
+    if (res.status === 204) {
+      return { success: true, status: 204 };
+    }
+
+    const json = await res.json();
+    return {
+      success: true,
+      data: (json?.data !== undefined ? json.data : json) as T,
+      meta: json?.meta,
+      status: res.status,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      error: message,
+      status: 0,
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Post-MVP Phase 4: Personalized Career Roadmap API Methods
+// -----------------------------------------------------------------------------
+
+/**
+ * Generate canonical career roadmap from POST /api/v1/roadmap/generate.
+ * In-memory if unauthenticated, persisted if X-User-Id is provided.
+ */
+export async function generateRoadmap(
+  request: RoadmapGenerateRequest,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: CanonicalRoadmapData;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<CanonicalRoadmapData>("/api/v1/roadmap/generate", {
+    method: "POST",
+    body: request,
+    userId,
+    includeAuth: true,
+  });
+}
+
+/**
+ * Retrieve candidate's active roadmap for a target role from GET /api/v1/roadmap/active.
+ */
+export async function fetchActiveRoadmap(
+  roleId?: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: CanonicalRoadmapData;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const query = roleId ? `?role_id=${encodeURIComponent(roleId)}` : "";
+  return postMvpFetch<CanonicalRoadmapData>(`/api/v1/roadmap/active${query}`, {
+    method: "GET",
+    userId,
+    includeAuth: true,
+  });
+}
+
+/**
+ * Retrieve a persisted roadmap by ID from GET /api/v1/roadmap/{roadmap_id}.
+ */
+export async function fetchRoadmap(
+  roadmapId: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: CanonicalRoadmapData;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<CanonicalRoadmapData>(
+    `/api/v1/roadmap/${encodeURIComponent(roadmapId)}`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Query approved curated learning resources for a canonical skill from GET /api/v1/roadmap/resources/{skill_id}.
+ */
+export async function fetchApprovedResources(
+  skillId: string
+): Promise<{
+  success: boolean;
+  data?: ApprovedResourceListResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<ApprovedResourceListResponse>(
+    `/api/v1/roadmap/resources/${encodeURIComponent(skillId)}`,
+    {
+      method: "GET",
+      includeAuth: false,
+    }
+  );
+}
+
+/**
+ * Request non-authoritative Qwen explanation of a canonical roadmap from POST /api/v1/roadmap/{roadmap_id}/explain.
+ */
+export async function explainRoadmap(
+  roadmapId: string,
+  request: AIRoadmapExplainRequest = {},
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: AIRoadmapExplainResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<AIRoadmapExplainResponse>(
+    `/api/v1/roadmap/${encodeURIComponent(roadmapId)}/explain`,
+    {
+      method: "POST",
+      body: request,
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Post-MVP Phase 5: GitHub Skill Verification API Methods
+// -----------------------------------------------------------------------------
+
+/**
+ * Deterministically verify a roadmap milestone from POST /api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verify.
+ * Accepts volatile GitHub PAT exclusively via Authorization Bearer header.
+ */
+export async function verifyMilestone(
+  roadmapId: string,
+  milestoneId: string,
+  payload?: MilestoneVerifyRequest,
+  patToken?: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: MilestoneVerificationResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<MilestoneVerificationResponse>(
+    `/api/v1/roadmap/${encodeURIComponent(roadmapId)}/milestones/${encodeURIComponent(milestoneId)}/verify`,
+    {
+      method: "POST",
+      body: payload,
+      userId,
+      patToken,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Retrieve latest milestone verification audit record from GET /api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verification.
+ */
+export async function fetchMilestoneVerification(
+  roadmapId: string,
+  milestoneId: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: MilestoneVerificationResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<MilestoneVerificationResponse>(
+    `/api/v1/roadmap/${encodeURIComponent(roadmapId)}/milestones/${encodeURIComponent(milestoneId)}/verification`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Batch verify all milestones sequentially for a roadmap from POST /api/v1/roadmap/{roadmap_id}/verify.
+ */
+export async function batchVerifyRoadmap(
+  roadmapId: string,
+  payload?: RoadmapBatchVerifyRequest,
+  patToken?: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: RoadmapBatchVerificationResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<RoadmapBatchVerificationResponse>(
+    `/api/v1/roadmap/${encodeURIComponent(roadmapId)}/verify`,
+    {
+      method: "POST",
+      body: payload,
+      userId,
+      patToken,
+      includeAuth: true,
+    }
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Post-MVP Phase 2: Evidence-Grounded Career Chatbot API Method
+// -----------------------------------------------------------------------------
+
+/**
+ * Execute evidence-grounded career chatbot reasoning from POST /api/v1/ai/chat.
+ * Consumes pre-constructed VerifiedContext. Never sends credentials or chat history.
+ */
+export async function sendCareerChat(
+  request: CareerChatRequest
+): Promise<{
+  success: boolean;
+  data?: CareerChatResponse;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<CareerChatResponse>("/api/v1/ai/chat", {
+    method: "POST",
+    body: request,
+    includeAuth: false,
+  });
+}

@@ -2,198 +2,184 @@
 
 ## 1. API Overview
 
-This document establishes the authoritative API specification for **SkillForge AI**, an evidence-based AI skill-gap analysis and personalized career roadmap platform.
+This document establishes the authoritative API specification for **SkillForge AI** v1.0.0 MVP.
 
-The SkillForge AI backend is built with **FastAPI** (Python 3.12+), providing high-performance, asynchronous REST endpoints backed by **PostgreSQL 16** with the **pgvector** extension. The frontend is built on **Next.js** (App Router, TypeScript, Tailwind CSS) and interacts strictly with this API.
+The backend is built with **FastAPI** (Python 3.12+), providing asynchronous REST endpoints backed by **PostgreSQL 16** with the **pgvector** extension. The frontend is built on **Next.js** (App Router, TypeScript, Tailwind CSS) and interacts with this API.
 
 ### Core Conventions
 - **Protocol**: HTTP/1.1 and HTTP/2 over TLS in production; standard HTTP for local development.
-- **Base URL**:
+- **Base URLs**:
   - Development Root: `http://localhost:8000`
   - Development API v1: `http://localhost:8000/api/v1`
   - Production API: `https://api.skillforge.ai/api/v1`
-- **Versioning Strategy**: URI-based path versioning under `/api/v1`. Unversioned root endpoints are strictly reserved for operational infrastructure diagnostics (`/health`, `/health/db`).
-- **Data Exchange**: Requests and responses use `application/json; charset=utf-8`, except file upload endpoints which consume `multipart/form-data`.
-- **Identifiers**: All resource identifiers are strictly UUIDv4 strings (e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`).
-- **Timestamps**: All timestamps are formatted in ISO 8601 extended format with UTC timezone offset (e.g., `2026-09-01T14:30:00.000Z`).
-- **Authentication**: Stateless JSON Web Tokens (JWT) passed via the standard HTTP header:
-  ```http
-  Authorization: Bearer <access_token>
-  ```
+- **Versioning**: URI-based path versioning under `/api/v1`. Unversioned root endpoints are reserved for operational diagnostics (`/`, `/health`, `/health/db`).
+- **Data Exchange**: Requests and responses use `application/json; charset=utf-8`, except file uploads which use `multipart/form-data`.
+- **Identifiers**: All resource identifiers are RFC 4122 UUIDv4 strings (e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`).
+- **Timestamps**: All timestamps use ISO 8601 extended format with UTC offset (e.g., `2026-09-01T14:30:00.000Z`).
+- **Data Boundaries**:
+  - **Shared Catalogs**: Roles, skills, and industry demand data are shared across all users.
+  - **Candidate Evidence**: Resumes, repositories, claimed skills, demonstrated skills, and skill gap analyses are strictly scoped to candidate identity.
 
 ---
 
-## 2. API Design Principles
+## 2. API Design & Security Principles
 
-1. **REST-Oriented Resources**: URIs represent concrete domain resources (e.g., `/resumes`, `/skills`, `/evidence`, `/roadmaps`), using standard HTTP verbs (`GET`, `POST`, `PATCH`, `DELETE`).
-2. **Strict User Ownership**: All user-specific records are partitioned and queried strictly by the authenticated `user_id`. Cross-user data leakage is prevented at the database query layer.
-3. **Pydantic Validation**: All incoming payloads are strongly typed and validated before reaching route handlers.
-4. **Deterministic Business Logic**: Algorithmic scoring, dependency graphs, and gap classifications are computed deterministically on the backend.
-5. **Separation of LLM & Numerical Data**: The LLM provides qualitative reasoning, natural-language explanation, and contextual extraction. Numerical industry demand metrics are mathematically derived from verified market data and stored in PostgreSQL; the LLM is prohibited from generating or modifying demand scores.
-6. **Evidence-First Skill Evaluation**: Claims from resumes are treated as unverified (`CLAIMED`). Skills are only elevated to verified evidence tiers (`DEMONSTRATED` / `HIGH`) when backed by verifiable code artifacts from connected GitHub repositories.
-7. **Idempotency**: `PUT` and `DELETE` requests are idempotent. Resource generation endpoints return deterministic representations or reuse active state where specified.
-8. **Consistent Pagination**: Collection endpoints support standard limit/offset pagination parameters (`limit`, `offset`) and return structured pagination metadata.
-9. **Descriptive Errors**: Failures return consistent error envelopes with structured error codes and actionable descriptions.
+1. **REST-Oriented Resources**: Predictable URIs representing domain entities (`/resumes`, `/skills`, `/github`, `/evidence`, `/roles`, `/demand`, `/intelligence`, `/gaps`).
+2. **Deterministic Intelligence**: Skill gap classification (`STRONG`, `PARTIAL`, `MISSING`), priority calculation, and multi-repo evidence scoring are executed deterministically in code/SQL without LLM participation.
+3. **Structured Industry Demand**: MVP demand metrics are database-derived statistics from structured market data. The LLM does not calculate, invent, or override demand scores.
+4. **Evidence-Based Evaluation**: Skills are classified as `CLAIMED` via resume extraction and elevated to `DEMONSTRATED` only when backed by verifiable repository artifacts (manifests, workflows, Dockerfiles).
+5. **Token Security**: GitHub Personal Access Tokens (PATs) are volatile in-memory credentials for upstream queries. PATs are never stored in the database, never logged, and never returned in API responses.
+6. **IDOR & Scope Isolation**: Candidate-scoped endpoints validate candidate ownership and prevent cross-user data leakage.
+7. **Pydantic Validation**: All request and response structures conform strictly to Pydantic schemas.
 
 ---
 
-## 3. Authentication & User Context
+## 3. Standard Response & Error Formats
 
-Authentication is handled via OAuth2 Password Bearer flow issuing signed JWT access tokens. Passwords must be hashed using `bcrypt` or `argon2id`. The database field `password_hash` is strictly internal and never serialized in API responses.
+### 3.1 Standard Response Envelopes
 
-### 3.1 Register User
-```http
-POST /api/v1/auth/register
-Content-Type: application/json
-```
-#### Request Body
+#### Single Resource Envelope
 ```json
 {
-  "email": "candidate@example.com",
-  "password": "SecurePassword123!",
-  "full_name": "Jane Doe",
-  "target_role": "Backend Engineer",
-  "target_location": "India",
-  "weekly_hours_commitment": 10
+  "data": { ... }
 }
 ```
-#### Response `201 Created`
+
+#### Paginated Collection Envelope
 ```json
 {
-  "data": {
-    "user_id": "8a3e72c1-6789-4a12-b345-987654321abc",
-    "email": "candidate@example.com",
-    "full_name": "Jane Doe",
-    "target_role": "Backend Engineer",
-    "target_location": "India",
-    "weekly_hours_commitment": 10,
-    "created_at": "2026-09-01T14:30:00Z"
+  "data": [ ... ],
+  "meta": {
+    "total": 42,
+    "limit": 20,
+    "offset": 0
   }
 }
 ```
 
-### 3.2 Login (Acquire Token)
-```http
-POST /api/v1/auth/login
-Content-Type: application/json
-```
-#### Request Body
+### 3.2 Error Envelope Contract
+
+All exceptions handled by the FastAPI application return a standardized JSON error envelope:
+
 ```json
 {
-  "email": "candidate@example.com",
-  "password": "SecurePassword123!"
-}
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "token_type": "bearer",
-    "expires_in": 86400
+  "detail": "Descriptive message or validation details",
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Descriptive error explanation.",
+    "details": {}
   }
 }
 ```
 
-### 3.3 Get Current Authenticated User
-```http
-GET /api/v1/auth/me
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "user_id": "8a3e72c1-6789-4a12-b345-987654321abc",
-    "email": "candidate@example.com",
-    "full_name": "Jane Doe",
-    "target_role": "Backend Engineer",
-    "target_location": "India",
-    "weekly_hours_commitment": 10,
-    "created_at": "2026-09-01T14:30:00Z"
-  }
-}
-```
+### 3.3 HTTP Status Codes & Error Code Mapping
+
+The backend error handler (`backend/app/main.py`) deterministically maps status codes to error codes:
+
+| HTTP Status | Error Code | Trigger Scenarios in Implementation |
+| :--- | :--- | :--- |
+| `200 OK` | — | Successful resource retrieval, update, or calculation. |
+| `201 Created` | — | Successful creation (resume upload). |
+| `204 No Content` | — | Successful resource deletion with no response body. |
+| `400 Bad Request` | `BAD_REQUEST` | Unsupported file extension, invalid PDF/DOCX magic bytes, invalid DOCX structure, empty upload, non-resume document rejected by semantic validation, invalid evidence level filter. |
+| `401 Unauthorized` | `UNAUTHENTICATED` | Unauthenticated access when authentication is enforced. |
+| `403 Forbidden` | `FORBIDDEN` | Cross-user access denied: mismatch between query `user_id` and `X-User-Id` header, or attempting to access another candidate's private resume. |
+| `404 Not Found` | `NOT_FOUND` | Resource not found: nonexistent `resume_id`, `repo_id`, `role_id`, `skill_id`, `evidence_id`, or `user_id`. |
+| `413 Payload Too Large` | `PAYLOAD_TOO_LARGE` | Uploaded resume file exceeds maximum size limit (5 MB). |
+| `415 Unsupported Media Type` | `UNSUPPORTED_MEDIA_TYPE` | Uploaded file MIME type is not allowed. |
+| `422 Unprocessable Entity` | `VALIDATION_ERROR` | Pydantic payload validation failure, blank/whitespace location, location > 64 chars, invalid gap status filter, invalid priority level filter, malformed UUID. |
+| `429 Too Many Requests` | `RATE_LIMITED` | GitHub REST API upstream rate limit encountered. |
+| `500 Internal Server Error` | `INTERNAL_SERVER_ERROR` | Unhandled backend exception. |
+| `502 Bad Gateway` | `UPSTREAM_GATEWAY_ERROR` | Upstream GitHub API connection failure. |
+| `503 Service Unavailable` | `SERVICE_UNAVAILABLE` | PostgreSQL or pgvector database connectivity failure during health checks. |
+| `504 Gateway Timeout` | `GATEWAY_TIMEOUT` | Upstream GitHub API request timeout. |
 
 ---
 
-## 4. User Profile
+## 4. Operational & Health APIs
 
-### 4.1 Get Profile
+### 4.1 Root Welcome
 ```http
-GET /api/v1/users/me
-Authorization: Bearer <access_token>
+GET /
 ```
+Returns system operational metadata and documentation links.
+
 #### Response `200 OK`
 ```json
 {
-  "data": {
-    "user_id": "8a3e72c1-6789-4a12-b345-987654321abc",
-    "email": "candidate@example.com",
-    "full_name": "Jane Doe",
-    "target_role": "Backend Engineer",
-    "target_location": "India",
-    "weekly_hours_commitment": 10,
-    "updated_at": "2026-09-01T14:30:00Z"
-  }
+  "name": "SkillForge AI Backend",
+  "version": "1.0.0",
+  "status": "operational",
+  "docs": "/api/v1/docs"
 }
 ```
 
-### 4.2 Update Profile
+### 4.2 Application Health Probe
 ```http
-PATCH /api/v1/users/me
-Authorization: Bearer <access_token>
-Content-Type: application/json
+GET /health
+GET /api/v1/health
 ```
-#### Request Body
-```json
-{
-  "full_name": "Jane Doe",
-  "target_role": "Backend Engineer",
-  "target_location": "India",
-  "weekly_hours_commitment": 15
-}
-```
+Basic liveness probe verifying that the FastAPI application process is healthy.
+
 #### Response `200 OK`
 ```json
 {
-  "data": {
-    "user_id": "8a3e72c1-6789-4a12-b345-987654321abc",
-    "email": "candidate@example.com",
-    "full_name": "Jane Doe",
-    "target_role": "Backend Engineer",
-    "target_location": "India",
-    "weekly_hours_commitment": 15,
-    "updated_at": "2026-09-01T14:35:00Z"
-  }
+  "status": "ok"
+}
+```
+
+### 4.3 Database & pgvector Health Probe
+```http
+GET /health/db
+GET /api/v1/health/db
+```
+Readiness probe verifying PostgreSQL database connectivity, server version, and the active status of the `pgvector` extension.
+
+#### Response `200 OK`
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "pgvector_installed": true,
+  "database_version": "PostgreSQL 16.2 on x86_64-apple-darwin..."
+}
+```
+#### Response `503 Service Unavailable`
+```json
+{
+  "detail": "Database service unavailable or connection failed."
 }
 ```
 
 ---
 
-## 5. Resume APIs
+## 5. Resume Intelligence APIs
 
-Candidate resumes are processed through a multi-stage pipeline:
-```text
-File Upload (PDF/DOCX)
-      ↓ (Validation: Size, MIME, Magic Bytes)
-File Storage by UUID & Metadata Record
-      ↓ (Checkpoint 2: Text Extraction)
-Raw Text Extraction & Section Segmentation
-      ↓ (Checkpoint 3: Skill Extraction)
-Entity Recognition & Taxonomy Normalization
-      ↓ (Checkpoint 4: Persistence)
-Claimed Skills Persistence (user_claimed_skills)
-```
+The Resume Intelligence service validates, securely stores, parses, segments, and normalizes candidate resumes.
 
-### 5.1 Upload Resume
+### Implementation Specifications:
+- **Supported File Formats**: Strictly `.pdf` and `.docx`.
+- **Maximum File Size**: 5 MB (`5 * 1024 * 1024` bytes = 5,242,880 bytes).
+- **Security & Integrity Checks**:
+  - Filename sanitization via regex scrubbing to prevent directory traversal.
+  - Magic byte inspection: `%PDF-` for PDFs; `\x50\x4b\x03\x04` for DOCX archives.
+  - DOCX container verification: Validates OpenXML `[Content_Types].xml` and `word/` package structure.
+  - Disk storage: Isolated UUID naming (`<uuid>.<ext>`) in upload storage directory.
+- **Semantic Resume Validation Gate**: Verifies that the document is a genuine resume (requires minimum 50 words, rejects invoices, receipts, code snippets, and short notes). Failed validation cleans up the uploaded file and returns `400 Bad Request`.
+- **Text & Section Extraction**: Segmented into Header, Education, Experience, Skills, Projects, and Contact Information using PyMuPDF and pdfplumber.
+- **Skill Normalization**: Discovered terms are mapped to canonical skills via dictionary alias lookup and pgvector semantic matching.
+- **Ownership & Cascade**: Resumes are stored in the `resumes` table. Deletion cascades to `user_claimed_skills` and unlinks disk files.
+
+---
+
+### 5.1 Upload and Parse Resume
 ```http
 POST /api/v1/resumes/upload
 Content-Type: multipart/form-data
 ```
-#### Form Data
-- `file`: PDF or DOCX file (maximum size: 5 MB).
-- *Note*: `user_id` is optional/nullable in Checkpoint 1 to support onboarding before authentication.
+
+#### Form Parameters
+- `file` (UploadFile, required): PDF or DOCX file (max 5 MB).
 
 #### Response `201 Created`
 ```json
@@ -203,16 +189,47 @@ Content-Type: multipart/form-data
   "file_type": "pdf",
   "file_size": 245760,
   "status": "uploaded",
-  "message": "Resume uploaded successfully. Text extraction and skill analysis scheduled for Checkpoint 2.",
-  "created_at": "2026-09-01T14:30:00Z"
+  "message": "Resume uploaded, parsed, and skills normalized successfully.",
+  "extracted_sections": ["contact_info", "experience", "education", "skills", "projects"],
+  "claimed_skills_count": 2,
+  "claimed_skills": [
+    {
+      "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "skill_name": "Python",
+      "canonical_slug": "python",
+      "category": "Programming Languages",
+      "raw_mention": "Python 3.12 Core & AsyncIO",
+      "confidence_score": 1.0
+    },
+    {
+      "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "skill_name": "FastAPI",
+      "canonical_slug": "fastapi",
+      "category": "Backend Framework",
+      "raw_mention": "FastAPI microservices",
+      "confidence_score": 0.9
+    }
+  ],
+  "created_at": "2026-09-10T14:30:00Z"
 }
 ```
 
-### 5.2 List User Resumes
+#### Error Responses
+- `400 Bad Request`: Empty file, missing filename, invalid magic bytes, invalid DOCX package, or non-resume semantic rejection.
+- `413 Payload Too Large`: File exceeds 5 MB.
+- `422 Unprocessable Entity`: Extraction or parsing failure.
+
+---
+
+### 5.2 List Resumes
 ```http
-GET /api/v1/resumes
-Authorization: Bearer <access_token>
+GET /api/v1/resumes?limit=20&offset=0
 ```
+
+#### Query Parameters
+- `limit` (integer, default: 20, min: 1, max: 100): Page size.
+- `offset` (integer, default: 0, min: 0): Pagination offset.
+
 #### Response `200 OK`
 ```json
 {
@@ -222,321 +239,155 @@ Authorization: Bearer <access_token>
       "filename": "jane_doe_resume.pdf",
       "file_type": "pdf",
       "file_size": 245760,
-      "created_at": "2026-09-01T14:30:00Z"
+      "status": "uploaded",
+      "detected_sections": ["contact_info", "experience", "education", "skills"],
+      "claimed_skills_count": 2,
+      "created_at": "2026-09-10T14:30:00Z"
     }
   ],
   "meta": {
-    "total": 1
+    "total": 1,
+    "limit": 20,
+    "offset": 0
   }
 }
 ```
+
+---
 
 ### 5.3 Get Resume Details
 ```http
 GET /api/v1/resumes/{resume_id}
-Authorization: Bearer <access_token>
 ```
+
+#### Path Parameters
+- `resume_id` (UUID, required): The UUID of the resume record.
+
 #### Response `200 OK`
 ```json
 {
-  "data": {
-    "resume_id": "ff158ffc-ea91-4068-ad97-52e977abbda2",
-    "filename": "jane_doe_resume.pdf",
-    "file_type": "pdf",
-    "file_size": 245760,
-    "has_raw_text": true,
-    "parsed_data": {
-      "sections_detected": ["skills", "experience", "education", "projects"],
-      "extracted_skills_count": 8
-    },
-    "created_at": "2026-09-01T14:30:00Z"
-  }
-}
-```
-
-### 5.4 Delete Resume
-```http
-DELETE /api/v1/resumes/{resume_id}
-Authorization: Bearer <access_token>
-```
-#### Response `204 No Content`
-
----
-
-## 6. Claimed Skills
-
-Skills extracted from uploaded resumes or explicitly self-declared by the candidate are persisted in `user_claimed_skills`.
-
-### 6.1 List Claimed Skills
-```http
-GET /api/v1/skills/claimed
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": [
+  "resume_id": "ff158ffc-ea91-4068-ad97-52e977abbda2",
+  "filename": "jane_doe_resume.pdf",
+  "file_type": "pdf",
+  "file_size": 245760,
+  "has_raw_text": true,
+  "raw_text": "Jane Doe\nBackend Software Engineer\nSkills: Python, FastAPI...",
+  "detected_sections": ["contact_info", "experience", "education", "skills"],
+  "contact_info": {
+    "email": "jane@example.com",
+    "phone": "+91 9876543210"
+  },
+  "claimed_skills_count": 2,
+  "claimed_skills": [
     {
       "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
       "skill_name": "Python",
       "canonical_slug": "python",
-      "category": "Languages",
-      "source": "resume",
-      "raw_mention": "Python 3.10 / AsyncIO",
-      "confidence_score": 0.95,
-      "evidence_tier": "CLAIMED",
-      "created_at": "2026-09-01T14:30:00Z"
-    },
+      "category": "Programming Languages",
+      "raw_mention": "Python 3.12 Core & AsyncIO",
+      "confidence_score": 1.0
+    }
+  ],
+  "parsed_data": {
+    "sections": { ... },
+    "detected_sections": ["contact_info", "experience", "education", "skills"]
+  },
+  "created_at": "2026-09-10T14:30:00Z"
+}
+```
+
+#### Error Responses
+- `404 Not Found`: Resume ID does not exist.
+
+---
+
+### 5.4 Delete Resume
+```http
+DELETE /api/v1/resumes/{resume_id}
+```
+
+Safely deletes the resume file from disk, deletes the database record, and cascades the deletion to associated claimed skills.
+
+#### Response `204 No Content`
+*(Empty response body)*
+
+#### Error Responses
+- `404 Not Found`: Resume ID does not exist (or has already been deleted).
+
+---
+
+## 6. Skills Intelligence APIs
+
+Provides endpoints to query candidate claimed skills and multi-repository demonstrated skills.
+
+### 6.1 List Claimed Skills
+```http
+GET /api/v1/skills/claimed?resume_id=ff158ffc-ea91-4068-ad97-52e977abbda2&limit=20&offset=0
+```
+
+#### Query Parameters
+- `resume_id` (UUID, optional): Filter skills by specific resume ID scope.
+- `limit` (integer, default: 20, min: 1, max: 100): Page limit.
+- `offset` (integer, default: 0, min: 0): Page offset.
+
+#### Response `200 OK`
+```json
+{
+  "data": [
     {
-      "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
-      "skill_name": "FastAPI",
-      "canonical_slug": "fastapi",
-      "category": "Frameworks",
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "skill_name": "Python",
+      "canonical_slug": "python",
+      "category": "Programming Languages",
       "source": "resume",
-      "raw_mention": "FastAPI REST microservices",
-      "confidence_score": 0.90,
+      "raw_mention": "Python 3.12 Core & AsyncIO",
+      "confidence_score": 1.0,
       "evidence_tier": "CLAIMED",
-      "created_at": "2026-09-01T14:30:00Z"
+      "resume_id": "ff158ffc-ea91-4068-ad97-52e977abbda2",
+      "created_at": "2026-09-10T14:30:00Z"
     }
   ],
   "meta": {
-    "total": 2
+    "total": 1,
+    "limit": 20,
+    "offset": 0
   }
 }
 ```
 
 ---
 
-## 7. GitHub Integration
-
-The GitHub engine accesses candidate repositories using the official GitHub REST API.
-
-#### Security & Integrity Guarantees:
-- **PAT Security**: Personal Access Tokens (PAT) are strictly volatile in-memory for HTTP `Authorization: Bearer` headers. PATs are **never** stored in the database, **never** placed in URL query parameters, **never** logged, and **never** returned in API responses or error payloads.
-- **Error Mapping**: GitHub API failures map deterministically to standard internal errors:
-  - 401 Unauthorized $\rightarrow$ `UNAUTHENTICATED`
-  - 403 / 429 Rate Limited $\rightarrow$ `RATE_LIMITED`
-  - 404 Not Found $\rightarrow$ `NOT_FOUND`
-  - 422 Validation Error $\rightarrow$ `VALIDATION_ERROR`
-  - 500 / 502 Upstream Failure $\rightarrow$ `UPSTREAM_GATEWAY_ERROR`
-  - Timeout $\rightarrow$ `GATEWAY_TIMEOUT` (504)
-- **Safety Limits**:
-  - `MAX_TREE_ENTRIES = 1000` (prevents memory exhaustion on deep git trees)
-  - `MAX_FILE_SIZE_BYTES = 512 KB` (safeguards against oversized manifest denial of service)
-  - Repository code is **never executed** (no package installation, builds, or script execution).
-  - Malicious paths containing traversal (`../`), null bytes, or absolute paths are strictly rejected.
-- **Ownership Scoping**: All repository, evidence, and demonstrated-skill endpoints enforce `user_id` query scoping.
-- **Stale Evidence Reconciliation**: Re-scans automatically delete removed evidence and recompute demonstrated skills. Skills with 0 remaining evidence records are automatically deleted from `demonstrated_skills`.
-
-### 7.1 Connect GitHub Account
-```http
-POST /api/v1/github/connect
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "github_username": "janedoe"
-}
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "github_username": "janedoe",
-    "connected": true,
-    "discovered_repositories": 8
-  }
-}
-```
-
-### 7.2 List Discovered Repositories
-```http
-GET /api/v1/github/repositories
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": [
-    {
-      "repo_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
-      "repo_name": "task-management-api",
-      "repo_url": "https://github.com/janedoe/task-management-api",
-      "primary_language": "Python",
-      "is_fork": false,
-      "stars_count": 14,
-      "last_pushed_at": "2026-08-20T10:15:00Z"
-    }
-  ],
-  "meta": {
-    "total": 1
-  }
-}
-```
-
-### 7.3 Get Repository Details
-```http
-GET /api/v1/github/repositories/{repo_id}
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "repo_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
-    "repo_name": "task-management-api",
-    "repo_url": "https://github.com/janedoe/task-management-api",
-    "primary_language": "Python",
-    "is_fork": false,
-    "stars_count": 14,
-    "last_pushed_at": "2026-08-20T10:15:00Z",
-    "repo_metadata": {
-      "has_dockerfile": true,
-      "has_ci_workflow": true,
-      "detected_dependencies": ["fastapi", "sqlalchemy", "psycopg", "pytest"]
-    }
-  }
-}
-```
-
-### 7.4 Analyze Repositories
-```http
-POST /api/v1/github/analyze
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "selected_repo_ids": ["7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d"],
-  "include_forks": false
-}
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "repositories_analyzed": 1,
-    "evidence_items_detected": 4,
-    "demonstrated_skills": [
-      {
-        "skill_name": "FastAPI",
-        "canonical_slug": "fastapi",
-        "confidence_score": 0.85,
-        "evidence_type": "dependency",
-        "evidence_tier": "HIGH"
-      },
-      {
-        "skill_name": "Docker",
-        "canonical_slug": "docker",
-        "confidence_score": 0.80,
-        "evidence_type": "dockerfile",
-        "evidence_tier": "HIGH"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 8. Project Evidence
-
-Auditable, concrete code artifacts extracted from repositories are persisted in `project_evidence`. Resume claims alone do NOT generate project evidence.
-
-### 8.1 List Evidence Items
-```http
-GET /api/v1/evidence
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": [
-    {
-      "evidence_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
-      "skill_name": "FastAPI",
-      "canonical_slug": "fastapi",
-      "repo_name": "task-management-api",
-      "evidence_type": "dependency",
-      "file_path": "backend/requirements.txt",
-      "matched_content": "fastapi>=0.110.0",
-      "confidence_score": 0.85,
-      "detected_at": "2026-09-01T14:35:00Z"
-    },
-    {
-      "evidence_id": "4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
-      "skill_name": "Docker",
-      "canonical_slug": "docker",
-      "repo_name": "task-management-api",
-      "evidence_type": "dockerfile",
-      "file_path": "Dockerfile",
-      "matched_content": "FROM python:3.12-slim\nWORKDIR /app",
-      "confidence_score": 0.80,
-      "detected_at": "2026-09-01T14:35:00Z"
-    }
-  ],
-  "meta": {
-    "total": 2
-  }
-}
-```
-
-### 8.2 Get Evidence Item by ID
-```http
-GET /api/v1/evidence/{evidence_id}
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "evidence_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
-    "skill_name": "FastAPI",
-    "canonical_slug": "fastapi",
-    "repo_name": "task-management-api",
-    "evidence_type": "dependency",
-    "file_path": "backend/requirements.txt",
-    "matched_content": "fastapi>=0.110.0",
-    "confidence_score": 0.85,
-    "detected_at": "2026-09-01T14:35:00Z"
-  }
-}
-```
-
-### 8.3 List Aggregated Demonstrated Skills
+### 6.2 List Aggregated Demonstrated Skills
 ```http
 GET /api/v1/skills/demonstrated?evidence_level=HIGH&limit=20&offset=0
-Authorization: Bearer <access_token>
 ```
-#### Query Parameters
-- `limit` (optional, integer, default: 20, max: 100): Page limit.
-- `offset` (optional, integer, default: 0): Records to skip.
-- `repository_id` (optional, UUID): Filter skills with evidence in a specific repository.
-- `skill_id` (optional, UUID): Filter by canonical skill ID.
-- `evidence_level` (optional, string): Filter by tier (`HIGH`, `MEDIUM`, `LOW`).
-- `user_id` (optional, UUID): Scoped user ID filter.
 
-#### Deterministic Aggregation Formula
-1. Group evidence by repository for the skill.
-2. $\text{repo\_score}_i = \max_{e \in \text{evidence}(r_i, \text{skill})} (e.\text{confidence\_score})$. Repeated analysis or duplicate evidence within the same repository does NOT artificially inflate confidence.
-3. Multi-repository bounded combination:
-   $$\text{multi\_repo\_score} = 1.0 - \prod_{i=1}^{N} (1.0 - \text{repo\_score}_i)$$
-4. Clamp: $0.0 \le \text{confidence\_score} \le 1.0$, rounded to 2 decimal places.
-5. Deterministic Evidence Levels:
+Retrieves demonstrated skills aggregated across all connected GitHub repositories.
+
+#### Query Parameters
+- `evidence_level` (string, optional): Filter by tier (`HIGH`, `MEDIUM`, `LOW`). Invalid values return `400 Bad Request`.
+- `repository_id` (UUID, optional): Filter by supporting repository.
+- `skill_id` (UUID, optional): Filter by canonical skill ID.
+- `user_id` (UUID, optional): Filter by user ID.
+- `username` (string, optional): Filter by GitHub account username/owner.
+- `limit` (integer, default: 20, min: 1, max: 100): Page limit.
+- `offset` (integer, default: 0, min: 0): Page offset.
+
+#### Multi-Repository Aggregation Rules
+1. Within a single repository: $\text{repo\_score} = \max(\text{evidence confidence})$.
+2. Across multiple independent repositories: $\text{multi\_repo\_score} = 1.0 - \prod (1.0 - \text{repo\_score}_i)$, clamped to $[0.0, 1.0]$.
+3. Evidence Level Tiers:
    - `HIGH`: $\text{confidence\_score} \ge 0.85$
    - `MEDIUM`: $0.70 \le \text{confidence\_score} < 0.85$
    - `LOW`: $\text{confidence\_score} < 0.70$
-6. **Inviolable Rule**: LLMs are strictly forbidden from creating, inferring, or altering demonstrated skills or their confidence scores.
 
 #### Response `200 OK`
 ```json
 {
   "data": [
     {
-      "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+      "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
       "skill_name": "FastAPI",
       "slug": "fastapi",
       "category": "Backend Framework",
@@ -544,12 +395,12 @@ Authorization: Bearer <access_token>
       "evidence_level": "HIGH",
       "evidence_count": 2,
       "repository_count": 1,
-      "last_verified_at": "2026-09-01T14:35:00Z",
+      "last_verified_at": "2026-09-10T14:35:00Z",
       "repositories": [
         {
           "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
           "repo_name": "task-management-api",
-          "repo_url": "https://github.com/user/task-management-api",
+          "repo_url": "https://github.com/janedoe/task-management-api",
           "max_confidence": 0.95,
           "evidence_count": 2
         }
@@ -565,32 +416,42 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 8.4 Get Demonstrated Skill Detail with Audit Trail
+---
+
+### 6.3 Get Demonstrated Skill Detail with Audit Trail
 ```http
 GET /api/v1/skills/demonstrated/{skill_id}
-Authorization: Bearer <access_token>
 ```
+
+Retrieves the demonstrated skill record alongside all underlying auditable `project_evidence` items. If no evidence records remain, stale records are automatically cleaned up and `404 Not Found` is returned.
+
+#### Path Parameters
+- `skill_id` (UUID, required): Canonical skill UUID.
+
+#### Query Parameters
+- `user_id` (UUID, optional): User ownership scope.
+
 #### Response `200 OK`
 ```json
 {
   "data": {
-    "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+    "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
     "skill_name": "FastAPI",
     "slug": "fastapi",
     "category": "Backend Framework",
     "description": "Modern, fast web framework for building APIs with Python.",
     "confidence_score": 0.95,
     "evidence_level": "HIGH",
-    "evidence_count": 2,
+    "evidence_count": 1,
     "repository_count": 1,
-    "last_verified_at": "2026-09-01T14:35:00Z",
+    "last_verified_at": "2026-09-10T14:35:00Z",
     "repositories": [
       {
         "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
         "repo_name": "task-management-api",
-        "repo_url": "https://github.com/user/task-management-api",
+        "repo_url": "https://github.com/janedoe/task-management-api",
         "max_confidence": 0.95,
-        "evidence_count": 2
+        "evidence_count": 1
       }
     ],
     "evidence_types": ["dependency"],
@@ -599,52 +460,252 @@ Authorization: Bearer <access_token>
         "evidence_id": "9b8a7f6e-5d4c-3b2a-1f0e-9d8c7b6a5e4d",
         "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
         "repo_name": "task-management-api",
-        "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+        "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
         "skill_name": "FastAPI",
         "canonical_slug": "fastapi",
         "evidence_type": "dependency",
         "artifact_path": "backend/requirements.txt",
         "file_path": "backend/requirements.txt",
         "artifact_name": "requirements.txt",
-        "evidence_description": "FastAPI is declared as a Python dependency in backend/requirements.txt.",
-        "matched_content": "fastapi==0.115.0",
+        "evidence_description": "FastAPI declared in requirements.txt",
+        "matched_content": "fastapi>=0.115.0",
         "confidence_score": 0.95,
-        "evidence_metadata": {
-          "package": "fastapi",
-          "manifest": "requirements.txt"
-        },
-        "detected_at": "2026-09-01T14:35:00Z",
-        "created_at": "2026-09-01T14:35:00Z"
+        "evidence_metadata": {},
+        "detected_at": "2026-09-10T14:35:00Z",
+        "created_at": "2026-09-10T14:35:00Z"
       }
     ]
-  }
-}
-```
-#### Response `404 Not Found`
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Demonstrated skill with id '...' not found.",
-    "details": null
   }
 }
 ```
 
 ---
 
-## 9. Job Roles
+## 7. GitHub Intelligence APIs
 
-Target industry tracks stored in `job_roles`.
-
-### 9.1 List Job Roles
+### 7.1 Connect GitHub Account
 ```http
-GET /api/v1/roles?category=Engineering
+POST /api/v1/github/connect
+Content-Type: application/json
 ```
+
+Connects to GitHub, discovers public repositories, filters out forks, and stores repository metadata.
+
+#### Request Body
+```json
+{
+  "github_username": "janedoe",
+  "access_token": "ghp_optionalVolatileTokenForRateLimits"
+}
+```
+
+#### Response `200 OK`
+```json
+{
+  "data": {
+    "github_username": "janedoe",
+    "connected": true,
+    "discovered_repositories": 4,
+    "connected_at": "2026-09-10T14:35:00Z",
+    "repositories": [
+      {
+        "repo_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+        "github_repository_id": 12345678,
+        "repo_name": "task-management-api",
+        "full_name": "janedoe/task-management-api",
+        "repo_url": "https://github.com/janedoe/task-management-api",
+        "description": "Async task management REST API",
+        "default_branch": "main",
+        "visibility": "public",
+        "primary_language": "Python",
+        "is_fork": false,
+        "stars_count": 12,
+        "forks_count": 2,
+        "last_pushed_at": "2026-09-08T10:00:00Z",
+        "synced_at": "2026-09-10T14:35:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### Error Responses
+- `400 Bad Request`: Invalid username format.
+- `404 Not Found`: GitHub user does not exist on GitHub.
+- `429 Too Many Requests`: GitHub API rate limit reached.
+
+---
+
+### 7.2 List Discovered Repositories
+```http
+GET /api/v1/github/repositories?limit=20&offset=0
+```
+
 #### Query Parameters
-- `category` (optional, string): Filter by role category (e.g., `Engineering`, `Data`).
-- `limit` (optional, default: 20): Maximum records.
-- `offset` (optional, default: 0): Records to skip.
+- `limit` (integer, default: 20, min: 1, max: 100): Items per page.
+- `offset` (integer, default: 0, min: 0): Records to skip.
+- `user_id` (UUID, optional): Scoped user ID filter.
+- `username` (string, optional): Restrict strictly to repositories owned by that GitHub account handle.
+
+#### Response `200 OK`
+Returns paginated list of non-forked discovered repositories (`GitHubRepositoryListResponse`).
+
+---
+
+### 7.3 Get Repository Details
+```http
+GET /api/v1/github/repositories/{repo_id}
+```
+
+Reads stored metadata from PostgreSQL without issuing redundant GitHub API requests.
+
+#### Response `200 OK`
+```json
+{
+  "data": {
+    "repo_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+    "github_repository_id": 12345678,
+    "repo_name": "task-management-api",
+    "full_name": "janedoe/task-management-api",
+    "repo_url": "https://github.com/janedoe/task-management-api",
+    "description": "Async task management REST API",
+    "default_branch": "main",
+    "visibility": "public",
+    "primary_language": "Python",
+    "is_fork": false,
+    "stars_count": 12,
+    "forks_count": 2,
+    "last_pushed_at": "2026-09-08T10:00:00Z",
+    "repo_metadata": {
+      "has_dockerfile": true,
+      "has_ci_workflow": true
+    },
+    "created_at": "2026-09-10T14:35:00Z",
+    "synced_at": "2026-09-10T14:35:00Z"
+  }
+}
+```
+
+---
+
+### 7.4 Analyze Repositories for Evidence
+```http
+POST /api/v1/github/analyze
+Content-Type: application/json
+```
+
+Recursively scans file trees for dependency manifests (`requirements.txt`, `package.json`, `pom.xml`, `go.mod`), infrastructure files (`Dockerfile`, `docker-compose.yml`), and CI/CD configurations (`.github/workflows/*.yml`). Recomputes demonstrated skills idempotently.
+
+#### Request Body
+```json
+{
+  "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+  "selected_repo_ids": null,
+  "include_forks": false
+}
+```
+
+#### Response `200 OK`
+```json
+{
+  "data": {
+    "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+    "repository_name": "task-management-api",
+    "analyzed": true,
+    "repositories_analyzed": 1,
+    "evidence_count": 2,
+    "evidence_items_detected": 2,
+    "demonstrated_skills": [
+      {
+        "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+        "skill_name": "FastAPI",
+        "name": "FastAPI",
+        "canonical_slug": "fastapi",
+        "confidence_score": 0.95,
+        "evidence_type": "dependency",
+        "evidence_tier": "HIGH"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 8. Project Evidence APIs
+
+Auditable, concrete code artifacts extracted from repositories are stored in `project_evidence`.
+
+### 8.1 List Verified Project Evidence Items
+```http
+GET /api/v1/evidence?repository_id=7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d&limit=20&offset=0
+```
+
+#### Query Parameters
+- `limit` (integer, default: 20, min: 1, max: 100)
+- `offset` (integer, default: 0, min: 0)
+- `repository_id` / `repo_id` (UUID, optional): Filter by repository.
+- `skill_id` (UUID, optional): Filter by skill.
+- `evidence_type` (string, optional): Filter by evidence type (e.g. `dependency`, `dockerfile`, `ci_workflow`).
+- `user_id` (UUID, optional): Filter by user ID.
+
+#### Response `200 OK`
+```json
+{
+  "data": [
+    {
+      "evidence_id": "9b8a7f6e-5d4c-3b2a-1f0e-9d8c7b6a5e4d",
+      "repository_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+      "repo_name": "task-management-api",
+      "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "skill_name": "FastAPI",
+      "canonical_slug": "fastapi",
+      "evidence_type": "dependency",
+      "artifact_path": "backend/requirements.txt",
+      "file_path": "backend/requirements.txt",
+      "artifact_name": "requirements.txt",
+      "evidence_description": "FastAPI declared in requirements.txt",
+      "matched_content": "fastapi>=0.115.0",
+      "confidence_score": 0.95,
+      "evidence_metadata": {},
+      "detected_at": "2026-09-10T14:35:00Z",
+      "created_at": "2026-09-10T14:35:00Z"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### 8.2 Get Project Evidence Item Detail
+```http
+GET /api/v1/evidence/{evidence_id}
+```
+
+#### Response `200 OK`
+Returns single `ProjectEvidenceDetailResponse`.
+
+#### Error Responses
+- `404 Not Found`: Evidence item not found.
+
+---
+
+## 9. Canonical Job Roles APIs
+
+### 9.1 List Canonical Job Roles
+```http
+GET /api/v1/roles?category=Engineering&limit=20&offset=0
+```
+
+#### Query Parameters
+- `category` (string, optional): Role category filter.
+- `limit` (integer, default: 20, min: 1, max: 100)
+- `offset` (integer, default: 0, min: 0)
 
 #### Response `200 OK`
 ```json
@@ -655,26 +716,24 @@ GET /api/v1/roles?category=Engineering
       "title": "Backend Engineer",
       "slug": "backend-engineer",
       "category": "Engineering",
-      "description": "Designs, implements, and maintains scalable server-side systems, databases, and APIs."
-    },
-    {
-      "role_id": "0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
-      "title": "Full Stack Engineer",
-      "slug": "full-stack-engineer",
-      "category": "Engineering",
-      "description": "Builds complete web applications covering frontend user interfaces and backend services."
+      "description": "Designs, implements, and maintains server-side systems."
     }
   ],
   "meta": {
-    "total": 2
+    "total": 1,
+    "limit": 20,
+    "offset": 0
   }
 }
 ```
 
-### 9.2 Get Role by ID
+---
+
+### 9.2 Get Canonical Job Role by ID
 ```http
 GET /api/v1/roles/{role_id}
 ```
+
 #### Response `200 OK`
 ```json
 {
@@ -683,117 +742,24 @@ GET /api/v1/roles/{role_id}
     "title": "Backend Engineer",
     "slug": "backend-engineer",
     "category": "Engineering",
-    "description": "Designs, implements, and maintains scalable server-side systems, databases, and APIs."
+    "description": "Designs, implements, and maintains server-side systems."
   }
 }
 ```
 
 ---
 
-## 10. Industry Skill Demand
+## 10. Industry Skill Demand APIs
 
 > [!IMPORTANT]
-> **Data Integrity Constraint**: `demand_score` is a database-derived statistical metric calculated from structured, permitted job-market data. The API exposes stored values directly from PostgreSQL table `skill_demand`. The LLM MUST NOT calculate, rewrite, estimate, or override `demand_score`.
+> MVP demand data is **structured baseline data** stored in PostgreSQL table `skill_demand`. Real-time market data ingestion is a planned post-MVP capability. The LLM is strictly prohibited from altering or generating demand metrics.
 
-### 10.1 List Industry Demand
-```http
-GET /api/v1/demand?role_id=9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c&location=India&limit=10
-```
-#### Query Parameters
-- `role_id` (optional, UUID): Filter by target job role.
-- `location` (optional, string, default: `India`): Market geographic scope.
-- `limit` (optional, integer, default: 20): Maximum skills to return.
-- `offset` (optional, integer, default: 0): Records to skip.
-
-#### Response `200 OK`
-```json
-{
-  "data": [
-    {
-      "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-      "skill_name": "Python",
-      "canonical_slug": "python",
-      "role_title": "Backend Engineer",
-      "location": "India",
-      "sample_size": 14200,
-      "demand_score": 0.68,
-      "growth_rate": 0.08,
-      "data_updated_at": "2026-09-01"
-    },
-    {
-      "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
-      "skill_name": "Docker",
-      "canonical_slug": "docker",
-      "role_title": "Backend Engineer",
-      "location": "India",
-      "sample_size": 14200,
-      "demand_score": 0.51,
-      "growth_rate": 0.12,
-      "data_updated_at": "2026-09-01"
-    }
-  ],
-  "meta": {
-    "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
-    "location": "India",
-    "total": 2,
-    "data_freshness": "2026-09-01"
-  }
-}
-```
-
-### 10.2 Get Role Demand Breakdown
-```http
-GET /api/v1/demand/{role_id}?location=India
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "role": {
-      "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
-      "title": "Backend Engineer",
-      "slug": "backend-engineer",
-      "category": "Engineering",
-      "description": "Designs, implements, and maintains scalable server-side systems, databases, and APIs."
-    },
-    "skills": [
-      {
-        "skill_id": "64c288bb-5278-4506-a96f-f7e7a5004928",
-        "skill_name": "Git",
-        "canonical_slug": "git",
-        "category": "Systems",
-        "demand_score": 0.78,
-        "growth_rate": 0.02,
-        "sample_size": 14200,
-        "location": "India",
-        "data_updated_at": "2026-09-01"
-      }
-    ]
-  },
-  "meta": {
-    "total": 13,
-    "location": "India",
-    "data_freshness": "2026-09-01",
-    "total_demanded_skills": 13,
-    "average_demand_score": 0.58,
-    "highest_demand_score": 0.78,
-    "lowest_demand_score": 0.35,
-    "average_growth_rate": 0.08,
-    "top_skill": "Git"
-  }
-}
-```
-
-### 10.3 Audit Demand Data Quality & Integrity
+### 10.1 Audit Demand Data Quality & Integrity
 ```http
 GET /api/v1/demand/audit/quality
 ```
-Audits the integrity of the industry demand data foundation via SQL aggregations:
-- Confirms zero orphaned demand records
-- Confirms zero out-of-bounds demand scores (`0.0 <= demand_score <= 1.0`)
-- Confirms positive sample sizes (`sample_size > 0`)
-- Confirms zero duplicate records (`UNIQUE (role_id, skill_id, location)`)
-- Confirms 100% role coverage
+
+Executes SQL integrity audits: checks for orphaned roles, orphaned demand records, out-of-bounds scores (`0.0 <= demand_score <= 1.0`), non-positive sample sizes, and duplicate records.
 
 #### Response `200 OK`
 ```json
@@ -809,88 +775,60 @@ Audits the integrity of the industry demand data foundation via SQL aggregations
     "non_positive_sample_sizes": 0,
     "duplicate_records": 0,
     "data_freshness": "2026-09-01",
-    "audit_timestamp": "2026-09-01T16:20:00Z"
+    "audit_timestamp": "2026-09-10T14:40:00Z"
   }
 }
 ```
 
-### 10.4 Skill Demand Ranking
+---
+
+### 10.2 List Industry Skill Demand
 ```http
-GET /api/v1/intelligence/skills/ranking?location=India&limit=50
+GET /api/v1/demand?role_id=9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c&location=India&limit=20&offset=0
 ```
-Calculates weighted demand across the market:
-`SUM(demand_score * sample_size) / SUM(sample_size)`.
 
-### 10.5 Skill Across Roles
-```http
-GET /api/v1/intelligence/skills/{skill_id}/roles?location=India
-```
-Returns demand profile of a single skill across all canonical roles.
+#### Query Parameters
+- `role_id` (UUID, optional): Canonical job role filter.
+- `skill_id` (UUID, optional): Canonical skill filter.
+- `location` (string, default: `"India"`): Geographic scope.
+- `limit` (integer, default: 20, min: 1, max: 100)
+- `offset` (integer, default: 0, min: 0)
 
-### 10.6 Role Comparison
-```http
-POST /api/v1/intelligence/roles/compare
-Content-Type: application/json
-
+#### Response `200 OK`
+```json
 {
-  "role_ids": ["UUID_1", "UUID_2"],
-  "location": "India"
+  "data": [
+    {
+      "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "skill_name": "Python",
+      "canonical_slug": "python",
+      "category": "Programming Languages",
+      "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+      "role_title": "Backend Engineer",
+      "location": "India",
+      "sample_size": 14200,
+      "demand_score": 0.78,
+      "growth_rate": 0.08,
+      "data_updated_at": "2026-09-01"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "limit": 20,
+    "offset": 0,
+    "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+    "location": "India",
+    "data_freshness": "2026-09-01"
+  }
 }
 ```
-Compares 2 to 5 canonical job roles deterministically. Identifies shared skills, role-specific specializations, and demand score differentials.
-
-### 10.7 Role Market Signals
-```http
-GET /api/v1/intelligence/roles/{role_id}/signals?location=India
-```
-Returns market-demand signals including counts of rising, stable, and declining skills, top 5 demanded skills, and top 5 fastest growing skills.
-
-### 10.8 Demand Trends
-```http
-GET /api/v1/intelligence/trends?location=India&limit=20
-```
-Lists demand records enriched with growth trajectory classifications (`RISING`, `STABLE`, `DECLINING`), ordered by growth rate descending.
 
 ---
 
-## 11. Skill Gap Analysis
-
-Combines claimed skills, verified project evidence, target role requirements, and mathematical industry demand metrics.
-
-### Evidence Classification Tiers
-- `HIGH`: Claimed in resume AND demonstrated by repository code artifacts.
-- `MEDIUM`: Demonstrated by repository code artifacts without explicit resume claim.
-- `LOW`: Claimed in resume only; zero repository code artifacts detected.
-- `MISSING`: Required by target role but neither claimed nor demonstrated.
-
-### Priority Score Formula
-The engine prioritizes skill gaps using a deterministic formula with configurable weights:
-$$\text{Priority} = w_{\text{demand}} \cdot \text{DemandScore} + w_{\text{growth}} \cdot \text{GrowthRate} + w_{\text{gap}} \cdot (1 - \text{EvidenceScore}) + \text{PrerequisiteBonus}$$
-
-Where:
-- $w_{\text{demand}} = 0.40$ (market baseline demand weight)
-- $w_{\text{growth}} = 0.20$ (market trend trajectory weight)
-- $w_{\text{gap}} = 0.30$ (candidate proficiency deficit weight)
-- $\text{PrerequisiteBonus} = 0.10$ (applied if all prerequisites in DAG are satisfied)
-
-### 11.1 Retrieve Skill Gaps for Role
+### 10.3 Get Role Demand Profile Breakdown
 ```http
-GET /api/v1/gaps/{role_id}?location=India&status=MISSING&limit=50&offset=0
-X-User-Id: <optional_user_id>
+GET /api/v1/demand/{role_id}?location=India
 ```
-Computes and returns the candidate's deterministic skill gap analysis against a canonical target role.
-Combines:
-- Industry demand requirements for the target role (`skill_demand`)
-- Candidate resume claims (`user_claimed_skills`)
-- Candidate GitHub demonstrated evidence (`demonstrated_skills`)
-Classifies each skill into `STRONG`, `PARTIAL`, or `MISSING`.
-
-#### Query Parameters:
-- `location` (string, optional, default: `"India"`, 1–64 chars): Market geographic scope. Blank or whitespace returns `422`.
-- `status` (string, optional): Filter by gap status (`STRONG`, `PARTIAL`, `MISSING`). Invalid value returns `422`.
-- `limit` (integer, optional, 1–100): Maximum records to return. Invalid bounds return `422`.
-- `offset` (integer, optional, default: 0, $\ge 0$): Pagination offset. Negative values return `422`.
-- `user_id` (UUID, optional): Scoped candidate ID. If mismatched with `X-User-Id`, returns `403 Forbidden`. If non-existent, returns `404 Not Found`.
 
 #### Response `200 OK`
 ```json
@@ -900,7 +838,145 @@ Classifies each skill into `STRONG`, `PARTIAL`, or `MISSING`.
       "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
       "title": "Backend Engineer",
       "slug": "backend-engineer",
-      "category": "Backend",
+      "category": "Engineering",
+      "description": "Designs, implements, and maintains server-side systems."
+    },
+    "skills": [
+      {
+        "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+        "skill_name": "Python",
+        "canonical_slug": "python",
+        "category": "Programming Languages",
+        "demand_score": 0.78,
+        "growth_rate": 0.08,
+        "sample_size": 14200,
+        "location": "India",
+        "data_updated_at": "2026-09-01"
+      }
+    ]
+  },
+  "meta": {
+    "total": 1,
+    "location": "India",
+    "data_freshness": "2026-09-01",
+    "total_demanded_skills": 1,
+    "average_demand_score": 0.78,
+    "highest_demand_score": 0.78,
+    "lowest_demand_score": 0.78,
+    "average_growth_rate": 0.08,
+    "top_skill": "Python"
+  }
+}
+```
+
+---
+
+## 11. Demand Intelligence APIs
+
+Advanced analytical endpoints for skill rankings, multi-role comparisons, market signals, and growth trends.
+
+### 11.1 Skill Demand Ranking
+```http
+GET /api/v1/intelligence/skills/ranking?location=India&limit=50&offset=0
+```
+Calculates weighted demand across the market: `SUM(demand_score * sample_size) / SUM(sample_size)`.
+
+### 11.2 Skill Demand Profile Across Job Roles
+```http
+GET /api/v1/intelligence/skills/{skill_id}/roles?location=India
+```
+Returns cross-role demand profile for a specific skill.
+
+### 11.3 Compare Canonical Job Roles
+```http
+POST /api/v1/intelligence/roles/compare
+Content-Type: application/json
+```
+Compares 2 to 5 canonical job roles deterministically. Identifies shared skills, role-specific specializations, and demand score differentials.
+
+#### Request Body
+```json
+{
+  "role_ids": [
+    "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+    "0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d"
+  ],
+  "location": "India"
+}
+```
+
+### 11.4 Role Market Signals
+```http
+GET /api/v1/intelligence/roles/{role_id}/signals?location=India
+```
+Returns rising, stable, and declining skill counts, top 5 demanded skills, and top 5 fastest growing skills.
+
+### 11.5 Demand Growth Trends
+```http
+GET /api/v1/intelligence/trends?location=India&limit=20&offset=0
+```
+Lists demand records enriched with growth trajectory classifications (`RISING`, `STABLE`, `DECLINING`), ordered by growth rate descending.
+
+---
+
+## 12. Skill Gap & Priority APIs
+
+The Skill Gap Engine compares candidate evidence against structured role demand requirements using deterministic formulas.
+
+### Supported Candidate Evidence States:
+1. **Resume Only**: Extracted claimed skills; demonstrated evidence is empty.
+2. **GitHub Only**: Inspected repositories; claimed evidence is empty.
+3. **Resume + GitHub**: Unified synthesis cross-validating claims against code artifacts.
+
+### Deterministic Gap Classifications:
+- `STRONG`: Candidate evidence satisfies or exceeds benchmark requirements.
+- `PARTIAL`: Moderate evidence or claimed skill lacking sufficient demonstrated depth.
+- `MISSING`: Target-role skill with neither claimed nor demonstrated evidence.
+
+*(Note: No alternative classification names are used; LLMs do not perform classification).*
+
+### Priority Scoring Formula (`scoring_version: "v1"`):
+$$\text{growth\_signal} = \text{clamp}\left(\frac{\text{growth\_rate} + 1.0}{2.0}, 0.0, 1.0\right)$$
+$$\text{priority\_score} = \text{gap\_severity\_weight} \cdot (0.70 \cdot \text{demand\_score} + 0.30 \cdot \text{growth\_signal})$$
+
+Where:
+- $\text{gap\_severity\_weight}$: `MISSING` = $1.0$, `PARTIAL` = $0.5$, `STRONG` = $0.0$
+- Priority Tiers:
+  - `HIGH`: $\text{priority\_score} \ge 0.67$
+  - `MEDIUM`: $0.34 \le \text{priority\_score} < 0.67$
+  - `LOW`: $\text{priority\_score} < 0.34$
+
+---
+
+### 12.1 Get Skill Gaps for Target Role
+```http
+GET /api/v1/gaps/{role_id}?location=India&status=MISSING
+X-User-Id: <optional_uuid>
+```
+
+#### Query Parameters
+- `location` (string, default: `"India"`): 1–64 characters, non-blank.
+- `status` (string, optional): Filter by gap status (`STRONG`, `PARTIAL`, `MISSING`).
+- `limit` (integer, optional): 1–100.
+- `offset` (integer, default: 0): Offset $\ge 0$.
+- `user_id` (UUID, optional): Scoped user ID.
+- `resume_id` (UUID, optional): Specific resume ID scope.
+- `username` (string, optional): GitHub account scope.
+- `include_resume` (boolean, default: `true`): Include resume claims.
+- `include_github` (boolean, default: `true`): Include GitHub demonstrated evidence.
+
+#### Headers
+- `X-User-Id` (string, optional): Authenticated candidate UUID for IDOR protection.
+
+#### Response `200 OK`
+```json
+{
+  "data": {
+    "role": {
+      "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+      "title": "Backend Engineer",
+      "slug": "backend-engineer",
+      "category": "Engineering",
       "description": "Designs, implements, and maintains server-side systems."
     },
     "location": "India",
@@ -912,13 +988,13 @@ Classifies each skill into `STRONG`, `PARTIAL`, or `MISSING`.
     },
     "skills": [
       {
-        "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
         "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
         "skill_name": "Docker",
         "canonical_slug": "docker",
         "category": "DevOps",
         "status": "MISSING",
-        "demand_score": 0.51,
+        "demand_score": 0.80,
         "growth_rate": 0.12,
         "claimed": false,
         "claim_confidence": 0.0,
@@ -929,87 +1005,33 @@ Classifies each skill into `STRONG`, `PARTIAL`, or `MISSING`.
         "priority_score": 0.71,
         "priority_level": "HIGH",
         "scoring_version": "v1"
-      },
-      {
-        "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
-        "skill_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
-        "skill_name": "Python",
-        "canonical_slug": "python",
-        "category": "Programming",
-        "status": "STRONG",
-        "demand_score": 0.78,
-        "growth_rate": 0.08,
-        "claimed": true,
-        "claim_confidence": 1.0,
-        "demonstrated": true,
-        "demonstrated_score": 0.95,
-        "evidence_level": "HIGH",
-        "evidence_count": 2
       }
     ]
   },
   "meta": {
     "user_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
     "location": "India",
-    "calculated_at": "2026-09-02T09:15:00Z",
+    "calculated_at": "2026-09-10T14:45:00Z",
     "data_freshness": "2026-09-01",
     "scoring_version": "v1"
   }
 }
 ```
 
-### 11.2 Execute Gap Analysis
+---
+
+### 12.2 Get Prioritized Actionable Gaps for Role
 ```http
-POST /api/v1/gaps/analyze
-Content-Type: application/json
-X-User-Id: <optional_user_id>
-
-{
-  "target_role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
-  "location": "India",
-  "user_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c"
-}
+GET /api/v1/gaps/{role_id}/priorities?location=India&priority_level=HIGH&status=MISSING
+X-User-Id: <optional_uuid>
 ```
-Idempotently analyzes and reconciles candidate skill gaps.
-- **Idempotency**: Repeated calls do not duplicate rows or alter scores.
-- **Stale Cleanup**: Purges obsolete skill requirements if role requirements change.
-- **Security**: Validates location (non-blank). Returns `403 Forbidden` if `user_id` conflicts with `X-User-Id`. Returns `404 Not Found` if user does not exist.
 
-#### Response `200 OK`
-Returns the deterministic skill gap analysis object (`SkillGapResponse`).
+Retrieves candidate's actionable gaps (`MISSING` and `PARTIAL` only). `STRONG` skills are excluded.
 
-### 11.3 Retrieve Prioritized Actionable Gaps for Role
-```http
-GET /api/v1/gaps/{role_id}/priorities?location=India&priority_level=HIGH&status=MISSING&limit=50&offset=0
-X-User-Id: <optional_user_id>
-```
-Retrieves candidate's deterministically prioritized actionable skill gaps (`MISSING` and `PARTIAL` only). `STRONG` skills are excluded.
-
-#### Query Parameters:
-- `location` (string, optional, default: `"India"`, 1–64 chars): Market geographic scope.
-- `priority_level` (string, optional): Filter by priority tier (`HIGH`, `MEDIUM`, `LOW`). Invalid value returns `422`.
-- `status` (string, optional): Filter by actionable gap severity (`MISSING`, `PARTIAL`). Invalid value (such as `STRONG`) returns `422`.
-- `limit` (integer, optional, 1–100): Maximum records to return.
-- `offset` (integer, optional, default: 0, $\ge 0$): Pagination offset.
-- `user_id` (UUID, optional): Scoped candidate ID. IDOR protected via `X-User-Id`.
-
-#### Priority Model (`scoring_version: "v1"`):
-$$\text{growth\_signal} = \text{clamp}\left(\frac{\text{growth\_rate} + 1.0}{2.0}, 0.0, 1.0\right)$$
-$$\text{priority\_score} = \text{gap\_severity\_weight} \cdot (0.70 \cdot \text{demand\_score} + 0.30 \cdot \text{growth\_signal})$$
-Where:
-- $\text{gap\_severity\_weight}$: `MISSING` = $1.0$, `PARTIAL` = $0.5$, `STRONG` = $0.0$
-- Priority Tiers:
-  - `HIGH`: $\text{priority\_score} \ge 0.67$
-  - `MEDIUM`: $0.34 \le \text{priority\_score} < 0.67$
-  - `LOW`: $\text{priority\_score} < 0.34$
-
-#### Deterministic Ordering:
-1. `priority_score DESC`
-2. `MISSING before PARTIAL`
-3. `demand_score DESC`
-4. `growth_rate DESC`
-5. `skill.name ASC`
-6. `skill.id ASC`
+#### Query Parameters
+- `priority_level` (string, optional): `HIGH`, `MEDIUM`, `LOW`.
+- `status` (string, optional): `MISSING`, `PARTIAL`. (Requesting `STRONG` returns `422 Unprocessable Entity`).
+- Other parameters match Section 12.1.
 
 #### Response `200 OK`
 ```json
@@ -1019,7 +1041,7 @@ Where:
       "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
       "title": "Backend Engineer",
       "slug": "backend-engineer",
-      "category": "Backend",
+      "category": "Engineering",
       "description": "Designs, implements, and maintains server-side systems."
     },
     "location": "India",
@@ -1056,31 +1078,60 @@ Where:
   "meta": {
     "user_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
     "location": "India",
-    "calculated_at": "2026-09-02T10:00:00Z",
+    "calculated_at": "2026-09-10T14:45:00Z",
     "data_freshness": "2026-09-01",
     "scoring_version": "v1"
   }
 }
 ```
 
-### 11.4 Retrieve Gap Evidence Chain for Skill
+---
+
+### 12.3 Execute Skill Gap Analysis
+```http
+POST /api/v1/gaps/analyze
+Content-Type: application/json
+X-User-Id: <optional_uuid>
+```
+
+Computes and idempotently persists skill gap results in PostgreSQL.
+
+#### Request Body
+```json
+{
+  "target_role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
+  "location": "India",
+  "user_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
+  "resume_id": null,
+  "include_resume": true,
+  "include_github": true,
+  "username": "janedoe"
+}
+```
+
+#### Response `200 OK`
+Returns `SkillGapResponse` object matching Section 12.1.
+
+---
+
+## 13. Evidence Audit API
+
+### 13.1 Retrieve Audit Evidence Chain for Skill Gap
 ```http
 GET /api/v1/gaps/{role_id}/skills/{skill_id}/evidence?location=India
-X-User-Id: <optional_user_id>
+X-User-Id: <optional_uuid>
 ```
-Retrieves the complete deterministic evidence chain and audit trail for a specific skill gap:
-- **Candidate Evidence**: Extracted resume claims (`user_claimed_skills`, `resumes`) and verified GitHub code artifacts (`demonstrated_skills`, `project_evidence`, `github_repositories`).
-- **Market Evidence**: Canonical industry demand statistics (`skill_demand`) for the target role and location.
-- **Deterministic Reasoning**: Rule-based grounded explanations for status classification and priority tier without LLM inference.
+
+Retrieves the complete, auditable evidence chain for a specific skill gap, detailing the relationship between resume evidence, GitHub artifacts, market signals, and rule-based explanations.
 
 #### Response `200 OK`
 ```json
 {
   "data": {
-    "skill_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+    "skill_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
     "skill_name": "Python",
     "canonical_slug": "python",
-    "category": "Programming",
+    "category": "Programming Languages",
     "status": "STRONG",
     "priority_score": null,
     "priority_level": null,
@@ -1088,35 +1139,35 @@ Retrieves the complete deterministic evidence chain and audit trail for a specif
       "has_evidence": true,
       "resume_claims": [
         {
-          "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-          "raw_mention": "Python 3.12 Core & Asyncio",
+          "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "raw_mention": "Python 3.12 Core & AsyncIO",
           "confidence_score": 1.0,
           "source": "resume",
-          "resume_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
-          "resume_file_name": "resume_2026.pdf",
-          "created_at": "2026-09-02T09:00:00Z"
+          "resume_id": "ff158ffc-ea91-4068-ad97-52e977abbda2",
+          "resume_file_name": "jane_doe_resume.pdf",
+          "created_at": "2026-09-10T14:30:00Z"
         }
       ],
       "github_demonstrated": {
-        "confidence_score": 0.92,
+        "confidence_score": 0.95,
         "evidence_level": "HIGH",
         "evidence_count": 1,
         "repository_count": 1,
-        "last_verified_at": "2026-09-02T09:10:00Z"
+        "last_verified_at": "2026-09-10T14:35:00Z"
       },
       "github_artifacts": [
         {
-          "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+          "id": "9b8a7f6e-5d4c-3b2a-1f0e-9d8c7b6a5e4d",
           "repo_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
-          "repo_name": "live-async-api",
-          "repo_full_name": "user/live-async-api",
-          "repo_url": "https://github.com/user/live-async-api",
-          "evidence_type": "MANIFEST_DEPENDENCY",
-          "file_path": "requirements.txt",
-          "artifact_name": "uvicorn",
-          "matched_content": "uvicorn>=0.28.0",
-          "confidence_score": 0.92,
-          "detected_at": "2026-09-02T09:10:00Z"
+          "repo_name": "task-management-api",
+          "repo_full_name": "janedoe/task-management-api",
+          "repo_url": "https://github.com/janedoe/task-management-api",
+          "evidence_type": "dependency",
+          "file_path": "backend/requirements.txt",
+          "artifact_name": "requirements.txt",
+          "matched_content": "fastapi>=0.115.0",
+          "confidence_score": 0.95,
+          "detected_at": "2026-09-10T14:35:00Z"
         }
       ]
     },
@@ -1127,11 +1178,11 @@ Retrieves the complete deterministic evidence chain and audit trail for a specif
       "location": "India",
       "demand_score": 0.78,
       "growth_rate": 0.08,
-      "sample_size": 10000,
-      "data_updated_at": "2026-09-01T00:00:00Z"
+      "sample_size": 14200,
+      "data_updated_at": "2026-09-01"
     },
     "reasoning": {
-      "classification_reason": "Strong because verified GitHub code artifacts demonstrate this skill at HIGH confidence (92%) across 1 repository(ies) with 1 evidence artifact(s).",
+      "classification_reason": "Strong because verified GitHub code artifacts demonstrate this skill at HIGH confidence (95%) across 1 repository(ies) with 1 evidence artifact(s).",
       "priority_reason": "Skill is already sufficiently demonstrated (STRONG). It is not considered an actionable gap.",
       "scoring_version": "v1"
     }
@@ -1139,708 +1190,173 @@ Retrieves the complete deterministic evidence chain and audit trail for a specif
   "meta": {
     "user_id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
     "location": "India",
-    "calculated_at": "2026-09-02T10:15:00Z",
+    "calculated_at": "2026-09-10T14:50:00Z",
     "data_freshness": "2026-09-01",
     "scoring_version": "v1"
   }
 }
 ```
 
-### 11.5 Active Gaps State
-```http
-GET /api/v1/gaps
-```
-#### Response `200 OK`
-Returns the latest computed gap analysis state for the authenticated user.
+---
+
+## 14. Ownership, Scoping & Security Contract
+
+### 14.1 Candidate Data Isolation
+All candidate-specific resources implement strict ownership scoping:
+- **IDOR Protection**: When both `user_id` query parameter and `X-User-Id` header are present, they must match. Conflicting IDs trigger `403 Forbidden`.
+- **User Existence**: If a `user_id` is supplied, the database checks that the user exists. Nonexistent IDs trigger `404 Not Found`.
+- **Resume Ownership**: If a `resume_id` is supplied:
+  - The resume must exist (`404 Not Found`).
+  - If the candidate is authenticated (`user_id` is present), the resume must belong to that candidate (`403 Forbidden`).
+  - If the session is unauthenticated (`user_id` is None), attempting to access a resume owned by an authenticated user returns `403 Forbidden`.
+- **Cross-User Leakage**: Claimed skills and demonstrated skills are queried strictly filtered by `user_id` or `resume_id`.
+
+### 14.2 Shared Catalog Integrity
+Canonical entities (`skills`, `job_roles`, `skill_demand`) are global public read-only catalogs. They cannot be modified by candidate API requests.
 
 ---
 
-## 12. Roadmap APIs
+## 15. Implemented MVP Endpoints
 
-The Roadmap Engine sequences prioritized skill gaps into structured learning milestones:
-```text
-Ranked Skill Gaps
-      ↓
-Prerequisite DAG Inspection (skill_dependencies)
-      ↓
-Topological Sort with Priority Tie-Breaking
-      ↓
-Milestone Clustering & Workload Partitioning
-      ↓
-Curated Resource Association (learning_resources)
-      ↓
-Hands-On Project Assignment & GitHub Rubric
-      ↓
-Persisted Roadmap & Milestones (roadmaps, roadmap_milestones)
-```
+The following table lists the active endpoints implemented in the SkillForge AI v1.0.0 MVP:
 
-The LLM is strictly prohibited from altering topological prerequisite orderings.
-
-### 12.1 Generate Personalized Roadmap
-```http
-POST /api/v1/roadmaps/generate
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "role_id": "9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c",
-  "weekly_hours_commitment": 10
-}
-```
-#### Response `201 Created`
-```json
-{
-  "data": {
-    "roadmap_id": "5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
-    "role_title": "Backend Engineer",
-    "status": "ACTIVE",
-    "total_milestones": 3,
-    "estimated_weeks": 6,
-    "milestones": [
-      {
-        "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-        "sequence_order": 1,
-        "title": "Containerization & Microservices Infrastructure",
-        "description": "Master Docker containerization, multi-container Docker Compose architectures, and image optimization.",
-        "target_skills": ["Docker", "Docker Compose"],
-        "estimated_hours": 15,
-        "status": "IN_PROGRESS"
-      },
-      {
-        "milestone_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
-        "sequence_order": 2,
-        "title": "Cloud Native Orchestration",
-        "description": "Deploy resilient microservices to Kubernetes clusters with ingress controllers and persistent volumes.",
-        "target_skills": ["Kubernetes"],
-        "estimated_hours": 20,
-        "status": "NOT_STARTED"
-      }
-    ],
-    "created_at": "2026-09-01T14:45:00Z"
-  }
-}
-```
-
-### 12.2 List User Roadmaps
-```http
-GET /api/v1/roadmaps
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": [
-    {
-      "roadmap_id": "5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
-      "role_title": "Backend Engineer",
-      "status": "ACTIVE",
-      "total_milestones": 3,
-      "created_at": "2026-09-01T14:45:00Z"
-    }
-  ],
-  "meta": { "total": 1 }
-}
-```
-
-### 12.3 Get Roadmap Details
-```http
-GET /api/v1/roadmaps/{roadmap_id}
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-Returns the complete roadmap object with milestones.
-
-### 12.4 Get Roadmap Milestones
-```http
-GET /api/v1/roadmaps/{roadmap_id}/milestones
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-Returns the ordered array of milestones for `{roadmap_id}`.
-
-### 12.5 Update Milestone Status
-```http
-PATCH /api/v1/roadmaps/{roadmap_id}/milestones/{milestone_id}
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "status": "IN_PROGRESS"
-}
-```
-#### Allowed Statuses
-`NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `VERIFIED`.
-
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-    "status": "IN_PROGRESS",
-    "updated_at": "2026-09-01T14:50:00Z"
-  }
-}
-```
-
----
-
-## 13. Learning Resources
-
-Educational resources mapped to canonical skills stored in `learning_resources`.
-
-### 13.1 List Learning Resources
-```http
-GET /api/v1/resources?skill_id=3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f&difficulty=beginner
-```
-#### Query Parameters
-- `skill_id` (optional, UUID): Filter by canonical skill.
-- `difficulty` (optional, string): `beginner`, `intermediate`, `advanced`.
-- `resource_type` (optional, string): `documentation`, `course`, `tutorial`, `book`.
-- `limit` (optional, integer, default: 20): Maximum records.
-- `offset` (optional, integer, default: 0): Records to skip.
-
-#### Response `200 OK`
-```json
-{
-  "data": [
-    {
-      "resource_id": "8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e",
-      "skill_name": "Docker",
-      "title": "Official Docker Getting Started Guide",
-      "url": "https://docs.docker.com/get-started/",
-      "resource_type": "documentation",
-      "difficulty": "beginner",
-      "rating": 4.8
-    }
-  ],
-  "meta": { "total": 1 }
-}
-```
-
-### 13.2 Get Resource Details
-```http
-GET /api/v1/resources/{resource_id}
-```
-#### Response `200 OK`
-Returns the single learning resource entity matching `{resource_id}`.
-
----
-
-## 14. Resource Recommendation
-
-Selects curated learning materials using deterministic filters and semantic vector similarity in PostgreSQL `pgvector`. RAG is forbidden from fabricating resource URLs or metadata.
-
-### 14.1 Get Recommendations for Milestone
-```http
-POST /api/v1/resources/recommend
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-  "limit": 3
-}
-```
-#### Selection Pipeline
-1. Identifies `target_skills` in the milestone.
-2. Inspects candidate's current evidence level (skips basic content if prior evidence exists).
-3. Matches resources in `learning_resources` by canonical `skill_id`.
-4. Ranks candidates by `rating` and cosine similarity against milestone requirements.
-
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-    "recommendations": [
-      {
-        "resource_id": "8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e",
-        "title": "Official Docker Getting Started Guide",
-        "url": "https://docs.docker.com/get-started/",
-        "resource_type": "documentation",
-        "difficulty": "beginner",
-        "skill_name": "Docker",
-        "relevance_score": 0.94
-      }
-    ]
-  }
-}
-```
-
----
-
-## 15. AI Assistant
-
-The Contextual AI Assistant provides grounded guidance, explains prerequisite rationale, and clarifies project rubrics.
-
-### Retrieval & Grounding Pipeline
-```text
-User Prompt + Authenticated User Context
-                 ↓
-Query Embedding Generation (pgvector)
-                 ↓
-Cosine Similarity Retrieval from rag_documents
-                 ↓
-Deterministic Grounding Facts Injected:
-  • Target Role & Market Demand % from skill_demand
-  • Verified User Skills & Gaps from project_evidence
-  • Active Roadmap Milestone Status
-                 ↓
-LLM Prompt Assembly & Structured Generation
-                 ↓
-Grounded Response Returned
-```
-
-The LLM cannot modify system-of-record data, nor can it invent numerical demand figures. Responses are returned as structured JSON payloads.
-
-### 15.1 Assistant Chat
-```http
-POST /api/v1/assistant/chat
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "message": "Why is Docker scheduled before Kubernetes in my roadmap?",
-  "active_milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c"
-}
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "reply": "Docker is sequenced before Kubernetes because container runtime fundamentals are a hard architectural prerequisite for cluster orchestration in our taxonomy. In the Indian market for Backend Engineers, Docker exhibits 51% demand with +12% annual growth. Mastering container build files, networking, and multi-container Docker Compose provides the practical artifacts required before deploying distributed Kubernetes pods.",
-    "grounded_facts": {
-      "target_role": "Backend Engineer",
-      "market_demand": "51%",
-      "growth_rate": "+12%",
-      "dependency_relationship": "Docker is a hard prerequisite for Kubernetes in canonical taxonomy"
-    },
-    "referenced_sources": [
-      {
-        "title": "SkillForge Taxonomy Prerequisite Graph",
-        "corpus_type": "taxonomy"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 16. GitHub Project Verification
-
-Automated verification loop evaluating hands-on candidate repositories against the milestone rubric. Merely creating an empty repository does not pass verification.
-
-### 16.1 Verify Completed Milestone
-```http
-POST /api/v1/verify/project
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-#### Request Body
-```json
-{
-  "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-  "repository_url": "https://github.com/janedoe/task-management-api"
-}
-```
-#### Evaluation Pipeline
-```text
-POST /verify/project
-       ↓
-GitHub API Repository Tree Scan
-       ↓
-Inspect Manifests, Dockerfile, Workflows, Source
-       ↓
-Rubric Evaluation against Milestone Target Skills
-       ↓
-Outcome Decision:
-  ├── PASS (Score >= 0.70):
-  │     • Insert rows into project_evidence
-  │     • Update roadmap_milestones status to 'VERIFIED'
-  │     • Elevate skill evidence tiers to 'DEMONSTRATED' / 'HIGH'
-  │     • Recompute active skill gaps
-  └── FAIL (Score < 0.70):
-        • Return detailed missing criteria checklist
-        • Status remains 'IN_PROGRESS'
-```
-
-#### Response `200 OK (Verification Passed)`
-```json
-{
-  "data": {
-    "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-    "verification_status": "VERIFIED",
-    "score": 0.85,
-    "evaluated_criteria": [
-      { "criterion": "Dockerfile present and syntactically valid", "passed": true },
-      { "criterion": "docker-compose.yml multi-service configuration", "passed": true },
-      { "criterion": "Service health check defined", "passed": true }
-    ],
-    "elevated_skills": ["Docker", "Docker Compose"],
-    "next_milestone_id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d"
-  }
-}
-```
-
-#### Response `200 OK (Verification Failed)`
-```json
-{
-  "data": {
-    "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-    "verification_status": "REJECTED",
-    "score": 0.40,
-    "evaluated_criteria": [
-      { "criterion": "Dockerfile present and syntactically valid", "passed": true },
-      { "criterion": "docker-compose.yml multi-service configuration", "passed": false },
-      { "criterion": "Service health check defined", "passed": false }
-    ],
-    "missing_evidence": [
-      "No docker-compose.yml file detected in repository root.",
-      "Dockerfile is missing HEALTHCHECK directive or service check."
-    ],
-    "actionable_checklist": [
-      "Add a valid docker-compose.yml coordinating your web service and database.",
-      "Include a HEALTHCHECK CMD curl in your Dockerfile."
-    ]
-  }
-}
-```
-
----
-
-## 17. Dashboard API
-
-Consolidated dashboard endpoint designed for the Next.js frontend to eliminate redundant roundtrips and avoid duplicating business logic client-side.
-
-### 17.1 Get Dashboard State
-```http
-GET /api/v1/dashboard
-Authorization: Bearer <access_token>
-```
-#### Response `200 OK`
-```json
-{
-  "data": {
-    "user": {
-      "user_id": "8a3e72c1-6789-4a12-b345-987654321abc",
-      "full_name": "Jane Doe",
-      "target_role": "Backend Engineer",
-      "weekly_hours_commitment": 10
-    },
-    "skills_summary": {
-      "claimed_count": 8,
-      "demonstrated_count": 4,
-      "verified_count": 2
-    },
-    "top_skill_gaps": [
-      {
-        "skill_name": "Docker",
-        "priority_rank": 1,
-        "demand_score": 0.51,
-        "evidence_tier": "MISSING"
-      },
-      {
-        "skill_name": "Kubernetes",
-        "priority_rank": 2,
-        "demand_score": 0.38,
-        "evidence_tier": "MISSING"
-      }
-    ],
-    "active_roadmap": {
-      "roadmap_id": "5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
-      "status": "ACTIVE",
-      "current_milestone": {
-        "milestone_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
-        "sequence_order": 1,
-        "title": "Containerization & Microservices Infrastructure",
-        "status": "IN_PROGRESS"
-      },
-      "completed_milestones_count": 0,
-      "total_milestones_count": 3
-    }
-  }
-}
-```
-
----
-
-## 18. Common Response Format
-
-All API responses conform to standard JSON envelopes.
-
-### 18.1 Single Resource Envelope
-```json
-{
-  "data": { ... }
-}
-```
-
-### 18.2 Collection Envelope with Pagination Metadata
-```json
-{
-  "data": [ ... ],
-  "meta": {
-    "total": 42,
-    "limit": 20,
-    "offset": 0
-  }
-}
-```
-
-### 18.3 HTTP Status Codes Used
-| Status Code | Meaning | Standard Usage |
-| :--- | :--- | :--- |
-| `200 OK` | Success | Successful resource retrieval, update, or calculation. |
-| `201 Created` | Resource Created | Successful entity creation (register, upload, generate). |
-| `204 No Content` | Success (No Body) | Successful resource deletion. |
-| `400 Bad Request` | Client Error | Invalid format, malformed input, magic-byte mismatch. |
-| `401 Unauthorized` | Authentication Failure | Missing, invalid, or expired JWT bearer token. |
-| `403 Forbidden` | Access Denied | Accessing a resource owned by another user. |
-| `404 Not Found` | Resource Absent | Requested resource does not exist in datastore. |
-| `409 Conflict` | State Conflict | Duplicate unique field (e.g. duplicate email). |
-| `413 Payload Too Large` | File Too Large | File upload exceeds maximum threshold (5 MB). |
-| `422 Unprocessable Entity` | Schema Error | Pydantic payload validation failure. |
-| `500 Internal Server Error` | Server Error | Unhandled backend exception. |
-
----
-
-## 19. Error Response Format
-
-Errors return consistent payloads with standard error codes:
-
-```json
-{
-  "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "The requested roadmap milestone does not exist.",
-    "details": {
-      "resource_type": "milestone",
-      "resource_id": "6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c"
-    }
-  }
-}
-```
-
-### Standard Error Codes
-| Error Code | HTTP Status | Description |
-| :--- | :--- | :--- |
-| `VALIDATION_ERROR` | 422 / 400 | Request parameter or payload failed Pydantic validation. |
-| `UNSUPPORTED_MEDIA_TYPE` | 400 | File is not an accepted PDF or DOCX binary. |
-| `FILE_TOO_LARGE` | 413 | File exceeds 5 MB size limit. |
-| `AUTHENTICATION_REQUIRED` | 401 | Missing or invalid Authorization header. |
-| `FORBIDDEN_ACCESS` | 403 | User does not own the requested resource. |
-| `RESOURCE_NOT_FOUND` | 404 | Entity not found in database. |
-| `DUPLICATE_RESOURCE` | 409 | Resource violates unique constraint. |
-| `INTERNAL_SERVER_ERROR` | 500 | Unhandled exception (sanitized in production). |
-
-*Security Rule*: Stack traces, internal file paths, database connection strings, and tokens are NEVER exposed in error responses.
-
----
-
-## 20. Validation Rules
-
-| Field / Parameter | Type | Validation Constraints |
-| :--- | :--- | :--- |
-| `id` / `*_id` | UUID | Valid RFC 4122 UUIDv4 string. |
-| `email` | String | Valid email address; max 255 characters; normalized lowercase. |
-| `password` | String | Minimum 8 characters; at least 1 number and 1 special character. |
-| `file` (Resume) | Binary | Strictly `.pdf` or `.docx`; max 5 MB ($5 \times 1024 \times 1024$ bytes); valid magic bytes (`%PDF-` or `PK\x03\x04`). |
-| `confidence_score` | Float | $0.0 \le \text{confidence\_score} \le 1.0$. |
-| `demand_score` | Float | $0.0 \le \text{demand\_score} \le 1.0$. |
-| `growth_rate` | Float | Real number representing YoY growth (e.g. $-0.50 \le \text{growth\_rate} \le +2.00$). |
-| `weekly_hours` | Integer | $5 \le \text{weekly\_hours\_commitment} \le 40$. |
-| `repository_url` | String | Valid HTTP/HTTPS GitHub URL (`https://github.com/:owner/:repo`). |
-
----
-
-## 21. Authorization & Ownership
-
-All user-specific endpoints enforce strict ownership:
-- Queries execute scoped database operations: `SELECT ... WHERE user_id = current_user.id`.
-- Accessing another user's resume, repository, roadmap, evidence, or assistant history returns `404 Not Found` or `403 Forbidden`.
-- Global public read-only catalogs (`skills`, `job_roles`, `skill_demand`, `learning_resources`) are readable by all authenticated or guest users.
-
----
-
-## 22. API-to-Database Mapping
-
-| Endpoint | HTTP Method | Primary Database Tables |
-| :--- | :--- | :--- |
-| `/auth/register`, `/auth/login`, `/auth/me` | POST, GET | `users` |
-| `/users/me` | GET, PATCH | `users` |
-| `/resumes/upload`, `/resumes`, `/resumes/{id}` | POST, GET, DELETE | `resumes`, `users` |
-| `/skills/claimed` | GET | `user_claimed_skills`, `skills` |
-| `/github/connect`, `/github/repositories` | POST, GET | `github_repositories`, `users` |
-| `/github/analyze` | POST | `github_repositories`, `project_evidence`, `skills` |
-| `/evidence`, `/evidence/{id}` | GET | `project_evidence`, `skills`, `github_repositories` |
-| `/roles`, `/roles/{id}` | GET | `job_roles` |
-| `/demand`, `/demand/{role_id}` | GET | `skill_demand`, `job_roles`, `skills` |
-| `/gaps/analyze`, `/gaps` | POST, GET | `user_claimed_skills`, `project_evidence`, `skill_demand`, `skill_dependencies` |
-| `/roadmaps/generate`, `/roadmaps` | POST, GET | `roadmaps`, `roadmap_milestones`, `skill_dependencies`, `skills` |
-| `/roadmaps/{id}/milestones/{m_id}` | PATCH | `roadmap_milestones` |
-| `/resources`, `/resources/{id}` | GET | `learning_resources`, `skills` |
-| `/resources/recommend` | POST | `learning_resources`, `roadmap_milestones`, `skills` |
-| `/assistant/chat` | POST | `rag_documents`, `skill_demand`, `project_evidence`, `roadmaps` |
-| `/verify/project` | POST | `roadmap_milestones`, `project_evidence`, `github_repositories`, `skills` |
-| `/dashboard` | GET | `users`, `user_claimed_skills`, `project_evidence`, `roadmaps`, `roadmap_milestones` |
-
----
-
-## 23. API Security
-
-1. **Authentication & Password Security**: Passwords hashed using bcrypt/argon2 with salting. Access tokens use HMAC-SHA256 with an ephemeral secret key loaded from environment variables.
-2. **Path Traversal & Safe File Storage**: Client filenames are sanitized with `os.path.basename` and regex scrubbing. Disk storage exclusively uses `<uuid>.<ext>` inside `backend/uploads/resumes/` (isolated from source code and ignored by git).
-3. **MIME & Magic Byte Verification**: Uploads are verified by file extension AND magic byte header inspections (`%PDF-` and `PK\x03\x04`). Spoofed extensions are rejected with HTTP 400.
-4. **Token Protection**: GitHub Personal Access Tokens (PATs) are never saved in plaintext and never serialized in API responses.
-5. **SSRF Protection**: Repository verification validates that URLs resolve strictly to `github.com` domains before HTTP queries are issued.
-6. **Prompt Injection Hardening**: Resumes, commit logs, and repository files are treated as untrusted user input and enclosed within XML/Markdown delimiter boundaries in LLM prompts.
-
----
-
-## 24. LLM Boundary
-
-| Allowed LLM Capabilities | Strictly Prohibited Actions |
-| :--- | :--- |
-| Extracting entities (skills, experience) from unstructured resume text. | Inventing or generating numerical industry-demand percentages. |
-| Resolving ambiguous skill mentions to canonical taxonomy slugs. | Modifying or overriding database `demand_score` values. |
-| Providing conversational explanations for roadmap milestones. | Declaring a skill verified without concrete repository evidence. |
-| Generating milestone descriptions and project challenge briefs. | Bypassing or reordering prerequisite DAG relationships. |
-| Explaining rubric failures and actionable improvement steps. | Fabricating learning resource URLs or metadata. |
-
----
-
-## 25. API Sequence Examples
-
-### Example A — Resume Ingestion
-```text
-Client -> POST /api/v1/resumes/upload (binary PDF)
-          FastAPI verifies magic bytes (%PDF-) and size (< 5 MB)
-          FastAPI writes uploads/resumes/<uuid>.pdf and records row in 'resumes'
-       <- 201 Created (resume_id)
-```
-
-### Example B — GitHub Repository Analysis
-```text
-Client -> POST /api/v1/github/connect (username: 'janedoe')
-       <- 200 OK (discovered_repositories: 4)
-Client -> POST /api/v1/github/analyze (repo_ids: ['...'])
-          Backend scans package manifests (requirements.txt, Dockerfile)
-          Backend creates audit records in 'project_evidence'
-       <- 200 OK (demonstrated_skills: ['FastAPI', 'Docker'])
-```
-
-### Example C — Skill Gap & Priority Calculation
-```text
-Client -> POST /api/v1/gaps/analyze (target_role_id: '...')
-          Backend loads claimed skills (resume) + demonstrated skills (evidence)
-          Backend retrieves empirical demand_score from 'skill_demand'
-          Backend calculates Priority Score using deterministic formula
-       <- 200 OK (prioritized_gaps: [ { skill: 'Docker', priority_rank: 1, evidence: 'MISSING' } ])
-```
-
-### Example D — Personalized Roadmap Generation
-```text
-Client -> POST /api/v1/roadmaps/generate (role_id: '...', weekly_hours: 10)
-          Backend extracts required subgraph from 'skill_dependencies'
-          Topological sort orders prerequisites before advanced skills
-          Partitions skills into sequential milestones with curated resources
-       <- 201 Created (roadmap_id, milestones: [ { order: 1, title: 'Docker Basics' } ])
-```
-
-### Example E — Hands-On Project Verification
-```text
-Client -> POST /api/v1/verify/project (milestone_id: '...', repo_url: '...')
-          Backend scans candidate repo tree for Dockerfile and compose file
-          Passes criteria -> creates project_evidence, marks milestone 'VERIFIED'
-       <- 200 OK (verification_status: 'VERIFIED', next_milestone_id: '...')
-```
-
----
-
-## 26. OpenAPI Compatibility
-
-This API specification maps directly to FastAPI and Pydantic schemas. 
-When the FastAPI application runs, the interactive documentation is automatically accessible at:
-- **Swagger UI**: `/api/v1/docs`
-- **ReDoc**: `/api/v1/redoc`
-- **OpenAPI JSON**: `/api/v1/openapi.json`
-
----
-
-## 27. Implementation Status
-
-The implementation status is based on inspection of the actual repository code:
-
-| Endpoint | Purpose | MVP Phase | Implementation Status |
+| HTTP Method | Route | Purpose | Implementation Status |
 | :--- | :--- | :--- | :--- |
-| `GET /` | Operational API metadata | Phase 1 | **IMPLEMENTED** |
-| `GET /health` | Application status probe | Phase 1 | **IMPLEMENTED** |
-| `GET /health/db` | PostgreSQL & pgvector check | Phase 1 | **IMPLEMENTED** |
-| `GET /api/v1/health` | Mounted v1 application probe | Phase 1 | **IMPLEMENTED** |
-| `GET /api/v1/health/db` | Mounted v1 database probe | Phase 1 | **IMPLEMENTED** |
-| `POST /api/v1/resumes/upload` | Resume document upload, section extraction & skill normalization | Phase 2 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/resumes` | List user resumes with pagination | Phase 2 (CP 4) | **IMPLEMENTED** |
-| `GET /api/v1/resumes/{id}` | Get resume parsed metadata, sections & claimed skills | Phase 2 (CP 2, 4) | **IMPLEMENTED** |
-| `DELETE /api/v1/resumes/{id}` | Delete resume document and cascade claimed skills | Phase 2 (CP 4) | **IMPLEMENTED** |
-| `POST /api/v1/auth/register` | User registration | Phase 1 / 2 | PLANNED |
-| `POST /api/v1/auth/login` | JWT authentication login | Phase 1 / 2 | PLANNED |
-| `GET /api/v1/auth/me` | Current user identity | Phase 1 / 2 | PLANNED |
-| `GET /api/v1/users/me` | User profile retrieval | Phase 1 / 2 | PLANNED |
-| `PATCH /api/v1/users/me` | Update target role and preferences | Phase 1 / 2 | PLANNED |
-| `GET /api/v1/skills/claimed` | List resume-claimed skills | Phase 2 (CP 3, 4) | **IMPLEMENTED** |
-| `GET /api/v1/skills/demonstrated` | List aggregated demonstrated skills | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/skills/demonstrated/{id}` | Get demonstrated skill with audit trail | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `POST /api/v1/github/connect` | Discover user GitHub repositories | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/github/repositories` | List discovered repositories | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/github/repositories/{id}` | Inspect repository metadata | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `POST /api/v1/github/analyze` | Scan code manifests for evidence | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/evidence` | Audit list of verified project evidence | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/evidence/{id}` | Audit detailed project evidence by ID | Phase 3 (CP 1–4) | **IMPLEMENTED** |
-| `GET /api/v1/roles` | List canonical job roles | Phase 4 (CP 1, 2) | **IMPLEMENTED** |
-| `GET /api/v1/roles/{role_id}` | Get canonical job role by ID | Phase 4 (CP 1, 2) | **IMPLEMENTED** |
-| `GET /api/v1/demand` | Query empirical skill demand statistics | Phase 4 (CP 1, 2) | **IMPLEMENTED** |
-| `GET /api/v1/demand/{role_id}` | Get complete role demand profile breakdown | Phase 4 (CP 1, 2) | **IMPLEMENTED** |
-| `GET /api/v1/demand/audit/quality` | Audit demand data quality and integrity | Phase 4 (CP 2) | **IMPLEMENTED** |
-| `GET /api/v1/intelligence/skills/ranking` | Rank skills across market or specific role | Phase 4 (CP 3) | **IMPLEMENTED** |
-| `GET /api/v1/intelligence/skills/{id}/roles` | Demand profile of a skill across roles | Phase 4 (CP 3) | **IMPLEMENTED** |
-| `POST /api/v1/intelligence/roles/compare` | Multi-role skill comparison and overlap | Phase 4 (CP 3) | **IMPLEMENTED** |
-| `GET /api/v1/intelligence/roles/{id}/signals` | Market signals and growth trajectories | Phase 4 (CP 3) | **IMPLEMENTED** |
-| `GET /api/v1/intelligence/trends` | Classified market growth trajectories | Phase 4 (CP 3) | **IMPLEMENTED** |
-| `GET /api/v1/gaps/{role_id}` | Retrieve deterministic skill gaps for role | Phase 5 (CP 1, 4) | **IMPLEMENTED** |
-| `POST /api/v1/gaps/analyze` | Execute deterministic skill gap analysis | Phase 5 (CP 1, 4) | **IMPLEMENTED** |
-| `GET /api/v1/gaps/{role_id}/priorities` | Retrieve prioritized actionable gaps | Phase 5 (CP 2, 4) | **IMPLEMENTED** |
-| `GET /api/v1/gaps/{role_id}/skills/{skill_id}/evidence` | Retrieve audit evidence chain for skill gap | Phase 5 (CP 3, 4) | **IMPLEMENTED** |
-| `GET /api/v1/gaps` | Get active gap state | Phase 5 | PLANNED |
-| `POST /api/v1/roadmaps/generate` | Generate topologically sorted roadmap | Phase 6 | PLANNED |
-| `GET /api/v1/roadmaps` | List user roadmaps | Phase 6 | PLANNED |
-| `GET /api/v1/roadmaps/{id}` | Get active roadmap details | Phase 6 | PLANNED |
-| `PATCH /api/v1/roadmaps/{id}/milestones/{m_id}` | Update milestone state | Phase 6 | PLANNED |
-| `GET /api/v1/resources` | Query curated learning resources | Phase 6 | PLANNED |
-| `POST /api/v1/resources/recommend` | Semantic resource recommendation | Phase 6 / 7 | PLANNED |
-| `POST /api/v1/assistant/chat` | Grounded RAG career assistant | Phase 7 | PLANNED |
-| `POST /api/v1/verify/project` | GitHub milestone verification loop | Phase 8 | PLANNED |
-| `GET /api/v1/dashboard` | Consolidated Next.js dashboard state | Phase 9 | PLANNED |
+| `GET` | `/` | Root operational welcome & docs link | **IMPLEMENTED** |
+| `GET` | `/health` | Service health liveness probe | **IMPLEMENTED** |
+| `GET` | `/health/db` | PostgreSQL & pgvector connectivity probe | **IMPLEMENTED** |
+| `GET` | `/api/v1/health` | Mounted v1 service health probe | **IMPLEMENTED** |
+| `GET` | `/api/v1/health/db` | Mounted v1 database & pgvector probe | **IMPLEMENTED** |
+| `POST` | `/api/v1/resumes/upload` | Upload, validate, parse resume & normalize claimed skills | **IMPLEMENTED** |
+| `GET` | `/api/v1/resumes` | List candidate resumes with pagination | **IMPLEMENTED** |
+| `GET` | `/api/v1/resumes/{resume_id}` | Get resume parsed sections and claimed skills | **IMPLEMENTED** |
+| `DELETE` | `/api/v1/resumes/{resume_id}` | Delete resume file and cascade delete claimed skills | **IMPLEMENTED** |
+| `GET` | `/api/v1/skills/claimed` | List candidate claimed skills from resumes | **IMPLEMENTED** |
+| `GET` | `/api/v1/skills/demonstrated` | List multi-repo aggregated demonstrated skills | **IMPLEMENTED** |
+| `GET` | `/api/v1/skills/demonstrated/{skill_id}` | Get demonstrated skill with auditable evidence trail | **IMPLEMENTED** |
+| `POST` | `/api/v1/github/connect` | Discover public repositories (excluding forks) | **IMPLEMENTED** |
+| `GET` | `/api/v1/github/repositories` | List discovered non-forked repositories | **IMPLEMENTED** |
+| `GET` | `/api/v1/github/repositories/{repo_id}` | Get stored repository metadata | **IMPLEMENTED** |
+| `POST` | `/api/v1/github/analyze` | Scan code manifests and recompute demonstrated skills | **IMPLEMENTED** |
+| `GET` | `/api/v1/evidence` | List verified project evidence items | **IMPLEMENTED** |
+| `GET` | `/api/v1/evidence/{evidence_id}` | Get project evidence item detail by ID | **IMPLEMENTED** |
+| `GET` | `/api/v1/roles` | List canonical job roles | **IMPLEMENTED** |
+| `GET` | `/api/v1/roles/{role_id}` | Get canonical job role by ID | **IMPLEMENTED** |
+| `GET` | `/api/v1/demand/audit/quality` | Audit industry demand data quality and SQL integrity | **IMPLEMENTED** |
+| `GET` | `/api/v1/demand` | List structured industry skill demand statistics | **IMPLEMENTED** |
+| `GET` | `/api/v1/demand/{role_id}` | Get complete role demand profile breakdown | **IMPLEMENTED** |
+| `GET` | `/api/v1/intelligence/skills/ranking` | Rank skills across market or specific role | **IMPLEMENTED** |
+| `GET` | `/api/v1/intelligence/skills/{skill_id}/roles` | Profile of a skill across all canonical roles | **IMPLEMENTED** |
+| `POST` | `/api/v1/intelligence/roles/compare` | Multi-role skill comparison and overlap analysis | **IMPLEMENTED** |
+| `GET` | `/api/v1/intelligence/roles/{role_id}/signals` | Market signals and growth trajectories | **IMPLEMENTED** |
+| `GET` | `/api/v1/intelligence/trends` | Classified market growth trends (RISING, STABLE, DECLINING) | **IMPLEMENTED** |
+| `GET` | `/api/v1/gaps/{role_id}` | Retrieve deterministic skill gap analysis for role | **IMPLEMENTED** |
+| `GET` | `/api/v1/gaps/{role_id}/priorities` | Retrieve prioritized actionable gaps (MISSING & PARTIAL) | **IMPLEMENTED** |
+| `POST` | `/api/v1/gaps/analyze` | Execute deterministic skill gap analysis idempotently | **IMPLEMENTED** |
+| `GET` | `/api/v1/gaps/{role_id}/skills/{skill_id}/evidence` | Retrieve audit evidence chain for specific skill gap | **IMPLEMENTED** |
 
 ---
 
-## 28. Rules for Maintaining API_SPEC.md
+## 16. Post-MVP Planned APIs
 
-1. **API_SPEC.md is the authoritative contract**: Client and server implementations must remain consistent with this specification.
-2. **Database synchronization**: Schema alterations in `DATA_MODEL.md` or Alembic migrations require immediate API specification review.
-3. **Documentation before completion**: New endpoints must be fully documented in `API_SPEC.md` before being marked complete.
-4. **Controlled Versioning**: Breaking changes require explicit RFC review and version incrementing under `/api/v2`.
-5. **Deterministic Demand Principle**: Numerical industry-demand values remain strictly database- and statistics-owned.
-6. **LLM Boundary Inviolability**: LLM and RAG layers cannot overwrite or bypass deterministic scoring, graph sequencing, or database evidence.
-7. **Scoped Authorization**: Every user-owned resource must explicitly document and enforce `WHERE user_id = current_user.id`.
-8. **Valid Examples**: All request and response payloads in this document must conform to valid JSON and accurate Pydantic types.
-9. **Accurate Implementation Tracking**: Section 27 must accurately reflect active repository code, avoiding premature claims of completion.
-10. **Evidence Primacy**: The API must never treat a self-asserted resume claim as verified repository evidence.
+> [!NOTE]
+> The endpoints and capabilities in this section are **PLANNED FOR POST-MVP EVOLUTION** on the `post-mvp-foundation` branch. They are not implemented in the frozen `v1.0.0-mvp` release. This section documents high-level conceptual directions only; exact paths, schemas, and provider integrations have not yet been selected.
+
+### P1 — Real-Time Industry Demand Pipeline
+- **Market Data Ingestion**: Endpoints to ingest licensed and permitted job postings.
+- **Market Demand Refresh & Recalculation**: Automated endpoints to trigger deterministic statistical demand recalculation and update PostgreSQL demand tables.
+- **Demand Evidence & Source Retrieval**: Endpoints exposing data lineage, sample sizes, and freshness metrics for refreshed market observations.
+
+### P2 & P3 — Local Qwen 3 8B AI Layer & Evidence-Grounded Career Chatbot
+- **Evidence-Grounded Explanations**: Endpoints providing natural-language reasoning over verified SkillForge candidate and market evidence.
+- **Interactive Career Assistant**: Conversational endpoints for candidate Q&A grounded strictly in deterministic audit records and verified market signals.
+
+### P4 — Personalized Roadmap & Learning Resources
+- **Personalized Roadmap Generation**: Sequenced learning path generation based on prerequisite DAG topological sorting.
+- **Vetted Learning Resources & Projects**: Curated resource matching and hands-on project challenge recommendations tailored to candidate skill gaps.
+
+### P5 — GitHub Skill Verification Loop (Implemented)
+
+The following closed-loop verification endpoints are implemented under `/api/v1/roadmap`:
+
+#### 1. Verify Roadmap Milestone
+- **Method**: `POST`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verify`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+  - `Authorization`: `Bearer <github_pat>` (Optional; required for private candidate repositories)
+- **Request Body**:
+  ```json
+  {
+    "repository_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "commit_sha": "optional-snapshot-sha"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "id": "uuid",
+    "milestone_id": "uuid",
+    "roadmap_id": "uuid",
+    "repository_id": "uuid",
+    "commit_sha": "40-char-sha",
+    "status": "VERIFIED",
+    "composite_confidence": 0.92,
+    "deliverable_score": 1.0,
+    "criteria_score": 0.88,
+    "skill_confidence": 0.85,
+    "verified_at": "2026-09-11T12:00:00Z",
+    "details": {
+      "deliverables": [...],
+      "criteria": [...]
+    },
+    "demonstrated_skills_recalculated": true,
+    "roadmap_unlocked": true
+  }
+  ```
+- **Status Codes**:
+  - `200 OK`: Verification completed (`VERIFIED`, `PARTIAL`, `UNVERIFIED`, or persisted `FAILED` audit record).
+  - `400 Bad Request`: Forked repository, query/body credential leakage, or milestone not associated with project deliverables.
+  - `401 Unauthorized`: Missing `X-User-Id`.
+  - `403 Forbidden`: Candidate does not own roadmap, repository, or connected GitHub handle mismatch.
+  - `404 Not Found`: Roadmap, milestone, or repository not found.
+
+#### 2. Get Milestone Verification History
+- **Method**: `GET`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verification`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+- **Query Parameters**:
+  - `limit`: Integer (Default: 10)
+- **Response**: `200 OK`
+  ```json
+  {
+    "milestone_id": "uuid",
+    "verifications": [...],
+    "total": 1
+  }
+  ```
+
+#### 3. Batch Verify Roadmap Milestones
+- **Method**: `POST`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/verify`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+  - `Authorization`: `Bearer <github_pat>` (Optional)
+- **Request Body**:
+  ```json
+  {
+    "repository_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "milestone_ids": ["uuid-1", "uuid-2"],
+    "commit_sha": "optional-snapshot-sha"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "roadmap_id": "uuid",
+    "verifications": [...],
+    "total_evaluated": 2,
+    "total_verified": 1
+  }
+  ```

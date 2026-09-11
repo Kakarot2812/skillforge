@@ -10,9 +10,27 @@ from app.db.models import Resume
 
 client = TestClient(app)
 
-# Valid dummy PDF and DOCX binary contents with proper magic headers
-VALID_PDF_BYTES = b"%PDF-1.5\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF"
-VALID_DOCX_BYTES = b"\x50\x4b\x03\x04\x14\x00\x06\x00\x08\x00\x00\x00!\x00" + b"[Content_Types].xml" + b"\x00" * 50
+from tests.test_resume_parser import generate_test_pdf_bytes, generate_test_docx_bytes
+
+# Valid PDF and DOCX binary contents with genuine resume structure
+VALID_PDF_BYTES = generate_test_pdf_bytes([
+    "Candidate Resume",
+    "Email: candidate@example.com | Phone: +1 555-0100",
+    "Technical Skills",
+    "Python, Docker, PostgreSQL, React",
+    "Professional Experience",
+    "Software Engineer at Acme Corp (2022 - 2024)",
+    "Education",
+    "B.S. in Computer Science",
+])
+
+VALID_DOCX_BYTES = generate_test_docx_bytes(
+    header="Candidate Resume | candidate@example.com",
+    skills="Python, Docker, PostgreSQL, React",
+    experience="Software Engineer at Acme Corp",
+    projects="SkillForge AI Platform",
+    education="B.S. in Computer Science",
+)
 
 
 def test_upload_valid_pdf():

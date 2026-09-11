@@ -379,54 +379,62 @@ def test_stale_evidence_and_demonstrated_skill_full_lifecycle():
             return dockerfile_content
         return None
 
-    with patch.object(github_analyzer, "fetch_repo_tree", return_value=mock_tree_1), \
-         patch.object(github_analyzer, "fetch_file_content", side_effect=mock_fetch_1):
+    try:
+        with patch.object(github_analyzer, "fetch_repo_tree", return_value=mock_tree_1), \
+             patch.object(github_analyzer, "fetch_file_content", side_effect=mock_fetch_1):
 
-        # Initial scan: FastAPI and Docker detected
-        res1 = client.post("/api/v1/github/analyze", json={"repository_id": str(repo_id)})
-        assert res1.status_code == 200
-        skills1 = {s["skill_name"] for s in res1.json()["data"]["demonstrated_skills"]}
-        assert "FastAPI" in skills1
-        assert "Docker" in skills1
+            # Initial scan: FastAPI and Docker detected
+            res1 = client.post("/api/v1/github/analyze", json={"repository_id": str(repo_id)})
+            assert res1.status_code == 200
+            skills1 = {s["skill_name"] for s in res1.json()["data"]["demonstrated_skills"]}
+            assert "FastAPI" in skills1
+            assert "Docker" in skills1
 
-        # Check demonstrated skills API
-        ds_res1 = client.get("/api/v1/skills/demonstrated")
-        ds_names1 = {s["skill_name"] for s in ds_res1.json()["data"]}
-        assert "FastAPI" in ds_names1
-        assert "Docker" in ds_names1
+            # Check demonstrated skills API
+            ds_res1 = client.get("/api/v1/skills/demonstrated")
+            ds_names1 = {s["skill_name"] for s in ds_res1.json()["data"]}
+            assert "FastAPI" in ds_names1
+            assert "Docker" in ds_names1
 
-    # Second scan: Dockerfile is REMOVED from the repository tree!
-    mock_tree_2 = [
-        {"path": "requirements.txt", "type": "blob"},
-    ]
+        # Second scan: Dockerfile is REMOVED from the repository tree!
+        mock_tree_2 = [
+            {"path": "requirements.txt", "type": "blob"},
+        ]
 
-    def mock_fetch_2(full_name, path, token=None):
-        if path == "requirements.txt":
-            return reqs_content
-        return None
+        def mock_fetch_2(full_name, path, token=None):
+            if path == "requirements.txt":
+                return reqs_content
+            return None
 
-    with patch.object(github_analyzer, "fetch_repo_tree", return_value=mock_tree_2), \
-         patch.object(github_analyzer, "fetch_file_content", side_effect=mock_fetch_2):
+        with patch.object(github_analyzer, "fetch_repo_tree", return_value=mock_tree_2), \
+             patch.object(github_analyzer, "fetch_file_content", side_effect=mock_fetch_2):
 
-        res2 = client.post("/api/v1/github/analyze", json={"repository_id": str(repo_id)})
-        assert res2.status_code == 200
-        skills2 = {s["skill_name"] for s in res2.json()["data"]["demonstrated_skills"]}
-        assert "FastAPI" in skills2
-        assert "Docker" not in skills2  # Docker removed from response!
+            res2 = client.post("/api/v1/github/analyze", json={"repository_id": str(repo_id)})
+            assert res2.status_code == 200
+            skills2 = {s["skill_name"] for s in res2.json()["data"]["demonstrated_skills"]}
+            assert "FastAPI" in skills2
+            assert "Docker" not in skills2  # Docker removed from response!
 
-        # Check demonstrated skills API: Docker must have disappeared!
-        ds_res2 = client.get("/api/v1/skills/demonstrated")
-        ds_names2 = {s["skill_name"] for s in ds_res2.json()["data"]}
-        assert "FastAPI" in ds_names2
-        assert "Docker" not in ds_names2  # Stale demonstrated skill cleanly removed!
+            # Check demonstrated skills API: Docker must have disappeared!
+            ds_res2 = client.get("/api/v1/skills/demonstrated")
+            ds_names2 = {s["skill_name"] for s in ds_res2.json()["data"]}
+            assert "FastAPI" in ds_names2
+            assert "Docker" not in ds_names2  # Stale demonstrated skill cleanly removed!
 
-    # Cleanup
-    db = SessionLocal()
-    r = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id).first()
-    if r:
-        db.delete(r)
-        db.commit()
-    db.close()
+    finally:
+        # Cleanup
+        db = SessionLocal()
+        r = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id).first()
+        if r:
+            db.delete(r)
+            db.commit()
+        fastapi_skill = db.query(Skill).filter(Skill.slug == "fastapi").first()
+        if fastapi_skill:
+            demonstrated_skill_service.recompute_demonstrated_skill(db=db, skill_id=fastapi_skill.id, user_id=None)
+        docker_skill = db.query(Skill).filter(Skill.slug == "docker").first()
+        if docker_skill:
+            demonstrated_skill_service.recompute_demonstrated_skill(db=db, skill_id=docker_skill.id, user_id=None)
+        db.close()
 
 
 # -----------------------------------------------------------------------------

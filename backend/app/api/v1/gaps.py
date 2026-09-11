@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import User
+from app.db.models import User, Resume
 from app.schemas.demand import JobRoleItem
 from app.schemas.skill_gap import (
     PrioritizedGapItem,
@@ -90,6 +90,42 @@ def verify_user_exists(db: Session, user_id: Optional[uuid.UUID]) -> None:
             )
 
 
+def verify_resume_context(
+    db: Session,
+    resume_id: Optional[uuid.UUID],
+    user_id: Optional[uuid.UUID],
+) -> None:
+    """
+    Validates resume existence and candidate ownership.
+    1. The resume must exist (404 NOT_FOUND).
+    2. If user_id is authenticated/non-null:
+       Resume.user_id must either equal user_id or follow the existing ownership rule.
+       If resume does not belong to user_id, rejects with 403 FORBIDDEN.
+    3. If user_id is None (unauthenticated session):
+       If resume.user_id is not None (belongs to an authenticated user), access is rejected
+       with 403 FORBIDDEN to prevent unauthorized access to private candidate data.
+    """
+    if resume_id is not None:
+        resume = db.query(Resume).filter(Resume.id == resume_id).first()
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume with id '{resume_id}' not found.",
+            )
+        if user_id is not None:
+            if resume.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cross-user access denied: target resume does not belong to authenticated user context.",
+                )
+        else:
+            if resume.user_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cross-user access denied: target resume belongs to an authenticated user.",
+                )
+
+
 def validate_gap_status_filter(status_filter: Optional[str]) -> Optional[str]:
     """Validates optional gap status filter."""
     if status_filter is not None:
@@ -159,6 +195,7 @@ def get_skill_gaps_for_role(
     clean_status = validate_gap_status_filter(status_filter)
     effective_user_id = resolve_user_id(user_id, x_user_id)
     verify_user_exists(db, effective_user_id)
+    verify_resume_context(db, resume_id, effective_user_id)
 
     try:
         role, summary, items = skill_gap_service.compute_and_persist_skill_gaps(
@@ -243,6 +280,7 @@ def get_prioritized_gaps_for_role(
     norm_prio, norm_status = validate_priority_filters(priority_level, status_filter)
     effective_user_id = resolve_user_id(user_id, x_user_id)
     verify_user_exists(db, effective_user_id)
+    verify_resume_context(db, resume_id, effective_user_id)
 
     try:
         role, summary, items = skill_gap_service.get_prioritized_gaps(
@@ -314,6 +352,7 @@ def analyze_skill_gaps(
     """
     effective_user_id = resolve_user_id(payload.user_id, x_user_id)
     verify_user_exists(db, effective_user_id)
+    verify_resume_context(db, payload.resume_id, effective_user_id)
     clean_location = validate_location(payload.location)
 
     try:
@@ -322,6 +361,10 @@ def analyze_skill_gaps(
             role_id=payload.target_role_id,
             user_id=effective_user_id,
             location=clean_location,
+            include_resume=payload.include_resume,
+            include_github=payload.include_github,
+            github_username=payload.username,
+            resume_id=payload.resume_id,
         )
     except KeyError as e:
         raise HTTPException(
@@ -381,6 +424,7 @@ def get_gap_evidence_for_skill(
     clean_location = validate_location(location)
     effective_user_id = resolve_user_id(user_id, x_user_id)
     verify_user_exists(db, effective_user_id)
+    verify_resume_context(db, resume_id, effective_user_id)
 
     try:
         evidence_data = skill_gap_evidence_service.get_gap_evidence(

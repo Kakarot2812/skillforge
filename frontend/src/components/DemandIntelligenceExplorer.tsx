@@ -164,17 +164,14 @@ export default function DemandIntelligenceExplorer() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-white">
-              Phase 4: Cross-Role Demand Intelligence
+              Cross-Role Career Demand Intelligence
             </h2>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-              Phase 4 Complete
-            </span>
             <span className="px-2 py-0.5 text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full">
-              PostgreSQL Mathematical Aggregation
+              Market Benchmark
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Deterministic cross-market rankings, multi-role skill comparisons, and verified YoY growth classifications.
+            Cross-market skill rankings, multi-role skill comparisons, and verified YoY growth trends.
           </p>
         </div>
         <div className="text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center gap-2">
@@ -308,7 +305,7 @@ export default function DemandIntelligenceExplorer() {
         <div className="space-y-6">
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Select 2 to 5 Canonical Roles to Compare:
+              Select 2 to 5 Career Tracks to Compare:
             </div>
             <div className="flex flex-wrap gap-2">
               {roles.map((r) => {
@@ -595,10 +592,10 @@ export default function DemandIntelligenceExplorer() {
         </div>
       )}
 
-      {/* Architectural Guarantee Note */}
+      {/* Evidence Analysis Note */}
       <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
         <span>
-          🛡️ <strong>Integrity Guarantee</strong>: All demand intelligence is calculated from canonical PostgreSQL market-demand records. LLMs do not generate, modify, or infer these metrics.
+          🛡️ <strong>Evidence-Based Analysis</strong>: All demand intelligence is calculated from empirical job market records. LLMs do not generate, modify, or infer these metrics.
         </span>
       </div>
     </div>

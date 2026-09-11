@@ -24,6 +24,11 @@ from app.schemas.skill_gap_evidence import (
     SkillGapEvidenceResponseData,
 )
 from app.services.skill_gap_service import skill_gap_service, SCORING_VERSION
+from app.services.demonstrated_skill_service import (
+    is_repo_owned_by_user,
+    aggregate_repository_scores,
+    compute_evidence_level,
+)
 
 
 def build_classification_explanation(
@@ -188,17 +193,49 @@ class SkillGapEvidenceService:
         resume_items: List[ResumeEvidenceItem] = []
         raw_mention_sample = None
         if include_resume:
+            # Resolve authoritative candidate resume scope:
+            # - If resume_id is provided, restrict strictly to that resume ID.
+            # - When resume_id is absent: do NOT union all historical anonymous resumes.
+            #   For authenticated users: resolve the latest resume for that user.
+            #   For unauthenticated sessions: resolve the latest anonymous resume deterministically.
+            effective_resume_id = resume_id
+            if effective_resume_id is None:
+                if user_id is not None:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id == user_id)
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+                else:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id.is_(None))
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+
             resume_query = (
                 db.query(UserClaimedSkill, Resume)
                 .outerjoin(Resume, UserClaimedSkill.resume_id == Resume.id)
                 .filter(UserClaimedSkill.skill_id == skill_id)
             )
-            if resume_id:
-                resume_query = resume_query.filter(UserClaimedSkill.resume_id == resume_id)
-            elif user_id:
+            if effective_resume_id:
+                resume_query = resume_query.filter(UserClaimedSkill.resume_id == effective_resume_id)
+                if user_id is not None:
+                    resume_query = resume_query.filter(Resume.user_id == user_id)
+                else:
+                    resume_query = resume_query.filter(Resume.user_id.is_(None))
+            elif user_id is not None:
+                # Fallback for authenticated direct claims created without a resume entity (e.g. unit tests)
                 resume_query = resume_query.filter(UserClaimedSkill.user_id == user_id)
             else:
-                resume_query = resume_query.filter(UserClaimedSkill.user_id.is_(None))
+                # No resume exists in unauthenticated context; do NOT aggregate historical claims
+                resume_query = resume_query.filter(False)
 
             resume_rows = resume_query.all()
             # Deterministic ordering: confidence_score DESC, source ASC, claim_id ASC
@@ -236,23 +273,34 @@ class SkillGapEvidenceService:
             else:
                 demo_query = demo_query.filter(DemonstratedSkill.user_id.is_(None))
             demos = demo_query.all()
-            demo = None
             if github_username and github_username.strip():
                 clean_handle = github_username.strip().lstrip("@").lower()
                 for d in demos:
                     repos = (d.skill_metadata or {}).get("repositories", [])
-                    if not repos or any(
-                        (r.get("repo_name", "").lower().startswith(f"{clean_handle}/") or
-                         clean_handle in r.get("repo_name", "").lower() or
-                         r.get("owner", "").lower() == clean_handle)
-                        for r in repos
-                    ):
-                        demo = d
+                    matching_repos = [r for r in repos if is_repo_owned_by_user(r, clean_handle)]
+                    if matching_repos:
+                        repo_scores = []
+                        for r in matching_repos:
+                            s = r.get("max_confidence")
+                            if s is None:
+                                s = r.get("confidence_score")
+                            if s is None:
+                                s = d.confidence_score
+                            repo_scores.append(float(s) if s is not None else 0.0)
+                        cand_score = aggregate_repository_scores(repo_scores)
+                        cand_level = compute_evidence_level(cand_score)
+                        cand_ev_count = sum(r.get("evidence_count", 1) for r in matching_repos)
+                        cand_repo_count = len(matching_repos)
+                        demo_summary = DemonstratedSkillSummary(
+                            confidence_score=round(cand_score, 2),
+                            evidence_level=cand_level,
+                            evidence_count=cand_ev_count,
+                            repository_count=cand_repo_count,
+                            last_verified_at=d.last_verified_at.isoformat() if d.last_verified_at else None,
+                        )
                         break
             elif demos:
                 demo = demos[0]
-
-            if demo:
                 demo_summary = DemonstratedSkillSummary(
                     confidence_score=round(demo.confidence_score, 2),
                     evidence_level=demo.evidence_level,
@@ -262,45 +310,53 @@ class SkillGapEvidenceService:
                 )
 
         # Retrieve individual project evidence artifacts
+        github_items: List[GitHubEvidenceItem] = []
         if include_github:
             evidence_query = (
                 db.query(ProjectEvidence, GitHubRepository)
                 .outerjoin(GitHubRepository, ProjectEvidence.repo_id == GitHubRepository.id)
                 .filter(ProjectEvidence.skill_id == skill_id)
             )
-        if user_id:
-            evidence_query = evidence_query.filter(ProjectEvidence.user_id == user_id)
-        else:
-            evidence_query = evidence_query.filter(ProjectEvidence.user_id.is_(None))
+            if user_id:
+                evidence_query = evidence_query.filter(ProjectEvidence.user_id == user_id)
+            else:
+                evidence_query = evidence_query.filter(ProjectEvidence.user_id.is_(None))
 
-        evidence_rows = evidence_query.all()
-        # Deterministic ordering: repo_name ASC, evidence_type ASC, confidence DESC, id ASC
-        evidence_rows.sort(
-            key=lambda item: (
-                (item[1].repo_name.lower() if item[1] else ""),
-                item[0].evidence_type,
-                -item[0].confidence_score,
-                str(item[0].id),
-            )
-        )
+            if github_username and github_username.strip():
+                clean_handle = github_username.strip().lstrip("@").lower()
+                evidence_query = evidence_query.filter(
+                    (GitHubRepository.full_name.ilike(f"{clean_handle}/%"))
+                    | (GitHubRepository.repo_url.ilike(f"%github.com/{clean_handle}/%"))
+                    | (GitHubRepository.repo_url.ilike(f"%/{clean_handle}/%"))
+                )
 
-        github_items: List[GitHubEvidenceItem] = []
-        for pe, repo in evidence_rows:
-            github_items.append(
-                GitHubEvidenceItem(
-                    id=pe.id,
-                    repo_id=pe.repo_id,
-                    repo_name=repo.repo_name if repo else "unknown-repo",
-                    repo_full_name=repo.full_name if repo else None,
-                    repo_url=repo.repo_url if repo else None,
-                    evidence_type=pe.evidence_type,
-                    file_path=pe.file_path,
-                    artifact_name=pe.artifact_name,
-                    matched_content=pe.matched_content,
-                    confidence_score=round(pe.confidence_score, 2),
-                    detected_at=pe.detected_at.isoformat() if pe.detected_at else None,
+            evidence_rows = evidence_query.all()
+            # Deterministic ordering: repo_name ASC, evidence_type ASC, confidence DESC, id ASC
+            evidence_rows.sort(
+                key=lambda item: (
+                    (item[1].repo_name.lower() if item[1] else ""),
+                    item[0].evidence_type,
+                    -item[0].confidence_score,
+                    str(item[0].id),
                 )
             )
+
+            for pe, repo in evidence_rows:
+                github_items.append(
+                    GitHubEvidenceItem(
+                        id=pe.id,
+                        repo_id=pe.repo_id,
+                        repo_name=repo.repo_name if repo else "unknown-repo",
+                        repo_full_name=repo.full_name if repo else None,
+                        repo_url=repo.repo_url if repo else None,
+                        evidence_type=pe.evidence_type,
+                        file_path=pe.file_path,
+                        artifact_name=pe.artifact_name,
+                        matched_content=pe.matched_content,
+                        confidence_score=round(pe.confidence_score, 2),
+                        detected_at=pe.detected_at.isoformat() if pe.detected_at else None,
+                    )
+                )
 
         # 8. Candidate evidence package
         has_evidence = len(resume_items) > 0 or len(github_items) > 0 or demo_summary is not None
@@ -325,11 +381,11 @@ class SkillGapEvidenceService:
 
         # 10. Deterministic reasoning package
         claimed = len(resume_items) > 0
-        demonstrated = demo is not None
-        demo_score = demo.confidence_score if demo else 0.0
-        ev_level = demo.evidence_level if demo else None
-        ev_count = demo.evidence_count if demo else 0
-        repo_count = demo.repository_count if demo else 0
+        demonstrated = demo_summary is not None
+        demo_score = demo_summary.confidence_score if demo_summary else 0.0
+        ev_level = demo_summary.evidence_level if demo_summary else None
+        ev_count = demo_summary.evidence_count if demo_summary else 0
+        repo_count = demo_summary.repository_count if demo_summary else 0
 
         classification_reason = build_classification_explanation(
             status=status,

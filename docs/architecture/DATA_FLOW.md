@@ -1,58 +1,47 @@
 # SkillForge AI — Data Flow Architecture
 
-## 1. System-Wide Data Flow Overview
+This document defines the data flow, data movement, transformations, evidence boundaries, and ownership scopes of SkillForge AI. It is organized into two primary divisions:
 
-SkillForge AI processes heterogeneous input streams (PDF/DOCX resumes, GitHub source code, structured job market data) into structured skills, empirical demand signals, and personalized learning roadmaps.
+1. **v1.0.0 MVP Data Flow (Frozen Baseline)**: The operational, deterministic pipeline implemented and verified in the frozen `v1.0.0-mvp` release.
+2. **Post-MVP Data Flow (Planned Evolution)**: The planned architectural data flows for real-time market ingestion, local open-weight LLM reasoning (Qwen 3 8B), and closed-loop verification on the `post-mvp-foundation` branch.
+
+---
+
+# Part 1: v1.0.0 MVP Data Flow (Frozen Baseline)
+
+## 1. Implemented Candidate Analysis Flow
+
+SkillForge AI v1.0.0 MVP implements an end-to-end deterministic data flow that extracts candidate evidence, cross-references it with structured industry demand data, computes skill gaps and priority ranks, and generates an auditable evidence trail.
 
 ```text
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│   User Resume   │       │   GitHub Repos  │       │ Raw Market Data │
-│   (PDF / DOCX)  │       │  (Public API)   │       │  (Job Postings) │
-└────────┬────────┘       └────────┬────────┘       └────────┬────────┘
-         │                         │                         │
-         ▼                         ▼                         ▼
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│ Resume Parser   │       │ GitHub Analyzer │       │  Demand Pipeline│
-│ (PyMuPDF / LLM) │       │ (Manifests / CI)│       │ (Clean & Norm)  │
-└────────┬────────┘       └────────┬────────┘       └────────┬────────┘
-         │                         │                         │
-         ▼                         ▼                         ▼
-  Claimed Skills          Demonstrated Skills         Demand Scores
-         │                         │                         │
-         └────────────┬────────────┘                         │
-                      ▼                                      │
-            ┌───────────────────┐                            │
-            │  Evidence Matrix  │                            │
-            └─────────┬─────────┘                            │
-                      │                                      │
-                      └───────────────┬──────────────────────┘
-                                      ▼
-                           ┌─────────────────────┐
-                           │   Skill Gap Engine  │
-                           └──────────┬──────────┘
-                                      │
-                                      ▼
-                           ┌─────────────────────┐
-                           │   Roadmap Engine    │
-                           └──────────┬──────────┘
-                                      │
-                                      ▼
-                           ┌─────────────────────┐
-                           │  Resource Matching  │
-                           │      (RAG / DB)     │
-                           └──────────┬──────────┘
-                                      │
-                                      ▼
-                           ┌─────────────────────┐
-                           │  Next.js Dashboard  │
-                           └─────────────────────┘
+User
+  ↓
+Resume Upload ───────────────┐
+                             ↓
+                      Resume Evidence
+                             │
+GitHub Connection ───────────┤
+                             ↓
+                      Candidate Evidence
+                             ↓
+                   Canonical Skill Model
+                             ↓
+                  Industry Skill Demand
+                             ↓
+                  Deterministic Skill Gap
+                             ↓
+                    Priority Calculation
+                             ↓
+                       Evidence Audit
+                             ↓
+                    Career Intelligence UI
 ```
 
 ---
 
-## 2. Detailed Pipeline Sub-Flows
+## 2. Evidence Pipeline Sub-Flows & Data Boundaries
 
-### 2.1 Flow 1: Resume Ingestion & Claimed Skill Extraction
+### 2.1 Flow 1: Resume Ingestion & Claimed Skill Evidence
 
 ```text
 [Client Browser]
@@ -69,25 +58,25 @@ SkillForge AI processes heterogeneous input streams (PDF/DOCX resumes, GitHub so
        ▼
 [Section Splitter]
        │
-       │ 4. Entity Extraction & Normalization
+       │ 4. Entity Extraction & Canonical Taxonomy Normalization
        ▼
-[Skill Taxonomy Matcher] ◄─── pgvector semantic similarity & canonical aliases
+[Skill Taxonomy Matcher] ◄─── Canonical aliases & pgvector semantic matching
        │
-       │ 5. Store parsed resume & claimed skill relations
+       │ 5. Associate evidence strictly with candidate / resume scope
        ▼
-[PostgreSQL Database] (resumes, user_claimed_skills)
+[PostgreSQL Database] (resumes, resume_evidence)
 ```
 
-1. **Upload**: User uploads a resume document.
-2. **Text Extraction**: The backend extracts clean raw text and layout blocks.
-3. **Segmentation**: Regex and NLP segment the text into standard resume sections.
-4. **Extraction**: Known skill patterns are identified; ambiguous phrases are sent to the LLM for structured extraction.
-5. **Taxonomy Normalization**: Extracted terms are matched against canonical skills using alias lookups and pgvector cosine similarity.
-6. **Storage**: Claimed skills are persisted in PostgreSQL linked to the user.
+**Data Boundaries & Validation**:
+- **Upload & Validation**: Resume documents (PDF/DOCX) are uploaded and validated for MIME type, file integrity, and payload size.
+- **Text Extraction**: Text extraction engines (PyMuPDF / pdfplumber) extract clean raw text and layout blocks.
+- **Section Parsing**: Text is segmented into standard resume sections (Header, Education, Experience, Skills, Projects).
+- **Taxonomy Normalization**: Extracted skills are normalized against the canonical skill taxonomy using alias dictionaries and pgvector cosine similarity.
+- **Scope Isolation**: Resume-derived evidence is associated strictly with the candidate and resume scope. Candidate data remains isolated to the correct user profile.
 
 ---
 
-### 2.2 Flow 2: GitHub Repository & Evidence Extraction
+### 2.2 Flow 2: GitHub Repository & Demonstrated Evidence Extraction
 
 ```text
 [Client Browser]
@@ -96,209 +85,253 @@ SkillForge AI processes heterogeneous input streams (PDF/DOCX resumes, GitHub so
        ▼
 [FastAPI Backend]
        │
-       │ 2. GET /users/{username}/repos
+       │ 2. GET /users/{username}/repos (Query public repositories)
        ▼
 [GitHub REST API]
        │
-       │ 3. Return repository list (filter out forks)
+       │ 3. Exclude forks (is_fork == False) & verify repository ownership
        ▼
 [GitHub Service]
        │
-       │ 4. Inspect file trees:
-       │    - Dependency manifests (package.json, requirements.txt, etc.)
-       │    - Infrastructure files (Dockerfile, docker-compose.yml)
-       │    - CI/CD configurations (.github/workflows/*.yml)
+       │ 4. Inspect file trees for concrete artifacts:
+       │    - Dependency manifests: package.json, requirements.txt, pyproject.toml, pom.xml, go.mod
+       │    - Infrastructure files: Dockerfile, docker-compose.yml
+       │    - CI/CD workflows: .github/workflows/*.yml
        ▼
-[Evidence Heuristic Engine]
+[Evidence Engine]
        │
-       │ 5. Calculate Concrete Project Evidence
+       │ 5. Map artifacts to canonical skills & assign deterministic confidence weights
        ▼
 [PostgreSQL Database] (github_repositories, project_evidence)
        │
-       │ 6. Deterministic Demonstrated Skill Aggregation
+       │ 6. Deterministic Multi-Repo Demonstrated Skill Aggregation
        ▼
 [PostgreSQL Database] (demonstrated_skills)
-       │
-       │ 7. Future Skill Gap Engine (Phase 5)
-       ▼
 ```
 
-1. **Connection**: User submits their GitHub username or OAuth authorization (`POST /api/v1/github/connect`).
-2. **Discovery**: Backend queries the GitHub API for original repositories, excluding forks (`is_fork == False`).
-3. **Tree Inspection**: System queries git trees recursively via `/git/trees/{branch}` with entry safety limits.
-4. **Manifest / Infra / CI Inspection**: Parses concrete artifacts:
-   - Python: `requirements.txt`, `pyproject.toml`
-   - JavaScript/TypeScript: `package.json`
-   - Java: `pom.xml`
-   - Go: `go.mod`
-   - Docker: `Dockerfile`, `docker-compose.yml`
-   - CI/CD: `.github/workflows/*.yml`
-5. **Taxonomy Normalization**: Candidate technologies are matched deterministically against the canonical skill taxonomy and aliases (`skills`, `skill_aliases`). Unknown dependencies are safely ignored.
-6. **Confidence Scoring**: Deterministic confidence weights ($0.0 \le \text{score} \le 1.0$) are assigned (dependency: $0.95$, Dockerfile: $0.90$, docker-compose: $0.88$, CI workflow: $0.85$, structure: $0.70$).
-7. **Idempotent Reconciliation**: Auditable records are persisted into `project_evidence`, updating existing records in-place and reconciling stale evidence on re-scans.
-8. **Demonstrated Skill Aggregation**:
-   - Aggregates evidence records grouped by `(user_id, skill_id)`.
-   - Within each repository: $\text{repo\_score}_i = \max(\text{evidence confidence})$. Duplicate evidence in the same repository does not inflate scores.
-   - Across independent repositories: $\text{multi\_repo\_score} = 1.0 - \prod (1.0 - \text{repo\_score}_i)$, clamped to $[0.0, 1.0]$.
-   - Persisted into `demonstrated_skills` (`evidence_level`: `HIGH` $\ge 0.85$, `MEDIUM` $\ge 0.70$, `LOW` $< 0.70$).
-   - **Inviolable Principle**: LLMs are strictly forbidden from creating demonstrated skill records, modifying quantitative scores, or inventing repository evidence. Demonstrated skills are strictly backed by concrete code artifacts.
+**Data Boundaries & Validation**:
+- **Connection & Discovery**: Candidate connects their GitHub account; repository metadata is retrieved via the GitHub REST API.
+- **Ownership & Fork Filtering**: Forks (`is_fork == False`) and repositories outside the candidate's ownership are strictly excluded from evidence consideration.
+- **Artifact Inspection**: Scans git trees recursively for verifiable code artifacts:
+  - Python: `requirements.txt`, `pyproject.toml`
+  - JavaScript / TypeScript: `package.json`
+  - Java: `pom.xml`
+  - Go: `go.mod`
+  - Containerization: `Dockerfile`, `docker-compose.yml`
+  - CI/CD: `.github/workflows/*.yml`
+- **Canonical Skill Normalization**: Discovered technologies are normalized into the exact same canonical skill representation as resume evidence.
+- **Evidence Confidence & Aggregation**: Deterministic confidence weights are assigned to code evidence ($0.0 \le \text{score} \le 1.0$). Within a single repository, $\text{repo\_score} = \max(\text{evidence confidence})$. Across multiple independent repositories, signals are aggregated using the independent probability union: $\text{multi\_repo\_score} = 1.0 - \prod (1.0 - \text{repo\_score}_i)$, clamped to $[0.0, 1.0]$.
+- **Evidence Principle**: GitHub evidence represents *demonstrated concrete evidence*, not proof of mastery.
 
 ---
 
-### 2.3 Flow 3: Industry Demand Calculation Pipeline
+### 2.3 Candidate Evidence States & Scope Isolation
 
-```text
-[Raw Job Market Dataset] (Permitted / Licensed Job Postings)
-       │
-       │ 1. Ingestion & Preprocessing
-       ▼
-[Data Cleaning Pipeline]
-       │
-       │ 2. Deduplication & Noise Removal
-       ▼
-[Role Classification Engine] (Maps posting to canonical target role)
-       │
-       │ 3. Extract skills from Job Description
-       ▼
-[Taxonomy Normalizer] ◄─── Canonical Skill Dictionary + pgvector
-       │
-       │ 4. Aggregate by (Role, Skill, Location, Time Window)
-       ▼
-[Statistical Aggregator]
-       │
-       │ 5. Compute Demand Frequency % & Growth Trends
-       ▼
-[PostgreSQL Database] (skill_demand table)
-```
+Candidate evidence from resumes and GitHub repositories can exist independently. The system supports three distinct operational states:
 
-> [!IMPORTANT]
-> **Data-Driven Separation**: RAG and LLM systems are **not** permitted to generate or alter numerical demand scores. The demand scores stored in `skill_demand` are derived solely from mathematical aggregations over real job market data.
+1. **Resume Only**: Candidate provides resume evidence without GitHub. Claimed skills are extracted and normalized; demonstrated skills remain empty.
+2. **GitHub Only**: Candidate connects GitHub profile without uploading a resume. Demonstrated skills are extracted from verified repositories; claimed resume skills remain empty.
+3. **Resume + GitHub**: Candidate provides both resume and GitHub evidence. The system unifies both streams into a combined evidence profile, cross-validating claimed skills against demonstrated repository artifacts.
+
+**Scope Isolation Invariant**: All candidate-specific data (resumes, repositories, parsed evidence, demonstrated skill aggregations) is strictly partitioned and isolated by user ID and resume ID. Candidate evidence from one profile never leaks into another profile's scope.
 
 ---
 
-### 2.4 Flow 4: Skill Gap & Priority Scoring Flow
+### 2.4 Deterministic Skill Gap & Priority Scoring Flow
 
 ```text
-[User Request]
+[User Request] (Target Role Selected)
        │
        │ 1. Trigger Gap Analysis for Target Role
        ▼
-[FastAPI Skill Engine]
+[FastAPI Skill Gap Engine]
        │
-       ├──► 2. Read User Claimed Skills (from resumes)
-       ├──► 3. Read User Demonstrated Skills (from project_evidence)
-       └──► 4. Read Role Skill Demand (from skill_demand)
+       ├──► 2. Read User Claimed Skills (from resume_evidence)
+       ├──► 3. Read User Demonstrated Skills (from demonstrated_skills)
+       └──► 4. Read Structured Role Skill Demand (from skill_demand)
        │
        ▼
-[Synthesis Matrix]
+[Deterministic Synthesis Matrix]
        │
-       │ 5. Compute Evidence Level:
-       │    - High: Claimed + Demonstrated
-       │    - Medium: Demonstrated Only
-       │    - Low: Claimed Only
-       │    - Missing: Neither Claimed nor Demonstrated
+       │ 5. Evaluate Candidate Evidence vs. Role Demand
        ▼
-[Priority Scoring Algorithm]
+[Deterministic Classification]
+       │
+       ├──► STRONG: High candidate evidence meeting or exceeding role benchmark
+       ├──► PARTIAL: Moderate evidence or claimed skill lacking demonstrated depth
+       └──► MISSING: Critical target-role skill with neither claimed nor demonstrated evidence
+       │
+       ▼
+[Deterministic Priority Calculation]
        │
        │ 6. Priority = DemandWeight * DemandScore
        │             + GrowthWeight * GrowthRate
-       │             + GapWeight * (1.0 - EvidenceScore)
+       │             + GapSeverityWeight * (1.0 - EvidenceScore)
        │             + PrerequisiteBonus
        ▼
-[Ranked Skill Gap List]
+[Evidence Audit & Output Serialization]
+       │
+       │ 7. Audit records generated tracing every score to underlying evidence
+       ▼
+[PostgreSQL Database & Career Intelligence UI]
 ```
+
+**Deterministic Guardrails**:
+- **Skill Gap Classification**: Categorization into `STRONG`, `PARTIAL`, and `MISSING` is strictly deterministic based on candidate evidence levels relative to role demand thresholds. No LLM participates in or influences this classification.
+- **Priority Calculation**: Priority rank is calculated deterministically from existing demand, growth, and gap severity weights. No formulas are altered or invented.
+- **Evidence Audit**: The audit record synthesizes candidate evidence (resume lines, repository manifests) with market evidence (demand frequency, growth trends) into an explainable, auditable trail fully traceable to verified database records.
 
 ---
 
-### 2.5 Flow 5: Dynamic Roadmap Generation Flow
+## 3. Current MVP Data Ownership & Boundaries
+
+The MVP architecture maintains rigorous data ownership boundaries across three distinct categories:
 
 ```text
-[Ranked Skill Gap List]
-       │
-       │ 1. Retrieve Prerequisite Graph (DAG) from skill_dependencies
-       ▼
-[Topological Sort Engine]
-       │
-       │ 2. Sequence missing skills ensuring prerequisites precede dependents
-       ▼
-[Milestone Clustering]
-       │
-       │ 3. Group sequenced skills into sequential phases based on user weekly hours
-       ▼
-[Resource & Project Association]
-       │
-       ├──► 4. Match vetted resources from learning_resources
-       └──► 5. Assign practical project challenges targeting milestone skills
-       │
-       ▼
-[PostgreSQL Database] (roadmaps, roadmap_milestones)
-       │
-       │ 6. Deliver structured JSON to Frontend
-       ▼
-[Next.js Interactive Roadmap UI]
+┌────────────────────────────────────────────────────────┐
+│                   CANDIDATE EVIDENCE                   │
+│  - Resume Evidence (claimed skills, parsed sections)   │
+│  - GitHub Evidence (manifests, workflows, Dockerfiles) │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                    MARKET EVIDENCE                     │
+│  - Structured Industry Skill Demand Data               │
+│  - Role Requirement Baselines                          │
+│  - Historical Growth Rates                             │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                  DERIVED INTELLIGENCE                  │
+│  - Deterministic Skill Classification (STRONG/PARTIAL/ │
+│    MISSING)                                            │
+│  - Deterministic Priority Ranks                        │
+│  - Traceable Evidence Audit Trails                     │
+└────────────────────────────────────────────────────────┘
 ```
+
+- **Candidate Evidence**: Owned exclusively by the authenticated user and scoped to individual resume/repository uploads.
+- **Market Evidence**: Owned by the system as pre-aggregated, structured industry demand records stored in `skill_demand` and `target_roles`.
+- **Derived Intelligence**: Computed deterministically from stored candidate evidence and structured market evidence. It is **never** generated arbitrarily by an LLM.
+- **No Real-Time Ingestion in MVP**: The frozen v1.0.0 MVP utilizes structured, validated industry demand baselines. Real-time market data ingestion is not part of the frozen MVP.
 
 ---
 
-### 2.6 Flow 6: RAG-Backed AI Assistant Flow
+# Part 2: Post-MVP Data Flow — Planned Evolution
 
-```text
-[User Chat Prompt in Next.js]
-       │
-       │ 1. POST /api/v1/assistant/chat
-       ▼
-[FastAPI Assistant Service]
-       │
-       │ 2. Load User Context (Profile, Gaps, Active Milestone)
-       │ 3. Generate Query Embedding
-       ▼
-[pgvector Search]
-       │
-       │ 4. Cosine similarity query on rag_documents table
-       │    Filter by relevant skill_ids and doc types
-       ▼
-[Retrieved Context Chunks]
-       │
-       │ 5. Assemble Prompt:
-       │    - System Instructions (grounding constraints)
-       │    - Verified User Skill Data
-       │    - Exact Database Demand Metrics (read-only facts)
-       │    - Retrieved Resource Snippets
-       │    - User Question
-       ▼
-[LLM (e.g. Gemini / Claude / GPT)]
-       │
-       │ 6. Stream grounded explanation / advice
-       ▼
-[Client Browser Chat Window]
-```
+> [!NOTE]
+> All data flows, pipelines, and models in Part 2 are **POST-MVP / PLANNED**. They are designed for implementation on the `post-mvp-foundation` branch and are not implemented in the frozen `v1.0.0-mvp` release.
 
 ---
 
-### 2.7 Flow 7: GitHub Verification Loop
+## 4. Planned Real-Time Industry Demand Pipeline (P1)
+
+In post-MVP Phase 1, the structured industry demand baseline evolves into a continuous, refreshable market data pipeline.
 
 ```text
-[User completes project and clicks "Verify Milestone"]
-       │
-       │ 1. POST /api/v1/verify/project { milestone_id, repo_url }
-       ▼
-[FastAPI Verification Service]
-       │
-       │ 2. Inspect target repository via GitHub API
-       ▼
-[GitHub API]
-       │
-       │ 3. Verify target files, dependencies, and code structure
-       ▼
-[Rubric Evaluation Engine]
-       │
-       ├──► If PASSED:
-       │    - Elevate skill to Demonstrated
-       │    - Update roadmap_milestones status to 'verified'
-       │    - Recompute skill gap score
-       │
-       └──► If FAILED:
-            - Return specific checklist of missing criteria to user
-       ▼
-[PostgreSQL Database & Client Dashboard Update]
+Market Sources
+  ↓
+Market Data Ingestion
+  ↓
+Cleaning / Normalization
+  ↓
+Skill Extraction
+  ↓
+Canonical Skill Normalization
+  ↓
+Deterministic Demand Calculation
+  ↓
+Demand Database
+  ↓
+Demand API
+  ↓
+Skill Gap + Priority
 ```
+
+### Critical Architectural Distinction: RAG vs. Demand Calculation
+
+- **RAG / retrieval does NOT calculate industry demand.**
+- The real-time behavior comes from continuously ingesting updated market data and recalculating the deterministic market signal.
+- The demand API serves refreshed, mathematically derived demand scores directly to the deterministic skill gap engine.
+
+---
+
+## 5. Planned AI Data Flow with Local Qwen 3 8B (P2 / P3)
+
+In post-MVP Phases 2 and 3, an open-weight local LLM (Qwen 3 8B) is integrated as an explanation, contextual reasoning, and personalization layer over verified SkillForge intelligence.
+
+```text
+Candidate Evidence
+        +
+Verified Market Evidence
+        +
+Deterministic Skill Gap / Priority
+        ↓
+Retrieval / Evidence Context
+        ↓
+Qwen 3 8B Local LLM
+        ↓
+Response Verification
+        ↓
+Career Intelligence Response
+```
+
+### Purpose of Qwen 3 8B
+Qwen 3 8B is planned strictly as an explanation, reasoning, and personalization layer over verified SkillForge evidence.
+
+### AI Safety & Boundary Rules
+
+> **"Deterministic systems decide what is true.**
+> **AI explains, reasons over, and personalizes verified evidence."**
+
+**The LLM May**:
+- Explain deterministic results and audit trails in clear natural language.
+- Reason over verified candidate evidence.
+- Explain market evidence and role trends.
+- Answer career questions using retrieved evidence context.
+- Generate learning suggestions.
+- Generate roadmap/resource recommendations based on verified gaps.
+
+**The LLM Must NOT**:
+- Invent candidate skills.
+- Decide authoritative skill possession.
+- Override `STRONG`, `PARTIAL`, or `MISSING` classifications.
+- Calculate authoritative demand scores.
+- Calculate authoritative priority scores.
+- Fabricate market evidence.
+- Present unsupported claims as verified facts.
+
+---
+
+## 6. Planned Closed-Loop Verification Flow (P5)
+
+In post-MVP Phase 5, SkillForge introduces a continuous verification loop connecting learning milestones to demonstrated GitHub evidence:
+
+```text
+Career Recommendation
+  ↓
+Learning / Project Work
+  ↓
+GitHub Project Evidence
+  ↓
+GitHub Re-analysis
+  ↓
+Demonstrated Skills Update
+  ↓
+Skill Gap Recalculation
+  ↓
+Priority Update
+  ↓
+Updated Career Recommendation
+```
+
+### Closed-Loop Stages
+1. **Targeted Learning**: Candidate undertakes recommended projects addressing verified skill gaps.
+2. **Project Deployment**: Candidate commits code, dependency manifests, and CI/CD configurations to their GitHub repository.
+3. **GitHub Re-Analysis**: GitHub analyzer re-inspects repository trees and extracts new concrete evidence.
+4. **Demonstrated Skills Update**: Multi-repo demonstrated skill scores update.
+5. **Skill Gap Recalculation**: Skill gaps are deterministically recalculated.
+6. **Priority Update**: Priority ranks update deterministically.
+7. **Updated Career Recommendation**: System presents refreshed, verified recommendations without manual intervention or LLM override.

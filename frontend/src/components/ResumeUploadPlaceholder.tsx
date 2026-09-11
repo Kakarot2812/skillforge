@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   FileText,
   UploadCloud,
@@ -25,7 +25,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export interface ResumeUploadPlaceholderProps {
-  onResumeChange?: (hasResume: boolean, filename?: string) => void;
+  onResumeChange?: (hasResume: boolean, filename?: string, resumeId?: string) => void;
 }
 
 export default function ResumeUploadPlaceholder({
@@ -38,6 +38,11 @@ export default function ResumeUploadPlaceholder({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const onResumeChangeRef = useRef(onResumeChange);
+  useEffect(() => {
+    onResumeChangeRef.current = onResumeChange;
+  }, [onResumeChange]);
+
   // Sync initial state from localStorage on client mount, verifying backend validity
   React.useEffect(() => {
     async function verifyResumeState() {
@@ -45,7 +50,7 @@ export default function ResumeUploadPlaceholder({
       const activeId = localStorage.getItem("skillforge_active_resume_id");
       const activeName = localStorage.getItem("skillforge_active_resume_filename");
       if (!activeId) {
-        onResumeChange?.(false);
+        onResumeChangeRef.current?.(false);
         return;
       }
       try {
@@ -53,7 +58,7 @@ export default function ResumeUploadPlaceholder({
         if (res.success && res.data?.data) {
           const matching = res.data.data.find((r: ResumeListItem) => r.resume_id === activeId);
           if (matching) {
-            onResumeChange?.(true, matching.filename || activeName || "Resume");
+            onResumeChangeRef.current?.(true, matching.filename || activeName || "Resume", matching.resume_id);
             setUploadResult({
               resume_id: matching.resume_id,
               filename: matching.filename,
@@ -71,15 +76,15 @@ export default function ResumeUploadPlaceholder({
         // If not found on backend (deleted or wiped), purge stale state
         localStorage.removeItem("skillforge_active_resume_id");
         localStorage.removeItem("skillforge_active_resume_filename");
-        onResumeChange?.(false);
+        onResumeChangeRef.current?.(false);
       } catch {
         if (activeName) {
-          onResumeChange?.(true, activeName);
+          onResumeChangeRef.current?.(true, activeName, activeId || undefined);
         }
       }
     }
     verifyResumeState();
-  }, [onResumeChange]);
+  }, []);
 
   const handleFileSelection = (file: File) => {
     setErrorMessage(null);
@@ -150,7 +155,7 @@ export default function ResumeUploadPlaceholder({
         localStorage.setItem("skillforge_active_resume_id", result.data.resume_id);
         localStorage.setItem("skillforge_active_resume_filename", result.data.filename);
       }
-      onResumeChange?.(true, result.data.filename);
+      onResumeChange?.(true, result.data.filename, result.data.resume_id);
     } else {
       setErrorMessage(result.error || "Upload failed. Please try again.");
     }
@@ -184,12 +189,12 @@ export default function ResumeUploadPlaceholder({
                 Resume Intelligence
               </h3>
               <p className="text-xs text-neutral-500">
-                Phase 2 • Resume Intelligence
+                Resume Evidence & Skill Extraction
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-            Phase 2 Complete
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase tracking-wider font-mono">
+            {uploadResult ? "Profile Active" : "Resume Evidence"}
           </span>
         </div>
 
@@ -254,7 +259,7 @@ export default function ResumeUploadPlaceholder({
                   <div className="pt-2 border-t border-emerald-500/20">
                     <div className="flex justify-between items-center mb-1.5">
                       <span className="text-[11px] text-neutral-300 font-medium">
-                        Canonical Claimed Skills:
+                        Extracted Claimed Skills:
                       </span>
                       <span className="text-[10px] font-mono text-emerald-400">
                         {uploadResult.claimed_skills.length} normalized
@@ -278,15 +283,14 @@ export default function ResumeUploadPlaceholder({
               </div>
             </div>
 
-            {/* Checkpoint 4 Notice */}
             <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
               <div className="flex items-center gap-1.5 font-medium text-emerald-400">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Phase 2 Resume Intelligence Complete</span>
+                <span>Resume Intelligence Verified</span>
               </div>
               <p className="leading-relaxed">
-                Ingestion, section parsing, canonical normalization, and lifecycle management verified. 
-                <strong className="text-purple-300 font-normal"> Integrated with SkillForge Career Intelligence Pipeline.</strong>
+                Resume sections and skills extracted and verified.
+                <strong className="text-purple-300 font-normal"> Integrated with SkillForge Career Intelligence.</strong>
               </p>
             </div>
 
@@ -404,8 +408,8 @@ export default function ResumeUploadPlaceholder({
 
             {!selectedFile && (
               <div className="px-3 py-2 rounded-lg bg-neutral-950/50 border border-neutral-800/80 text-[11px] text-neutral-500 flex items-center justify-between">
-                <span>Validation: MIME + Magic Bytes</span>
-                <span className="font-mono text-[10px]">Strict 5 MB limit</span>
+                <span>Supported Formats: PDF, DOCX</span>
+                <span className="font-mono text-[10px]">Max 5 MB</span>
               </div>
             )}
           </div>
@@ -413,8 +417,8 @@ export default function ResumeUploadPlaceholder({
       </div>
 
       <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500">
-        <span>GET /api/v1/resumes • DELETE /api/v1/resumes/{'{id}'}</span>
-        <span className="text-emerald-400 font-medium font-mono">Phase 2 Complete</span>
+        <span>Evidence Source: Candidate Resume</span>
+        <span className="text-neutral-400 font-medium">{uploadResult ? "Document Verified" : "No Resume Uploaded"}</span>
       </div>
     </div>
   );

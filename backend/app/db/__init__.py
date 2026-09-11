@@ -11,6 +11,11 @@ from app.db.models import (
     JobRole,
     IndustrySkillDemand,
     SkillDemand,
+    MarketJob,
+    MarketJobSkill,
+    MarketSkillDemand,
+    MarketSkillDemandSnapshot,
+    MarketSkillDemandGrowth,
 )
 
 __all__ = [
@@ -29,4 +34,9 @@ __all__ = [
     "JobRole",
     "IndustrySkillDemand",
     "SkillDemand",
+    "MarketJob",
+    "MarketJobSkill",
+    "MarketSkillDemand",
+    "MarketSkillDemandSnapshot",
+    "MarketSkillDemandGrowth",
 ]

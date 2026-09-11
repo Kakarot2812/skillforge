@@ -18,7 +18,7 @@ from app.schemas.resume import (
     ResumeDetailResponse,
 )
 from app.schemas.skill import PaginationMeta
-from app.services.resume_parser import parse_resume_file
+from app.services.resume_parser import parse_resume_file, validate_resume_document
 from app.services.skill_service import process_and_persist_resume_skills
 
 router = APIRouter(prefix="/resumes", tags=["Resumes"])
@@ -188,16 +188,28 @@ async def upload_resume(
 
     file_type = ext.lstrip(".").lower()
 
-    # 6. Text Extraction & Section Parsing
+    # 6. Text Extraction, Section Parsing & Resume Document Validation Gate
     try:
         raw_text, parsed_sections = parse_resume_file(str(destination), file_type)
+        validate_resume_document(raw_text, parsed_sections)
+    except HTTPException:
+        # Cleanup uploaded file from disk if validation fails
+        if destination.exists():
+            try:
+                destination.unlink()
+            except OSError:
+                pass
+        raise
     except Exception as exc:
-        raw_text = None
-        parsed_sections = {
-            "sections": {},
-            "detected_sections": [],
-            "error": f"Failed to extract text: {str(exc)}",
-        }
+        if destination.exists():
+            try:
+                destination.unlink()
+            except OSError:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to extract text or parse resume: {str(exc)}",
+        )
 
     detected_sections = parsed_sections.get("detected_sections", [])
 

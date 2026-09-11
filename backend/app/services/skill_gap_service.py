@@ -4,13 +4,38 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.db.models import JobRole, IndustrySkillDemand, Skill, UserClaimedSkill, DemonstratedSkill, SkillGap
+from app.db.models import JobRole, IndustrySkillDemand, Skill, UserClaimedSkill, DemonstratedSkill, SkillGap, Resume
 from app.schemas.skill_gap import (
     SkillGapItem,
     SkillGapSummary,
     PrioritizedGapItem,
     PrioritizedGapsSummary,
 )
+from app.services.demonstrated_skill_service import (
+    is_repo_owned_by_user,
+    aggregate_repository_scores,
+    compute_evidence_level,
+)
+
+
+class CandidateDemonstratedSkill:
+    """Lightweight candidate-scoped projection of a DemonstratedSkill."""
+    def __init__(
+        self,
+        skill_id: uuid.UUID,
+        confidence_score: float,
+        evidence_level: str,
+        evidence_count: int,
+        repository_count: int,
+        skill_metadata: Optional[Dict[str, Any]] = None,
+    ):
+        self.skill_id = skill_id
+        self.confidence_score = confidence_score
+        self.evidence_level = evidence_level
+        self.evidence_count = evidence_count
+        self.repository_count = repository_count
+        self.skill_metadata = skill_metadata or {}
+
 
 # Named constant adhering to demonstrated_skill_service.compute_evidence_level HIGH tier
 STRONG_DEMONSTRATED_THRESHOLD = 0.85
@@ -190,13 +215,49 @@ class SkillGapService:
         if not include_resume:
             claimed_map = {}
         else:
-            claimed_query = db.query(UserClaimedSkill)
-            if resume_id:
-                claimed_query = claimed_query.filter(UserClaimedSkill.resume_id == resume_id)
-            elif user_id:
+            # Resolve authoritative candidate resume scope:
+            # - If resume_id is provided, restrict strictly to that resume ID.
+            # - When resume_id is absent: do NOT union all historical anonymous resumes.
+            #   For authenticated users: resolve the latest resume for that user.
+            #   For unauthenticated sessions: resolve the latest anonymous resume deterministically.
+            effective_resume_id = resume_id
+            if effective_resume_id is None:
+                if user_id is not None:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id == user_id)
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+                else:
+                    latest_resume = (
+                        db.query(Resume)
+                        .filter(Resume.user_id.is_(None))
+                        .order_by(Resume.created_at.desc())
+                        .first()
+                    )
+                    if latest_resume:
+                        effective_resume_id = latest_resume.id
+
+            claimed_query = (
+                db.query(UserClaimedSkill)
+                .outerjoin(Resume, UserClaimedSkill.resume_id == Resume.id)
+            )
+            if effective_resume_id:
+                claimed_query = claimed_query.filter(UserClaimedSkill.resume_id == effective_resume_id)
+                if user_id is not None:
+                    claimed_query = claimed_query.filter(Resume.user_id == user_id)
+                else:
+                    claimed_query = claimed_query.filter(Resume.user_id.is_(None))
+            elif user_id is not None:
+                # Fallback for authenticated direct claims created without a resume entity (e.g. unit tests)
                 claimed_query = claimed_query.filter(UserClaimedSkill.user_id == user_id)
             else:
-                claimed_query = claimed_query.filter(UserClaimedSkill.user_id.is_(None))
+                # No resume exists in unauthenticated context; do NOT aggregate historical claims
+                claimed_query = claimed_query.filter(False)
+
             claimed_map = {cs.skill_id: cs for cs in claimed_query.all()}
 
         # 3. Fetch candidate demonstrated skills for this user
@@ -211,20 +272,34 @@ class SkillGapService:
             all_demos = demo_query.all()
             if github_username and github_username.strip():
                 clean_handle = github_username.strip().lstrip("@").lower()
-                filtered_demos = []
+                demonstrated_map = {}
                 for ds in all_demos:
                     repos = (ds.skill_metadata or {}).get("repositories", [])
-                    if not repos:
-                        filtered_demos.append(ds)
-                    elif any(
-                        (r.get("repo_name", "").lower().startswith(f"{clean_handle}/") or
-                         f"/{clean_handle}/" in r.get("repo_name", "").lower() or
-                         clean_handle in r.get("repo_name", "").lower() or
-                         r.get("owner", "").lower() == clean_handle)
-                        for r in repos
-                    ):
-                        filtered_demos.append(ds)
-                demonstrated_map = {ds.skill_id: ds for ds in filtered_demos}
+                    matching_repos = [r for r in repos if is_repo_owned_by_user(r, clean_handle)]
+                    if matching_repos:
+                        repo_scores = []
+                        for r in matching_repos:
+                            s = r.get("max_confidence")
+                            if s is None:
+                                s = r.get("confidence_score")
+                            if s is None:
+                                s = ds.confidence_score
+                            repo_scores.append(float(s) if s is not None else 0.0)
+                        cand_score = aggregate_repository_scores(repo_scores)
+                        cand_level = compute_evidence_level(cand_score)
+                        cand_ev_count = sum(r.get("evidence_count", 1) for r in matching_repos)
+                        cand_repo_count = len(matching_repos)
+                        demonstrated_map[ds.skill_id] = CandidateDemonstratedSkill(
+                            skill_id=ds.skill_id,
+                            confidence_score=cand_score,
+                            evidence_level=cand_level,
+                            evidence_count=cand_ev_count,
+                            repository_count=cand_repo_count,
+                            skill_metadata={
+                                "repositories": matching_repos,
+                                "evidence_types": (ds.skill_metadata or {}).get("evidence_types", []),
+                            },
+                        )
             else:
                 demonstrated_map = {ds.skill_id: ds for ds in all_demos}
 

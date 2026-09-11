@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,6 +17,25 @@ class Settings(BaseSettings):
     
     # CORS Origins
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    # Adzuna API Settings (Post-MVP P1 Market Ingestion Foundation)
+    ADZUNA_APP_ID: Optional[str] = None
+    ADZUNA_APP_KEY: Optional[str] = None
+    ADZUNA_API_BASE_URL: str = "https://api.adzuna.com/v1/api"
+
+    # Local Ollama / Qwen 3 8B Settings (Post-MVP P2 AI Foundation)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen3:8b"
+    OLLAMA_TIMEOUT_SECONDS: float = 60.0
+
+    # RAG / Local Embedding Settings (Post-MVP P3 RAG Foundation)
+    EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSION: int = 384
+    RAG_DEFAULT_TOP_K: int = 5
+    RAG_MAX_TOP_K: int = 10
+    RAG_CHUNK_SIZE: int = 500
+    RAG_CHUNK_OVERLAP: int = 50
+    RAG_MAX_DOCUMENT_CONTENT_LENGTH: int = 50000
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

@@ -5,9 +5,13 @@ import TargetRoleSelector from "@/components/TargetRoleSelector";
 import ResumeUploadPlaceholder from "@/components/ResumeUploadPlaceholder";
 import GitHubConnectPlaceholder from "@/components/GitHubConnectPlaceholder";
 import SkillGapExplorer from "@/components/SkillGapExplorer";
-import IndustryDemandExplorer from "@/components/IndustryDemandExplorer";
+import MarketDemandSection from "@/components/market/MarketDemandSection";
 import DemandIntelligenceExplorer from "@/components/DemandIntelligenceExplorer";
-import { Sparkles, CheckCircle2, TrendingUp, Compass, Award } from "lucide-react";
+import RoadmapSection from "@/components/roadmap/RoadmapSection";
+import CareerAssistant from "@/components/assistant/CareerAssistant";
+import { Sparkles, CheckCircle2, TrendingUp, Compass, Award, Bot } from "lucide-react";
+
+import { ensureCandidateIdentity } from "@/lib/identity";
 
 export default function DashboardPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
@@ -16,17 +20,21 @@ export default function DashboardPage() {
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [connectedGitHubUser, setConnectedGitHubUser] = useState<string | null>(null);
 
-  // Sync client-side state on mount from local storage
+  // Sync client-side state on mount from local storage and establish candidate identity
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      const activeResume = localStorage.getItem("skillforge_active_resume_id");
-      const activeFileName = localStorage.getItem("skillforge_active_resume_filename");
-      setHasResume(Boolean(activeResume));
-      setResumeFileName(activeFileName || null);
-      setResumeId(activeResume || null);
+      Promise.resolve().then(async () => {
+        await ensureCandidateIdentity();
 
-      const activeGitHub = localStorage.getItem("skillforge_connected_github_user");
-      setConnectedGitHubUser(activeGitHub || null);
+        const activeResume = localStorage.getItem("skillforge_active_resume_id");
+        const activeFileName = localStorage.getItem("skillforge_active_resume_filename");
+        setHasResume(Boolean(activeResume));
+        setResumeFileName(activeFileName || null);
+        setResumeId(activeResume || null);
+
+        const activeGitHub = localStorage.getItem("skillforge_connected_github_user");
+        setConnectedGitHubUser(activeGitHub || null);
+      });
     }
   }, []);
 
@@ -112,6 +120,10 @@ export default function DashboardPage() {
               <span className="px-2.5 py-1 rounded-md bg-neutral-900 border border-neutral-800 flex items-center gap-1.5">
                 <Award className="h-3 w-3 text-emerald-400" /> 4. Priority Roadmap
               </span>
+              <span className="text-neutral-600">→</span>
+              <span className="px-2.5 py-1 rounded-md bg-neutral-900 border border-neutral-800 flex items-center gap-1.5">
+                <Bot className="h-3 w-3 text-purple-400" /> 5. AI Career Assistant
+              </span>
             </div>
           </div>
         </section>
@@ -150,7 +162,10 @@ export default function DashboardPage() {
 
         {/* 2. Industry Demand Benchmark */}
         <section aria-label="Industry Skill Demand Benchmark" className="scroll-mt-20">
-          <IndustryDemandExplorer />
+          <MarketDemandSection
+            selectedRoleId={selectedRoleId}
+            onSelectRole={setSelectedRoleId}
+          />
         </section>
 
         {/* 3. Core Skill Gap & Actionable Priorities */}
@@ -167,7 +182,29 @@ export default function DashboardPage() {
           />
         </section>
 
-        {/* 4. Cross-Role Career Intelligence */}
+        {/* 4. Personalized Career Roadmap */}
+        <section aria-label="Personalized Career Roadmap" className="scroll-mt-20">
+          <RoadmapSection
+            selectedRoleId={selectedRoleId}
+            candidateReady={candidateReady}
+            hasResume={hasResume}
+            resumeId={resumeId}
+            connectedGitHubUsername={connectedGitHubUser}
+          />
+        </section>
+
+        {/* 5. AI Career Intelligence Assistant */}
+        <section aria-label="AI Career Intelligence Assistant" className="scroll-mt-20">
+          <CareerAssistant
+            selectedRoleId={selectedRoleId}
+            candidateReady={candidateReady}
+            hasResume={hasResume}
+            resumeId={resumeId}
+            connectedGitHubUsername={connectedGitHubUser}
+          />
+        </section>
+
+        {/* 6. Cross-Role Career Intelligence */}
         <section aria-label="Career Demand Intelligence Explorer" className="scroll-mt-20">
           <DemandIntelligenceExplorer />
         </section>

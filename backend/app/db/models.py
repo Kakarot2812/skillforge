@@ -12,6 +12,7 @@ from sqlalchemy import (
     func,
     UniqueConstraint,
     CheckConstraint,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -788,4 +789,40 @@ class RoadmapMilestone(Base):
 
     def __repr__(self) -> str:
         return f"<RoadmapMilestone roadmap={self.roadmap_id} #{self.order_index} skill={self.skill_id} status={self.status}>"
+
+
+class MilestoneVerification(Base):
+    """
+    Persistent audit storage for project verification attempts on roadmap milestones.
+    Post-MVP Checkpoint P5-B.
+
+    Enforces immutable audit history: each verification attempt appends a new record.
+    Multiple verification records may exist for a single milestone as a candidate iterates.
+    """
+    __tablename__ = "milestone_verifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    milestone_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_milestones.id", ondelete="CASCADE"), nullable=False, index=True)
+    roadmap_id = Column(UUID(as_uuid=True), ForeignKey("candidate_roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    repository_id = Column(UUID(as_uuid=True), ForeignKey("github_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    commit_sha = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, index=True)
+    confidence = Column(Float, nullable=True)
+    details = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('VERIFIED', 'PARTIAL', 'UNVERIFIED', 'FAILED')", name="chk_milestone_verifications_status"),
+        CheckConstraint("confidence >= 0.0 AND confidence <= 1.0", name="chk_milestone_verifications_confidence"),
+        Index("ix_milestone_verifications_milestone_created", "milestone_id", "created_at"),
+    )
+
+    milestone = relationship("RoadmapMilestone")
+    roadmap = relationship("CandidateRoadmap")
+    user = relationship("User")
+    repository = relationship("GitHubRepository")
+
+    def __repr__(self) -> str:
+        return f"<MilestoneVerification milestone={self.milestone_id} status={self.status} sha={self.commit_sha[:7]}>"
 

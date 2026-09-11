@@ -42,6 +42,7 @@ class User(Base):
     project_evidence = relationship("ProjectEvidence", back_populates="user", cascade="all, delete-orphan")
     demonstrated_skills = relationship("DemonstratedSkill", back_populates="user", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="user", cascade="all, delete-orphan")
+    roadmaps = relationship("CandidateRoadmap", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
@@ -601,3 +602,190 @@ class RAGChunk(Base):
 
     def __repr__(self) -> str:
         return f"<RAGChunk {self.id} doc={self.document_id} idx={self.chunk_index}>"
+
+
+# ---------------------------------------------------------------------------
+# Post-MVP Phase 4: Personalized Roadmap + Curated Resources
+# ---------------------------------------------------------------------------
+
+class SkillDependency(Base):
+    """
+    Persistent representation of a directed dependency between canonical skills.
+    Post-MVP Phase 4.
+
+    Edge: prerequisite_skill -> skill
+    Meaning: prerequisite_skill should be learned before skill.
+    Dependency types:
+    - 'HARD': Mandatory prerequisite. Blocks downstream skill from being scheduled earlier.
+    - 'RECOMMENDED': Helpful complementary skill. Does not hard-block sequencing.
+    """
+    __tablename__ = "skill_dependencies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    prerequisite_skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    dependency_type = Column(String(32), nullable=False, default="HARD")  # 'HARD', 'RECOMMENDED'
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("skill_id", "prerequisite_skill_id", name="uq_skill_dependencies_skill_prereq"),
+        CheckConstraint("skill_id != prerequisite_skill_id", name="chk_skill_dependencies_no_self_loop"),
+        CheckConstraint("dependency_type IN ('HARD', 'RECOMMENDED')", name="chk_skill_dependencies_type"),
+    )
+
+    skill = relationship("Skill", foreign_keys=[skill_id])
+    prerequisite_skill = relationship("Skill", foreign_keys=[prerequisite_skill_id])
+
+    def __repr__(self) -> str:
+        return f"<SkillDependency {self.prerequisite_skill_id} -> {self.skill_id} ({self.dependency_type})>"
+
+
+class ApprovedResource(Base):
+    """
+    Persistent representation of an explicitly approved, curated learning resource.
+    Post-MVP Phase 4.
+
+    Resources are strictly whitelisted and approved.
+    Arbitrary web scraping and hallucinated LLM URLs are strictly prohibited.
+    """
+    __tablename__ = "approved_resources"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    url = Column(String(1024), nullable=False)
+    resource_type = Column(String(64), nullable=False, index=True)  # 'OFFICIAL_DOCS', 'TUTORIAL', 'GUIDE', 'BOOK', 'COURSE'
+    provider = Column(String(128), nullable=False)
+    difficulty = Column(String(32), nullable=False)  # 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'
+    estimated_minutes = Column(Integer, nullable=True)
+    is_approved = Column(Boolean, nullable=False, default=True)
+    approval_source = Column(String(64), nullable=False, default="CURATED_SEED")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    skill = relationship("Skill")
+
+    def __repr__(self) -> str:
+        return f"<ApprovedResource {self.title} ({self.provider})>"
+
+
+class ApprovedProject(Base):
+    """
+    Persistent representation of an approved practical project mapped to a skill and target role.
+    Post-MVP Phase 4.
+
+    Defines practical deliverables and verification criteria intended for P5 GitHub verification.
+    """
+    __tablename__ = "approved_projects"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    role_id = Column(UUID(as_uuid=True), ForeignKey("job_roles.id", ondelete="SET NULL"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    difficulty = Column(String(32), nullable=False)  # 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'
+    deliverables = Column(JSONB, nullable=False, default=list)
+    verification_criteria = Column(JSONB, nullable=False, default=list)
+    estimated_hours = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    skill = relationship("Skill")
+    role = relationship("JobRole")
+
+    def __repr__(self) -> str:
+        return f"<ApprovedProject {self.title} ({self.difficulty})>"
+
+
+class CandidateRoadmap(Base):
+    """
+    Persistent representation of a candidate's personalized, sequenced learning roadmap.
+    Post-MVP Phase 4.
+
+    Enforces candidate ownership: persisted roadmaps REQUIRE an authenticated user_id.
+    Anonymous / demo roadmaps are computed in-memory and are not persisted.
+    """
+    __tablename__ = "candidate_roadmaps"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role_id = Column(UUID(as_uuid=True), ForeignKey("job_roles.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_role_title = Column(String(128), nullable=False)
+    location = Column(String(64), nullable=False, default="India")
+    status = Column(String(32), nullable=False, default="ACTIVE")  # 'ACTIVE', 'COMPLETED', 'ARCHIVED'
+    roadmap_version = Column(String(16), nullable=False, default="v1")
+    summary_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN ('ACTIVE', 'COMPLETED', 'ARCHIVED')", name="chk_candidate_roadmaps_status"),
+    )
+
+    user = relationship("User", back_populates="roadmaps")
+    role = relationship("JobRole")
+    milestones = relationship("RoadmapMilestone", back_populates="roadmap", cascade="all, delete-orphan", order_by="RoadmapMilestone.order_index")
+
+    def __repr__(self) -> str:
+        return f"<CandidateRoadmap user={self.user_id} role={self.target_role_title} status={self.status}>"
+
+
+class RoadmapMilestone(Base):
+    """
+    Persistent representation of an ordered milestone in a candidate roadmap.
+    Post-MVP Phase 4.
+
+    Enforces strictly deterministic sequencing and status lifecycle.
+    P4 initializes milestone status to 'NOT_STARTED'; 'VERIFIED' is reserved for P5 GitHub verification.
+    """
+    __tablename__ = "roadmap_milestones"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    roadmap_id = Column(UUID(as_uuid=True), ForeignKey("candidate_roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    order_index = Column(Integer, nullable=False)
+    status = Column(String(32), nullable=False, default="NOT_STARTED")  # 'NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED'
+    gap_status = Column(String(32), nullable=False)  # 'MISSING', 'PARTIAL'
+    priority_score = Column(Float, nullable=True)  # Nullable for transitive-only prerequisites
+    priority_level = Column(String(32), nullable=True)  # Nullable for transitive-only prerequisites
+    reason = Column(Text, nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("approved_projects.id", ondelete="SET NULL"), nullable=True)
+    milestone_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("roadmap_id", "order_index", name="uq_roadmap_milestones_order"),
+        UniqueConstraint("roadmap_id", "skill_id", name="uq_roadmap_milestones_skill"),
+        CheckConstraint("status IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED')", name="chk_roadmap_milestones_status"),
+        CheckConstraint("order_index >= 1", name="chk_roadmap_milestones_order_positive"),
+    )
+
+    roadmap = relationship("CandidateRoadmap", back_populates="milestones")
+    skill = relationship("Skill")
+    project = relationship("ApprovedProject")
+
+    def __repr__(self) -> str:
+        return f"<RoadmapMilestone roadmap={self.roadmap_id} #{self.order_index} skill={self.skill_id} status={self.status}>"
+

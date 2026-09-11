@@ -32,31 +32,23 @@ Updated Candidate Evidence
 
 ---
 
-## 2. v1.0.0 MVP Boundary
+## 2. Implementation Status & Boundaries
 
+### 2.1 Frozen v1.0.0 MVP Boundary
 > [!IMPORTANT]
-> **A career roadmap generation engine is NOT implemented in the v1.0.0 MVP.**
+> **A career roadmap generation engine is NOT implemented in the frozen v1.0.0 MVP release.**
 > The frozen v1.0.0 MVP focuses authoritatively on skill gap identification and deterministic priority scoring. All roadmap generation, milestone sequencing, and dynamic replanning belong to post-MVP development.
 
-### What v1.0.0 MVP Implements
-- **Resume Evidence Extraction**: Claimed skills extracted from PDFs and DOCX files.
-- **GitHub Evidence Extraction**: Concrete code artifacts extracted from manifests, Dockerfiles, and CI workflows.
-- **Structured Industry Demand**: Regional demand scores, growth signals, and sample sizes.
-- **Deterministic Skill Gap Classification**: Mathematical categorization into `STRONG`, `PARTIAL`, or `MISSING`.
-- **Deterministic Priority Scoring**: Weighted formula combining gap deficit, market demand, and YoY growth.
-- **Auditable Evidence Trail**: End-to-end provenance linking every conclusion to source database records.
+### 2.2 Post-MVP Checkpoint P4 Implementation (Active)
+Checkpoint P4 implements the complete, deterministic **Personalized Roadmap + Resources** engine on the `post-mvp-foundation` branch:
+- **Explicit Prerequisite DAG**: `skill_dependencies` table supporting `HARD` (blocking) and `RECOMMENDED` (non-blocking) dependencies.
+- **Deterministic Topological Sequencing**: Kahn's algorithm with deterministic tie-breaking (`priority_score DESC, demand_score DESC, growth_rate DESC, slug ASC`).
+- **Transitive Prerequisite Scoring**: Transitive unfulfilled prerequisites are dynamically added with `priority_score = None` and `priority_level = None` (zero score fabrication; deterministic prerequisite topology takes precedence).
+- **Approved Resource Catalog**: `approved_resources` and `approved_projects` tables serve as the sole curated authority. Arbitrary web scraping and hallucinated LLM URLs are strictly prohibited.
+- **Candidate Ownership & Isolation**: Persisted roadmaps require an authenticated `user_id` to prevent IDOR vulnerabilities. Anonymous candidates execute purely in-memory (`persisted=False`).
+- **Milestone Status Lifecycle**: Milestones strictly initialize to `NOT_STARTED`. `VERIFIED` status is reserved exclusively for P5 GitHub verification.
+- **Qwen Independence**: Canonical roadmaps are 100% functional without Qwen or RAG. Optional Qwen explanations operate strictly downstream with `status="EXPLANATORY"`.
 
-### What v1.0.0 MVP Does NOT Implement
-- Roadmap generation algorithms
-- Roadmap persistence tables (e.g. `roadmaps`, `roadmap_milestones`, `skill_dependencies`, `learning_resources` do **not** exist in the database)
-- Skill dependency graphs (DAG)
-- Topological roadmap sequencing
-- Learning resource recommendations
-- Project challenge generation
-- Weekly workload pacing or schedule adaptation
-- Roadmap progress tracking
-- Automated project verification loops
-- Adaptive roadmap replanning
 
 ---
 

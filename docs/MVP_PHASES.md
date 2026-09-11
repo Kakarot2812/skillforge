@@ -131,21 +131,20 @@ The chatbot must ground answers in verified SkillForge evidence and market evide
 
 It must not invent candidate evidence, demand data, classifications, or priorities.
 
-## P4 — Personalized Roadmap & Resources
+## P4 — Personalized Roadmap & Resources (Completed)
 
 ### Purpose
-Convert deterministic skill gaps and priorities into a personalized learning path.
+Convert deterministic skill gaps, priority scores, and prerequisite DAG constraints into a personalized learning path and project curriculum.
 
-Potential roadmap elements:
-- Target skill
-- Prerequisites
-- Learning objective
-- Resources
-- Practical project
-- Estimated effort
-- Verification criteria
+### Key Implemented Components
+- **Explicit Skill Dependency DAG**: `skill_dependencies` supporting `HARD` (blocking) and `RECOMMENDED` (non-blocking) dependencies.
+- **Deterministic Topological Sequencing**: Kahn's algorithm with priority tie-breaking (`priority_score DESC, demand_score DESC, growth_rate DESC, slug ASC`).
+- **Transitive Prerequisite Scoring**: Transitive unfulfilled prerequisites are dynamically scheduled with `priority_score = None` and `priority_level = None` (zero score fabrication; prerequisite topology takes precedence).
+- **Curated Approved Catalog**: `approved_resources` and `approved_projects` tables serve as the sole authority. Arbitrary web scraping and hallucinated LLM URLs are strictly prohibited.
+- **Candidate Ownership & Isolation**: Persisted roadmaps require an authenticated `user_id` to prevent IDOR vulnerabilities. Anonymous candidates execute purely in-memory (`persisted=False`).
+- **Milestone Status Lifecycle**: Milestones strictly initialize to `NOT_STARTED`. `VERIFIED` status is reserved exclusively for P5 GitHub verification.
+- **Qwen Independence**: Canonical roadmaps are 100% functional without Qwen or RAG. Optional Qwen explanations operate strictly downstream with `status="EXPLANATORY"`.
 
-Resources should be selected according to the candidate's existing skill level and verified gaps.
 
 ## P5 — GitHub Skill Verification Loop
 

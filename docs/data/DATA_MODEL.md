@@ -738,18 +738,142 @@ Stores deterministically chunked text segments with pgvector embeddings for simi
 - **Dimension Consistency**: Vector dimension is strictly 384, consistent with `sentence-transformers/all-MiniLM-L6-v2` and `settings.EMBEDDING_DIMENSION`.
 - **Search Semantics**: Exact cosine distance (`<=>`), stable secondary tie-breaking ordering (`distance ASC, id ASC`), and authoritative metadata filtering.
 
-### P2 & P3 — Local Qwen 3 8B AI Layer & Chatbot Concepts
-- **Retrieved Evidence Context**: Snapshots of verified candidate facts and market metrics passed into the local LLM prompt.
-- **Conversation Session**: Session history and dialogue turns for candidate career Q&A.
-- **Response Verification Log**: Audit log tracking that LLM outputs adhere to ground-truth evidence boundaries.
+#### Checkpoint P4 Implemented Tables: Personalized Roadmap & Curated Resources
+Implements deterministic career roadmaps, explicit skill dependencies, approved resource catalogs, and practical project specifications (Migration: `0017_roadmap_and_resources`).
 
-### P4 — Personalized Roadmap & Learning Resources Concepts
-- **Roadmap & Milestones**: Prerequisite-sequenced learning plans based on topological DAG traversals.
-- **Learning Resources**: Curated educational materials, documentation links, and courses matched to skill gaps.
-- **Project Recommendations**: Hands-on challenge briefs targeting demonstrated skill acquisition.
-- **Candidate Progress**: Tracking milestone completion states (`NOT_STARTED`, `IN_PROGRESS`, `VERIFIED`).
+##### 1. Table: `skill_dependencies`
+Represents directed prerequisite edges in the canonical skill graph ($u \to v$ means $u$ should be learned before $v$).
+
+- **Table Name**: `skill_dependencies`
+- **Participation**: Authoritative Directed Acyclic Graph (DAG) constraints used by the deterministic roadmap sequencing engine.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE skill_dependencies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      prerequisite_skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      dependency_type VARCHAR(32) NOT NULL DEFAULT 'HARD',
+      description TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_skill_dependencies_skill_prereq UNIQUE (skill_id, prerequisite_skill_id),
+      CONSTRAINT chk_skill_dependencies_no_self_loop CHECK (skill_id != prerequisite_skill_id),
+      CONSTRAINT chk_skill_dependencies_type CHECK (dependency_type IN ('HARD', 'RECOMMENDED'))
+  );
+  CREATE INDEX ix_skill_dependencies_skill_id ON skill_dependencies(skill_id);
+  CREATE INDEX ix_skill_dependencies_prereq_id ON skill_dependencies(prerequisite_skill_id);
+  ```
+- **Semantics**:
+  - `HARD`: Mandatory prerequisite. Blocks downstream skills in topological sorting unless candidate already possesses `STRONG` demonstrated evidence.
+  - `RECOMMENDED`: Helpful complementary skill. Preserved in metadata and rationale; does NOT block scheduling.
+
+##### 2. Table: `approved_resources`
+Stores explicitly approved, curated learning resources for canonical skills.
+
+- **Table Name**: `approved_resources`
+- **Participation**: Sole authority for learning materials. Arbitrary web scraping and hallucinated LLM URLs are strictly prohibited.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE approved_resources (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      url VARCHAR(1024) NOT NULL,
+      resource_type VARCHAR(64) NOT NULL,
+      provider VARCHAR(128) NOT NULL,
+      difficulty VARCHAR(32) NOT NULL,
+      estimated_minutes INTEGER,
+      is_approved BOOLEAN DEFAULT true NOT NULL,
+      approval_source VARCHAR(64) DEFAULT 'CURATED_SEED' NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+  CREATE INDEX ix_approved_resources_skill_id ON approved_resources(skill_id);
+  CREATE INDEX ix_approved_resources_resource_type ON approved_resources(resource_type);
+  ```
+
+##### 3. Table: `approved_projects`
+Stores curated practical projects mapped to canonical skills and career roles.
+
+- **Table Name**: `approved_projects`
+- **Participation**: Hands-on project challenges providing deliverable manifests and verification criteria for P5 GitHub verification.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE approved_projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      role_id UUID REFERENCES job_roles(id) ON DELETE SET NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      difficulty VARCHAR(32) NOT NULL,
+      deliverables JSONB DEFAULT '[]'::jsonb NOT NULL,
+      verification_criteria JSONB DEFAULT '[]'::jsonb NOT NULL,
+      estimated_hours INTEGER,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+  CREATE INDEX ix_approved_projects_skill_id ON approved_projects(skill_id);
+  CREATE INDEX ix_approved_projects_role_id ON approved_projects(role_id);
+  ```
+
+##### 4. Table: `candidate_roadmaps`
+Persisted learning trajectories for authenticated candidates.
+
+- **Table Name**: `candidate_roadmaps`
+- **Participation**: Audit trail and lifecycle container for candidate roadmaps. Requires non-null authenticated `user_id` to prevent IDOR vulnerabilities. (Anonymous roadmaps are generated strictly in-memory).
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE candidate_roadmaps (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role_id UUID NOT NULL REFERENCES job_roles(id) ON DELETE CASCADE,
+      target_role_title VARCHAR(128) NOT NULL,
+      location VARCHAR(64) DEFAULT 'India' NOT NULL,
+      status VARCHAR(32) DEFAULT 'ACTIVE' NOT NULL,
+      roadmap_version VARCHAR(16) DEFAULT 'v1' NOT NULL,
+      summary_metadata JSONB DEFAULT '{}'::jsonb NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT chk_candidate_roadmaps_status CHECK (status IN ('ACTIVE', 'COMPLETED', 'ARCHIVED'))
+  );
+  CREATE INDEX ix_candidate_roadmaps_user_id ON candidate_roadmaps(user_id);
+  CREATE INDEX ix_candidate_roadmaps_role_id ON candidate_roadmaps(role_id);
+  CREATE INDEX ix_candidate_roadmaps_user_role ON candidate_roadmaps(user_id, role_id);
+  ```
+
+##### 5. Table: `roadmap_milestones`
+Ordered milestones within a candidate roadmap.
+
+- **Table Name**: `roadmap_milestones`
+- **Participation**: Sequenced learning steps enforcing strictly deterministic ordering and status lifecycle.
+- **SQL Definition**:
+  ```sql
+  CREATE TABLE roadmap_milestones (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      roadmap_id UUID NOT NULL REFERENCES candidate_roadmaps(id) ON DELETE CASCADE,
+      skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+      order_index INTEGER NOT NULL,
+      status VARCHAR(32) DEFAULT 'NOT_STARTED' NOT NULL,
+      gap_status VARCHAR(32) NOT NULL,
+      priority_score FLOAT,
+      priority_level VARCHAR(32),
+      reason TEXT NOT NULL,
+      project_id UUID REFERENCES approved_projects(id) ON DELETE SET NULL,
+      milestone_metadata JSONB DEFAULT '{}'::jsonb NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT uq_roadmap_milestones_order UNIQUE (roadmap_id, order_index),
+      CONSTRAINT uq_roadmap_milestones_skill UNIQUE (roadmap_id, skill_id),
+      CONSTRAINT chk_roadmap_milestones_status CHECK (status IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED')),
+      CONSTRAINT chk_roadmap_milestones_order_positive CHECK (order_index >= 1)
+  );
+  CREATE INDEX ix_roadmap_milestones_roadmap_id ON roadmap_milestones(roadmap_id);
+  CREATE INDEX ix_roadmap_milestones_skill_id ON roadmap_milestones(skill_id);
+  ```
+- **Lifecycle Semantics**: P4 strictly initializes milestones to `NOT_STARTED`. `VERIFIED` status is strictly reserved for P5 GitHub verification.
+- **Transitive Prerequisite Scoring**: Transitive-only prerequisites maintain `priority_score = NULL` and `priority_level = NULL` (no fabricated priority facts).
 
 ### P5 — GitHub Skill Verification Loop Concepts
 - **Verification Event**: Audit records logging candidate milestone verification attempts.
 - **Repository Re-Scan**: Incremental code artifact diffing triggering deterministic skill gap recalculation.
 - **Skill Progression History**: Historical time-series tracking candidate skill advancement over time.
+

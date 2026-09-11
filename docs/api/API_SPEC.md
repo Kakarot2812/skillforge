@@ -1275,5 +1275,88 @@ The following table lists the active endpoints implemented in the SkillForge AI 
 - **Personalized Roadmap Generation**: Sequenced learning path generation based on prerequisite DAG topological sorting.
 - **Vetted Learning Resources & Projects**: Curated resource matching and hands-on project challenge recommendations tailored to candidate skill gaps.
 
-### P5 — GitHub Skill Verification Loop
-- **Automated Milestone Verification**: Closed-loop endpoints that re-scan connected GitHub repositories upon project completion, evaluate rubrics, and trigger deterministic skill-gap and priority recalculation.
+### P5 — GitHub Skill Verification Loop (Implemented)
+
+The following closed-loop verification endpoints are implemented under `/api/v1/roadmap`:
+
+#### 1. Verify Roadmap Milestone
+- **Method**: `POST`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verify`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+  - `Authorization`: `Bearer <github_pat>` (Optional; required for private candidate repositories)
+- **Request Body**:
+  ```json
+  {
+    "repository_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "commit_sha": "optional-snapshot-sha"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "id": "uuid",
+    "milestone_id": "uuid",
+    "roadmap_id": "uuid",
+    "repository_id": "uuid",
+    "commit_sha": "40-char-sha",
+    "status": "VERIFIED",
+    "composite_confidence": 0.92,
+    "deliverable_score": 1.0,
+    "criteria_score": 0.88,
+    "skill_confidence": 0.85,
+    "verified_at": "2026-09-11T12:00:00Z",
+    "details": {
+      "deliverables": [...],
+      "criteria": [...]
+    },
+    "demonstrated_skills_recalculated": true,
+    "roadmap_unlocked": true
+  }
+  ```
+- **Status Codes**:
+  - `200 OK`: Verification completed (`VERIFIED`, `PARTIAL`, `UNVERIFIED`, or persisted `FAILED` audit record).
+  - `400 Bad Request`: Forked repository, query/body credential leakage, or milestone not associated with project deliverables.
+  - `401 Unauthorized`: Missing `X-User-Id`.
+  - `403 Forbidden`: Candidate does not own roadmap, repository, or connected GitHub handle mismatch.
+  - `404 Not Found`: Roadmap, milestone, or repository not found.
+
+#### 2. Get Milestone Verification History
+- **Method**: `GET`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/milestones/{milestone_id}/verification`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+- **Query Parameters**:
+  - `limit`: Integer (Default: 10)
+- **Response**: `200 OK`
+  ```json
+  {
+    "milestone_id": "uuid",
+    "verifications": [...],
+    "total": 1
+  }
+  ```
+
+#### 3. Batch Verify Roadmap Milestones
+- **Method**: `POST`
+- **Path**: `/api/v1/roadmap/{roadmap_id}/verify`
+- **Headers**:
+  - `X-User-Id`: Candidate UUID (Required)
+  - `Authorization`: `Bearer <github_pat>` (Optional)
+- **Request Body**:
+  ```json
+  {
+    "repository_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "milestone_ids": ["uuid-1", "uuid-2"],
+    "commit_sha": "optional-snapshot-sha"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "roadmap_id": "uuid",
+    "verifications": [...],
+    "total_evaluated": 2,
+    "total_verified": 1
+  }
+  ```

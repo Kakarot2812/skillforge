@@ -295,28 +295,48 @@ Purpose: Provide natural-language interaction with verified SkillForge intellige
 - Explains deterministic classifications, scores, and priorities without hallucination.
 - Must not invent candidate evidence, demand data, classifications, or priorities.
 
-### P4 — Personalized Roadmap + Resources (Planned)
+### P4 — Personalized Roadmap + Resources (Completed)
 
-Purpose: Convert deterministic skill gaps and priorities into a personalized learning path.
-- Milestone sequencing respecting DAG prerequisites.
-- Resource matching according to the candidate's existing skill level and verified gaps.
-- Practical project challenges targeting missing demonstrated skills.
+Purpose: Convert deterministic skill gaps and priorities into a personalized, sequenced learning path and curriculum.
+- Topological milestone sequencing respecting DAG prerequisites via Kahn's algorithm with deterministic tie-breaking.
+- Approved resource catalog (`approved_resources`, `approved_projects`) serving as the sole authority without web scraping or hallucinated URLs.
+- Transitive prerequisite scheduling with zero score fabrication (`priority_score = None`).
+- Candidate ownership and IDOR isolation for persisted roadmaps.
 
-### P5 — GitHub Verification Loop (Planned)
+### P5 — GitHub Verification Loop (Completed)
 
-Purpose: Create a closed feedback loop between learning/project completion and demonstrated skill evidence.
+Purpose: Create a closed feedback loop between learning/project completion, candidate-owned GitHub code repositories, and demonstrated skill evidence.
 
-**Conceptual Flow**:
+**Architectural Flow**:
 ```text
-User learns/builds something
-→ updates GitHub/project evidence
-→ SkillForge re-analyzes evidence
-→ demonstrated skills update
-→ skill gap recalculated
-→ priorities update
+Canonical Roadmap Milestone
+        ↓
+Approved Project Deliverables
+        ↓
+Candidate GitHub Repository
+        ↓
+Deterministic Project Verification (ProjectVerifier)
+        ↓
+VERIFIED / PARTIAL / UNVERIFIED / FAILED
+        ↓
+Demonstrated Skill Re-computation
+        ↓
+Roadmap Milestone State Transition
+        ↓
+Downstream Unlock
+        ↓
+Optional Qwen Explanation (AIVerificationExplanationService)
 ```
 
-The system uses new GitHub evidence to re-evaluate demonstrated skills without allowing the LLM to override deterministic classification.
+**Key Architectural Invariants**:
+- **Deterministic Truth**: Verification status, confidence, and scores are server-authoritative and determined statically without code execution.
+- **Verification Statuses**:
+  - `VERIFIED`: Deliverables matched, $S_{\text{crit}} \ge 0.80$, unsupported criteria = 0, $S_{\text{skill}} \ge 0.70$, composite $C \ge 0.85$. Milestone transitions to `VERIFIED`.
+  - `PARTIAL`: Composite $C \ge 0.50$ OR $S_{\text{deliv}} \ge 0.50$ OR $S_{\text{crit}} \ge 0.50$. Milestone transitions from `NOT_STARTED` to `IN_PROGRESS`.
+  - `UNVERIFIED`: Candidate criteria/deliverables unfulfilled. Milestone transitions to `IN_PROGRESS`.
+  - `FAILED`: Reserved strictly for infrastructure/upstream failures (rate limit 429, timeout 504, upstream 502/503). Audit record is preserved; milestone status remains unchanged.
+- **Security Boundary**: Volatile PATs accepted only via `Authorization: Bearer <token>` header; never logged, persisted, or returned. Forked repositories rejected. Repository owner matched against connected handle.
+- **Explanatory AI (P5-E)**: Local Qwen 3 8B provides non-authoritative explanations. Treats candidate code as untrusted passive data, defends against prompt injection, redacts credentials, and cannot alter deterministic verification results.
 
 ---
 

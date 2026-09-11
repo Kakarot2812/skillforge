@@ -146,27 +146,48 @@ Convert deterministic skill gaps, priority scores, and prerequisite DAG constrai
 - **Qwen Independence**: Canonical roadmaps are 100% functional without Qwen or RAG. Optional Qwen explanations operate strictly downstream with `status="EXPLANATORY"`.
 
 
-## P5 — GitHub Skill Verification Loop
+## P5 — GitHub Skill Verification Loop (Completed)
 
 ### Purpose
-Create a closed feedback loop between learning/project completion and demonstrated skill evidence.
+Create a closed feedback loop between learning/project completion, candidate-owned GitHub code repositories, and demonstrated skill evidence.
 
-### Conceptual Flow
-```
-    Skill Gap
-       ↓
-    Learning / Project
-       ↓
-    GitHub Repository
-       ↓
-    Repository Analysis
-       ↓
-    New Evidence
-       ↓
-    Skill Re-evaluation
+### Architectural Flow
+```text
+Canonical Roadmap Milestone
+        ↓
+Approved Project Deliverables
+        ↓
+Candidate GitHub Repository
+        ↓
+Deterministic Project Verification (ProjectVerifier)
+        ↓
+VERIFIED / PARTIAL / UNVERIFIED / FAILED
+        ↓
+Demonstrated Skill Re-computation
+        ↓
+Roadmap Milestone State Transition
+        ↓
+Downstream Unlock
+        ↓
+Optional Qwen Explanation (AIVerificationExplanationService)
 ```
 
-The system should use new GitHub evidence to re-evaluate demonstrated skills without allowing the LLM to override deterministic classification.
+### Core Architecture Invariant
+> **"Deterministic systems decide what is true.**
+> **AI explains, reasons over, and personalizes verified evidence."**
+
+### Key Implemented Components
+- **P5-A: Deterministic ProjectVerifier**: Pure, side-effect-free verifier executing locked deliverable matching (exact normalized path or unique basename match; directory-style requires exact match; no suffix matching) and static automated criteria evaluation. Excludes subjective criteria from automated scoring.
+- **P5-B: Milestone Verification Persistence**: Migration `0018_milestone_verifications` creating `milestone_verifications` with foreign key cascades, check constraints for status and confidence [0.0, 1.0], and composite index `(milestone_id, created_at)` enabling append-only audit history.
+- **P5-C: VerificationService Orchestration**: Deterministic orchestration connecting candidate user validation, roadmap ownership, milestone linkage, non-forked repository ownership, connected GitHub username verification, snapshot commit SHA resolution, GitHub tree/content refresh, demonstrated-skill recomputation, and milestone state transitions.
+- **P5-D: Verification API + Security Boundary**: FastAPI endpoints (`POST /api/v1/roadmap/{id}/milestones/{id}/verify`, `GET /api/v1/roadmap/{id}/milestones/{id}/verification`, `POST /api/v1/roadmap/{id}/verify`). Enforces `X-User-Id` authentication, IDOR cross-check, forked repository rejection, and volatile PAT extraction strictly via `Authorization: Bearer <token>` header (never persisted, logged, or returned).
+- **P5-E: AI Verification Explanation Layer**: `AIVerificationExplanationService` providing non-authoritative Qwen 3 8B explanations. Defends against prompt injection in untrusted code/deliverables, redacts credentials, and guarantees server-authoritative status and confidence cannot be modified by the LLM.
+
+### Verification Statuses
+- **`VERIFIED`**: All required deliverables uniquely matched, automated criteria score $S_{\text{crit}} \ge 0.80$ with zero unsupported criteria, demonstrated skill score $S_{\text{skill}} \ge 0.70$, and composite confidence $C \ge 0.85$. Milestone transitions to `VERIFIED`.
+- **`PARTIAL`**: Not verified, and composite confidence $C \ge 0.50$ OR deliverables score $S_{\text{deliv}} \ge 0.50$ OR criteria score $S_{\text{crit}} \ge 0.50$. Milestone transitions from `NOT_STARTED` to `IN_PROGRESS`.
+- **`UNVERIFIED`**: Candidate-side failure to meet deliverable or criteria thresholds. Milestone transitions from `NOT_STARTED` to `IN_PROGRESS`.
+- **`FAILED`**: Reserved exclusively for external infrastructure and upstream failures (GitHub rate limit 429, timeout 504, upstream 502/503). Persists a `FAILED` audit record without altering roadmap milestone status. Candidate evaluation failures are never mapped to `FAILED`.
 
 ---
 

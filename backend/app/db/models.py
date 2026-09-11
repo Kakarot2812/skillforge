@@ -40,6 +40,8 @@ class User(Base):
     project_evidence = relationship("ProjectEvidence", back_populates="user", cascade="all, delete-orphan")
     demonstrated_skills = relationship("DemonstratedSkill", back_populates="user", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="user", cascade="all, delete-orphan")
+    roadmap_progress = relationship("UserRoadmapProgress", back_populates="user", cascade="all, delete-orphan")
+    practice_progress = relationship("UserPracticeProgress", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
@@ -61,6 +63,7 @@ class Skill(Base):
     demonstrated_by_users = relationship("DemonstratedSkill", back_populates="skill", cascade="all, delete-orphan")
     industry_demands = relationship("IndustrySkillDemand", back_populates="skill", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="skill", cascade="all, delete-orphan")
+    roadmap_skills = relationship("RoadmapSkill", back_populates="canonical_skill")
 
     def __repr__(self) -> str:
         return f"<Skill {self.name}>"
@@ -255,6 +258,7 @@ class JobRole(Base):
 
     skill_demands = relationship("IndustrySkillDemand", back_populates="role", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="role", cascade="all, delete-orphan")
+    roadmaps = relationship("Roadmap", back_populates="role")
 
     @property
     def name(self) -> str:
@@ -342,6 +346,200 @@ class SkillGap(Base):
 
     def __repr__(self) -> str:
         return f"<SkillGap user={self.user_id} role={self.role_id} skill={self.skill_id} status={self.status}>"
+
+
+class Roadmap(Base):
+    __tablename__ = "roadmaps"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role_id = Column(UUID(as_uuid=True), ForeignKey("job_roles.id", ondelete="SET NULL"), nullable=True, index=True)
+    slug = Column(String(128), unique=True, index=True, nullable=False)
+    title = Column(String(128), nullable=False)
+    domain = Column(String(128), nullable=False, index=True)
+    category = Column(String(64), nullable=False)
+    description = Column(Text, nullable=False)
+    version = Column(String(32), nullable=False, default="v1.0")
+    last_reviewed = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    has_market_data = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    role = relationship("JobRole", back_populates="roadmaps")
+    stages = relationship("RoadmapStage", back_populates="roadmap", cascade="all, delete-orphan", order_by="RoadmapStage.stage_order")
+    skills = relationship("RoadmapSkill", back_populates="roadmap", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<Roadmap {self.title} ({self.slug})>"
+
+
+class RoadmapStage(Base):
+    __tablename__ = "roadmap_stages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    roadmap_id = Column(UUID(as_uuid=True), ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    stage_order = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("roadmap_id", "stage_order", name="uq_roadmap_stages_roadmap_stage_order"),
+    )
+
+    roadmap = relationship("Roadmap", back_populates="stages")
+    skills = relationship("RoadmapSkill", back_populates="stage", cascade="all, delete-orphan", order_by="RoadmapSkill.skill_order")
+
+    def __repr__(self) -> str:
+        return f"<RoadmapStage {self.name} (order: {self.stage_order})>"
+
+
+class RoadmapSkill(Base):
+    __tablename__ = "roadmap_skills"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    stage_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_stages.id", ondelete="CASCADE"), nullable=False, index=True)
+    roadmap_id = Column(UUID(as_uuid=True), ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
+    canonical_skill_id = Column(UUID(as_uuid=True), ForeignKey("skills.id", ondelete="SET NULL"), nullable=True, index=True)
+    name = Column(String(128), nullable=False)
+    slug = Column(String(128), nullable=False, index=True)
+    description = Column(Text, nullable=False)
+    difficulty = Column(String(32), nullable=False, default="BEGINNER")
+    skill_order = Column(Integer, nullable=False)
+    key_topics = Column(JSONB, nullable=False, default=list)
+    practice_project = Column(Text, nullable=True)
+    practice_problems = Column(JSONB, nullable=False, default=list)
+    role_relevance = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("stage_id", "skill_order", name="uq_roadmap_skills_stage_order"),
+        CheckConstraint("difficulty IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED')", name="chk_roadmap_skill_difficulty"),
+    )
+
+    stage = relationship("RoadmapStage", back_populates="skills")
+    roadmap = relationship("Roadmap", back_populates="skills")
+    canonical_skill = relationship("Skill", back_populates="roadmap_skills")
+    resources = relationship("LearningResource", back_populates="roadmap_skill", cascade="all, delete-orphan")
+    user_progress = relationship("UserRoadmapProgress", back_populates="roadmap_skill", cascade="all, delete-orphan")
+    practice_progress = relationship("UserPracticeProgress", back_populates="roadmap_skill", cascade="all, delete-orphan")
+
+    prerequisites = relationship(
+        "RoadmapPrerequisite",
+        foreign_keys="RoadmapPrerequisite.roadmap_skill_id",
+        back_populates="roadmap_skill",
+        cascade="all, delete-orphan",
+    )
+    dependents = relationship(
+        "RoadmapPrerequisite",
+        foreign_keys="RoadmapPrerequisite.prerequisite_skill_id",
+        back_populates="prerequisite_skill",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self) -> str:
+        return f"<RoadmapSkill {self.name} ({self.difficulty})>"
+
+
+class RoadmapPrerequisite(Base):
+    __tablename__ = "roadmap_prerequisites"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    roadmap_skill_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    prerequisite_skill_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("roadmap_skill_id", "prerequisite_skill_id", name="uq_roadmap_prereqs_skill_prereq"),
+    )
+
+    roadmap_skill = relationship("RoadmapSkill", foreign_keys=[roadmap_skill_id], back_populates="prerequisites")
+    prerequisite_skill = relationship("RoadmapSkill", foreign_keys=[prerequisite_skill_id], back_populates="dependents")
+
+    def __repr__(self) -> str:
+        return f"<RoadmapPrerequisite {self.roadmap_skill_id} requires {self.prerequisite_skill_id}>"
+
+
+class LearningResource(Base):
+    __tablename__ = "learning_resources"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    roadmap_skill_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    resource_type = Column(String(32), nullable=False)  # 'DOCUMENTATION', 'YOUTUBE'
+    title = Column(String(255), nullable=False)
+    url = Column(String(512), nullable=False)
+    description = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("resource_type IN ('DOCUMENTATION', 'YOUTUBE')", name="chk_learning_resource_type"),
+    )
+
+    roadmap_skill = relationship("RoadmapSkill", back_populates="resources")
+
+    def __repr__(self) -> str:
+        return f"<LearningResource {self.resource_type}: {self.title}>"
+
+
+class UserRoadmapProgress(Base):
+    __tablename__ = "user_roadmap_progress"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    roadmap_skill_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="NOT_STARTED", index=True)  # 'NOT_STARTED', 'LEARNING', 'DONE', 'SKIPPED'
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "roadmap_skill_id", name="uq_user_roadmap_progress_user_skill"),
+        CheckConstraint("status IN ('NOT_STARTED', 'LEARNING', 'DONE', 'SKIPPED')", name="chk_user_roadmap_status"),
+    )
+
+    user = relationship("User", back_populates="roadmap_progress")
+    roadmap_skill = relationship("RoadmapSkill", back_populates="user_progress")
+
+    def __repr__(self) -> str:
+        return f"<UserRoadmapProgress user={self.user_id} skill={self.roadmap_skill_id} status={self.status}>"
+
+
+class UserPracticeProgress(Base):
+    __tablename__ = "user_practice_progress"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    roadmap_skill_id = Column(UUID(as_uuid=True), ForeignKey("roadmap_skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    problem_id = Column(String(128), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="NOT_STARTED", index=True)  # 'NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "roadmap_skill_id", "problem_id", name="uq_user_practice_progress_user_skill_prob"),
+        CheckConstraint("status IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED')", name="chk_user_practice_status"),
+    )
+
+    user = relationship("User", back_populates="practice_progress")
+    roadmap_skill = relationship("RoadmapSkill", back_populates="practice_progress")
+
+    def __repr__(self) -> str:
+        return f"<UserPracticeProgress user={self.user_id} skill={self.roadmap_skill_id} problem={self.problem_id} status={self.status}>"
 
 
 

@@ -8,6 +8,7 @@ from app.api.v1.roles import router as roles_router
 from app.api.v1.demand import router as demand_router
 from app.api.v1.demand_intelligence import router as intelligence_router
 from app.api.v1.gaps import router as gaps_router
+from app.api.v1.roadmaps import router as roadmaps_router, user_progress_router
 
 api_router = APIRouter()
 
@@ -37,5 +38,11 @@ api_router.include_router(intelligence_router, prefix="/intelligence")
 
 # Mount Skill Gap Foundation routes under /api/v1/gaps
 api_router.include_router(gaps_router, prefix="/gaps")
+
+# Mount Skill Roadmaps routes under /api/v1/roadmaps
+api_router.include_router(roadmaps_router, prefix="/roadmaps")
+
+# Mount User Roadmap Progress routes under /api/v1/users/me/roadmap-progress
+api_router.include_router(user_progress_router)
 
 

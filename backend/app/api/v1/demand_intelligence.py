@@ -31,6 +31,7 @@ from app.schemas.demand_intelligence import (
     DemandTrendsResponse,
 )
 from app.services.demand_intelligence_service import demand_intelligence_service
+from app.services.demand_service import demand_service
 
 router = APIRouter(tags=["Demand Intelligence"])
 
@@ -70,7 +71,7 @@ def get_skill_ranking(
             offset=offset,
             location=location,
             role_id=role_id,
-            data_freshness="2026-09-01",
+            data_freshness=demand_service.get_market_data_freshness(db),
         ),
     )
 
@@ -109,7 +110,7 @@ def get_skill_across_roles(
         ),
         meta=SkillRoleDemandMeta(
             location=location,
-            data_freshness="2026-09-01",
+            data_freshness=demand_service.get_market_data_freshness(db),
         ),
     )
 
@@ -163,7 +164,7 @@ def compare_job_roles(
         ),
         meta=RoleCompareMeta(
             location=payload.location,
-            data_freshness="2026-09-01",
+            data_freshness=demand_service.get_market_data_freshness(db),
         ),
     )
 
@@ -203,7 +204,7 @@ def get_role_signals(
         ),
         meta=RoleMarketSignalsMeta(
             location=location,
-            data_freshness="2026-09-01",
+            data_freshness=demand_service.get_market_data_freshness(db),
         ),
     )
 
@@ -242,6 +243,6 @@ def get_demand_trends(
             offset=offset,
             role_id=role_id,
             location=location,
-            data_freshness="2026-09-01",
+            data_freshness=demand_service.get_market_data_freshness(db),
         ),
     )

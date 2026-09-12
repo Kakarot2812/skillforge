@@ -66,7 +66,7 @@ def list_industry_demand(
     )
 
     items = [SkillDemandItem(**it) for it in items_raw]
-    freshness = items[0].data_updated_at if items else "2026-09-01"
+    freshness = demand_service.get_market_data_freshness(db)
 
     return SkillDemandListResponse(
         data=items,
@@ -108,7 +108,7 @@ def get_role_demand_breakdown(
 
     role, skills_raw, aggregates = result
     skills = [RoleSkillDemandItem(**s) for s in skills_raw]
-    freshness = skills[0].data_updated_at if skills else "2026-09-01"
+    freshness = demand_service.get_market_data_freshness(db)
 
     return RoleDemandDetailResponse(
         data=RoleDemandDetailData(

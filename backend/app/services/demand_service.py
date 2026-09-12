@@ -3,7 +3,23 @@ from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.db.models import JobRole, IndustrySkillDemand, Skill
+from app.db.models import JobRole, IndustrySkillDemand, Skill, MarketSkillDemandSnapshot
+
+
+def get_market_data_freshness(db: Session) -> str:
+    """
+    Returns the latest market data freshness timestamp as 'YYYY-MM-DD'.
+    Queries the newest snapshot from MarketSkillDemandSnapshot (post-P1-L).
+    Falls back to '2026-09-01' if no snapshot exists.
+    """
+    row = (
+        db.query(MarketSkillDemandSnapshot.snapshot_at)
+        .order_by(MarketSkillDemandSnapshot.snapshot_at.desc())
+        .first()
+    )
+    if row and row[0]:
+        return row[0].strftime("%Y-%m-%d")
+    return "2026-09-01"
 
 
 class DemandService:
@@ -312,9 +328,15 @@ class DemandService:
             "out_of_bounds_scores": out_of_bounds_scores,
             "non_positive_sample_sizes": non_positive_sample_sizes,
             "duplicate_records": duplicate_groups,
-            "data_freshness": "2026-09-01",
+            "data_freshness": self.get_market_data_freshness(db),
             "audit_timestamp": datetime.now(timezone.utc).isoformat(),
         }
+
+    def get_market_data_freshness(self, db: Session) -> str:
+        """
+        Delegates directly to get_market_data_freshness(db) to avoid duplicate query logic.
+        """
+        return get_market_data_freshness(db)
 
 
 demand_service = DemandService()

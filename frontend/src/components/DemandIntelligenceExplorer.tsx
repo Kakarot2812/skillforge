@@ -19,6 +19,7 @@ export default function DemandIntelligenceExplorer() {
   const [roles, setRoles] = useState<JobRole[]>([]);
   const [loadingRoles, setLoadingRoles] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataFreshness, setDataFreshness] = useState<string>("2026-09-01");
 
   // Tab A: Rankings state
   const [rankings, setRankings] = useState<SkillDemandRankingItem[]>([]);
@@ -67,6 +68,9 @@ export default function DemandIntelligenceExplorer() {
       const res = await fetchSkillDemandRanking("India", rankingFilterRole || undefined, 50, 0);
       if (res.success && res.data) {
         setRankings(res.data.data);
+        if (res.data.meta?.data_freshness) {
+          setDataFreshness(res.data.meta.data_freshness);
+        }
       } else {
         setError(res.error || "Failed to load skill rankings.");
       }
@@ -118,6 +122,9 @@ export default function DemandIntelligenceExplorer() {
       const res = await fetchDemandTrends("India", undefined, 30, 0);
       if (res.success && res.data) {
         setTrends(res.data.data);
+        if (res.data.meta?.data_freshness) {
+          setDataFreshness(res.data.meta.data_freshness);
+        }
       } else {
         setError(res.error || "Failed to load demand trends.");
       }
@@ -175,7 +182,7 @@ export default function DemandIntelligenceExplorer() {
           </p>
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 flex items-center gap-2">
-          <span>Freshness: <strong className="text-slate-800 dark:text-slate-200 font-mono">2026-09-01</strong></span>
+          <span>Freshness: <strong className="text-slate-800 dark:text-slate-200 font-mono">{dataFreshness}</strong></span>
           <span>•</span>
           <span>Location: <strong className="text-slate-800 dark:text-slate-200 font-mono">India</strong></span>
         </div>

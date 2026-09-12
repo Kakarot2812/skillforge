@@ -348,6 +348,12 @@ def test_global_ownership_and_provenance():
     res2 = client.get("/api/v1/demand?limit=10", headers={"X-User-Id": str(uuid.uuid4())})
     assert res1.json()["data"] == res2.json()["data"]
 
-    # Freshness date is preserved as documented baseline, not mutated on read
+    # Freshness date reflects dynamic market snapshot freshness, not mutated on read
+    db = SessionLocal()
+    try:
+        expected_freshness = demand_service.get_market_data_freshness(db)
+    finally:
+        db.close()
+
     meta = res1.json()["meta"]
-    assert meta["data_freshness"] == "2026-09-01"
+    assert meta["data_freshness"] == expected_freshness

@@ -8,8 +8,9 @@ import SkillGapExplorer from "@/components/SkillGapExplorer";
 import MarketDemandSection from "@/components/market/MarketDemandSection";
 import DemandIntelligenceExplorer from "@/components/DemandIntelligenceExplorer";
 import RoadmapSection from "@/components/roadmap/RoadmapSection";
+import SkillRoadmap from "@/components/roadmap/SkillRoadmap";
 import CareerAssistant from "@/components/assistant/CareerAssistant";
-import { Sparkles, CheckCircle2, TrendingUp, Compass, Award, Bot } from "lucide-react";
+import { Sparkles, CheckCircle2, TrendingUp, Compass, Award, Bot, Map } from "lucide-react";
 
 import { ensureCandidateIdentity } from "@/lib/identity";
 import { fetchResumeDetail } from "@/lib/api";
@@ -238,8 +239,9 @@ export default function DashboardPage() {
           />
         </section>
 
-        {/* 4. Personalized Career Roadmap */}
-        <section aria-label="Personalized Career Roadmap" className="scroll-mt-20">
+        {/* 4. Career Roadmaps: Personalized Career Milestones & Curated Skill Learning */}
+        <section aria-label="Career Roadmaps" className="scroll-mt-20 space-y-8">
+          {/* 4A. Candidate-Specific Personalized Roadmap (Topological DAG Milestones) */}
           <RoadmapSection
             selectedRoleId={selectedRoleId}
             candidateReady={candidateReady}
@@ -247,6 +249,24 @@ export default function DashboardPage() {
             resumeId={resumeId}
             connectedGitHubUsername={connectedGitHubUser}
           />
+
+          {/* Visual Divider: Distinguishing Personalized Milestones from Curated Domain Catalog */}
+          <div className="relative py-2" aria-hidden="true">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-neutral-800" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-[#0a0a0c] px-4 text-xs font-mono uppercase tracking-wider text-neutral-500 flex items-center gap-2 border border-neutral-800/80 rounded-full py-1">
+                <Map className="h-3.5 w-3.5 text-emerald-400" />
+                Curated Skill Learning Catalog
+              </span>
+            </div>
+          </div>
+
+          {/* 4B. Curated Technology Skill Learning Roadmap (12-Domain Prerequisite Curriculum) */}
+          <div className="bg-neutral-900/40 border border-neutral-800/90 rounded-2xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-xl">
+            <SkillRoadmap targetRoleId={selectedRoleId} />
+          </div>
         </section>
 
         {/* 5. AI Career Intelligence Assistant */}

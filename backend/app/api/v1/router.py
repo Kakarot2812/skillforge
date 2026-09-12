@@ -10,6 +10,7 @@ from app.api.v1.demand_intelligence import router as intelligence_router
 from app.api.v1.gaps import router as gaps_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.roadmap import router as roadmap_router
+from app.api.v1.roadmaps import router as roadmaps_router, user_progress_router
 from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
@@ -49,5 +50,11 @@ api_router.include_router(ai_router, prefix="/ai")
 
 # Mount Personalized Career Roadmap routes under /api/v1/roadmap
 api_router.include_router(roadmap_router, prefix="/roadmap")
+
+# Mount Curated Technology Skill Roadmap routes under /api/v1/roadmaps
+api_router.include_router(roadmaps_router, prefix="/roadmaps")
+
+# Mount User Roadmap Progress routes under /api/v1/users/me/roadmap-progress
+api_router.include_router(user_progress_router)
 
 

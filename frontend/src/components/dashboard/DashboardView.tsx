@@ -10,9 +10,6 @@ import { useCandidate } from "@/context/CandidateContext";
 import {
   LayoutDashboard,
   TrendingUp,
-  Compass,
-  Bot,
-  BarChart3,
   Briefcase,
   ShieldCheck,
   FileText,
@@ -37,16 +34,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     <div className="space-y-10 pb-16">
       {/* Dashboard Top Header & Executive Stats Cards */}
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-neutral-900/80 border border-neutral-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 shadow-md shadow-neutral-200/50 dark:shadow-none transition-colors duration-200">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
               <LayoutDashboard className="h-3.5 w-3.5" />
               <span>Career Roadmap & Market Intelligence</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
               Career Dashboard
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-400 max-w-2xl">
+            <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-2xl">
               Track real-time hiring benchmarks, explore your personalized milestone DAG roadmap, and get evidence-grounded career coaching.
             </p>
           </div>
@@ -57,7 +54,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <button
                   type="button"
                   onClick={() => onNavigate("analyzer")}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <span>Connect Evidence</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -65,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               ) : (
                 <Link
                   href="/analyzer"
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
                 >
                   <span>Connect Evidence</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -77,49 +74,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 4 Summary Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
               <Briefcase className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] text-neutral-400 font-medium truncate">Target Track</div>
-              <div className="text-xs font-bold text-white truncate">
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Target Track</div>
+              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
                 {selectedRoleId ? selectedRoleId.replace(/_/g, " ").toUpperCase() : "Select Track"}
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20 shrink-0">
+          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
+            <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-500/20 shrink-0">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] text-neutral-400 font-medium truncate">Resume Evidence</div>
-              <div className="text-xs font-bold text-white truncate">
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Resume Evidence</div>
+              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
                 {hasResume ? "Verified & Parsed" : "Not Provided"}
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
+            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] text-neutral-400 font-medium truncate">GitHub Code Evidence</div>
-              <div className="text-xs font-bold text-white truncate">
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">GitHub Code Evidence</div>
+              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
                 {connectedGitHubUser ? `@${connectedGitHubUser}` : "Not Connected"}
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
               <TrendingUp className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] text-neutral-400 font-medium truncate">Hiring Benchmark</div>
-              <div className="text-xs font-bold text-white truncate">India Tech Market</div>
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Hiring Benchmark</div>
+              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">India Tech Market</div>
             </div>
           </div>
         </div>

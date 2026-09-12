@@ -205,24 +205,24 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
   };
 
   return (
-    <div id="resume-intelligence-card" className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative flex flex-col justify-between shadow-lg">
+    <div id="resume-intelligence-card" className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative flex flex-col justify-between shadow-xs transition-colors duration-200">
       {/* Card Header */}
       <div>
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
               <FileText className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-neutral-200">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">
                 Resume Intelligence
               </h3>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 Resume Evidence & Skill Extraction
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase tracking-wider font-mono">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/30 uppercase tracking-wider font-mono">
             {uploadResult ? "Profile Active" : "Resume Evidence"}
           </span>
         </div>
@@ -240,42 +240,42 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
         {/* Success View */}
         {uploadResult ? (
           <div className="mt-5 space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-neutral-200 space-y-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-neutral-800 dark:text-neutral-200 space-y-3">
+              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-xs">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>Resume Uploaded & Intelligence Verified</span>
               </div>
 
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-neutral-400">File Name:</span>
-                  <span className="font-mono text-neutral-200 font-medium truncate max-w-[200px]">
+                  <span className="text-neutral-500 dark:text-neutral-400">File Name:</span>
+                  <span className="font-mono text-neutral-800 dark:text-neutral-200 font-medium truncate max-w-[200px]">
                     {uploadResult.filename}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-400">Format / Size:</span>
-                  <span className="font-mono text-neutral-300">
+                  <span className="text-neutral-500 dark:text-neutral-400">Format / Size:</span>
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300">
                     {uploadResult.file_type.toUpperCase()} • {formatFileSize(uploadResult.file_size)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center pt-1 border-t border-emerald-500/20">
-                  <span className="text-neutral-400">Resume ID:</span>
-                  <span className="font-mono text-[11px] text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+                <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-500/20">
+                  <span className="text-neutral-500 dark:text-neutral-400">Resume ID:</span>
+                  <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/50">
                     {uploadResult.resume_id}
                   </span>
                 </div>
 
                 {uploadResult.extracted_sections && uploadResult.extracted_sections.length > 0 && (
-                  <div className="pt-2 border-t border-emerald-500/20">
-                    <span className="text-[11px] text-neutral-400 block mb-1 font-medium">
+                  <div className="pt-2 border-t border-emerald-200 dark:border-emerald-500/20">
+                    <span className="text-[11px] text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">
                       Detected Sections:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {uploadResult.extracted_sections.map((sec) => (
                         <span
                           key={sec}
-                          className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-700 text-neutral-300 text-[10px] font-mono capitalize"
+                          className="px-2 py-0.5 rounded-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-[10px] font-mono capitalize"
                         >
                           {sec}
                         </span>
@@ -285,12 +285,12 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                 )}
 
                 {uploadResult.claimed_skills && uploadResult.claimed_skills.length > 0 && (
-                  <div className="pt-2 border-t border-emerald-500/20">
+                  <div className="pt-2 border-t border-emerald-200 dark:border-emerald-500/20">
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-[11px] text-neutral-300 font-medium">
+                      <span className="text-[11px] text-neutral-700 dark:text-neutral-300 font-medium">
                         Extracted Claimed Skills:
                       </span>
-                      <span className="text-[10px] font-mono text-emerald-400">
+                      <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
                         {uploadResult.claimed_skills.length} normalized
                       </span>
                     </div>
@@ -298,10 +298,10 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                       {uploadResult.claimed_skills.map((skill) => (
                         <span
                           key={skill.skill_id}
-                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-950/70 border border-emerald-600/50 text-emerald-200 text-[10px] font-medium"
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-600/50 text-emerald-800 dark:text-emerald-200 text-[10px] font-medium"
                         >
                           <span>{skill.skill_name}</span>
-                          <span className="text-[9px] font-mono text-emerald-400/80 bg-emerald-900/60 px-1 rounded">
+                          <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400/80 bg-emerald-100 dark:bg-emerald-900/60 px-1 rounded">
                             {Math.round(skill.confidence_score * 100)}%
                           </span>
                         </span>
@@ -312,33 +312,35 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
-              <div className="flex items-center gap-1.5 font-medium text-emerald-400">
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>Resume Intelligence Verified</span>
               </div>
               <p className="leading-relaxed">
                 Resume sections and skills extracted and verified.
-                <strong className="text-purple-300 font-normal"> Integrated with SkillForge Career Intelligence.</strong>
+                <strong className="text-purple-700 dark:text-purple-300 font-medium"> Integrated with SkillForge Career Intelligence.</strong>
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={resetForm}
-                className="py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+                className="py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-neutral-200 dark:border-neutral-700 cursor-pointer"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Upload Another</span>
               </button>
               <button
+                type="button"
                 onClick={async () => {
                   if (uploadResult?.resume_id) {
                     await deleteResume(uploadResult.resume_id);
                     resetForm();
                   }
                 }}
-                className="py-2 px-3 rounded-xl bg-red-950/40 hover:bg-red-900/50 text-red-300 hover:text-red-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-red-800/40 cursor-pointer"
+                className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-rose-700 dark:text-red-300 hover:text-rose-800 dark:hover:text-red-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-rose-200 dark:border-red-800/40 cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete Resume</span>
@@ -357,24 +359,24 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                 dragOver
                   ? "border-purple-500 bg-purple-500/10 scale-[0.99]"
                   : selectedFile
-                  ? "border-purple-500/50 bg-neutral-950/60"
-                  : "border-neutral-800 hover:border-neutral-700 bg-neutral-950/40"
+                  ? "border-purple-500/50 bg-purple-50/50 dark:bg-neutral-950/60"
+                  : "border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 bg-neutral-50/70 dark:bg-neutral-950/40"
               }`}
             >
-              <div className="p-3 rounded-full bg-neutral-900 text-neutral-400 mb-3 border border-neutral-800">
+              <div className="p-3 rounded-full bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 mb-3 border border-neutral-200 dark:border-neutral-800 shadow-xs">
                 {selectedFile ? (
-                  <FileCheck2 className="h-6 w-6 text-purple-400" />
+                  <FileCheck2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 ) : (
-                  <UploadCloud className="h-6 w-6 text-neutral-500" />
+                  <UploadCloud className="h-6 w-6 text-neutral-400 dark:text-neutral-500" />
                 )}
               </div>
 
               {selectedFile ? (
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-neutral-200 truncate max-w-xs">
+                  <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-200 truncate max-w-xs">
                     {selectedFile.name}
                   </p>
-                  <p className="text-[11px] font-mono text-purple-400">
+                  <p className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
                     {formatFileSize(selectedFile.size)} • Ready to upload
                   </p>
                   <span className="text-[10px] text-neutral-500 block pt-1">
@@ -383,7 +385,7 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-neutral-300">
+                  <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                     Click to select resume or drag & drop here
                   </p>
                   <p className="text-[11px] text-neutral-500">
@@ -395,8 +397,8 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
 
             {/* Error Message */}
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
                 <span className="leading-snug">{errorMessage}</span>
               </div>
             )}
@@ -408,7 +410,7 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                   type="button"
                   disabled={isUploading}
                   onClick={handleUpload}
-                  className="flex-1 py-2 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-2 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-purple-600/20 dark:shadow-purple-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUploading ? (
                     <>
@@ -427,7 +429,7 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
                   type="button"
                   disabled={isUploading}
                   onClick={resetForm}
-                  className="py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs border border-neutral-700 transition-all cursor-pointer disabled:opacity-50"
+                  className="py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 text-xs border border-neutral-200 dark:border-neutral-700 transition-all cursor-pointer disabled:opacity-50"
                   title="Clear selected file"
                 >
                   Clear
@@ -436,7 +438,7 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
             )}
 
             {!selectedFile && (
-              <div className="px-3 py-2 rounded-lg bg-neutral-950/50 border border-neutral-800/80 text-[11px] text-neutral-500 flex items-center justify-between">
+              <div className="px-3 py-2 rounded-lg bg-neutral-50 dark:bg-neutral-950/50 border border-neutral-200 dark:border-neutral-800/80 text-[11px] text-neutral-500 flex items-center justify-between">
                 <span>Supported Formats: PDF, DOCX</span>
                 <span className="font-mono text-[10px]">Max 5 MB</span>
               </div>
@@ -445,9 +447,9 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
         )}
       </div>
 
-      <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500">
+      <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
         <span>Evidence Source: Candidate Resume</span>
-        <span className="text-neutral-400 font-medium">{uploadResult ? "Document Verified" : "No Resume Uploaded"}</span>
+        <span className="text-neutral-700 dark:text-neutral-400 font-medium">{uploadResult ? "Document Verified" : "No Resume Uploaded"}</span>
       </div>
     </div>
   );

@@ -1,8 +1,55 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(226, 232, 240, 0.9);
+  --card-subtle: #f1f5f9;
+  --card-nested: #ffffff;
+  --card-hover: #f8fafc;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-border: rgba(226, 232, 240, 0.85);
+
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-track: #f1f5f9;
+}
+
+.dark {
+  --background: #0a0a0c;
+  --foreground: #f8fafc;
+
+  --card-bg: rgba(18, 18, 22, 0.8);
+  --card-border: rgba(38, 38, 43, 0.8);
+  --card-subtle: #141418;
+  --card-nested: #0e0e12;
+  --card-hover: #1c1c22;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+
+  --nav-bg: rgba(10, 10, 12, 0.9);
+  --nav-border: rgba(38, 38, 43, 0.8);
+
+  --input-bg: #141418;
+  --input-border: #2e2e36;
+
+  --color-scrollbar-thumb: #2e2e36;
+  --color-scrollbar-track: #0e0e12;
 }
 
 @theme inline {
@@ -12,15 +59,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom smooth scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Light / Dark modal backdrop animation */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }

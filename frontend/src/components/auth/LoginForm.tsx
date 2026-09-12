@@ -164,36 +164,36 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     >
       {/* Top Geometric Cube Emblem from Reference */}
       <Link href="/" className="mb-5 flex flex-col items-center group" aria-label="SkillForge Home">
-        <div className="w-11 h-11 flex items-center justify-center text-neutral-900 group-hover:scale-105 transition-transform">
+        <div className="w-11 h-11 flex items-center justify-center text-neutral-900 dark:text-neutral-100 group-hover:scale-105 transition-transform">
           {/* Isometric 3D Geometric Cube Logo matching reference */}
           <svg viewBox="0 0 36 36" fill="none" className="w-9 h-9">
             {/* Top Face */}
             <path
               d="M 18 3 L 31 10.5 L 18 18 L 5 10.5 Z"
-              fill="#18181b"
+              className="fill-zinc-800 dark:fill-indigo-500"
             />
             {/* Left Face */}
             <path
               d="M 5 10.5 L 18 18 L 18 33 L 5 25.5 Z"
-              fill="#27272a"
+              className="fill-zinc-700 dark:fill-indigo-600"
             />
             {/* Right Face */}
             <path
               d="M 18 18 L 31 10.5 L 31 25.5 L 18 33 Z"
-              fill="#09090b"
+              className="fill-zinc-900 dark:fill-indigo-700"
             />
             {/* Inner negative cut accent */}
-            <circle cx="18" cy="18" r="2.5" fill="#f4f4f5" />
+            <circle cx="18" cy="18" r="2.5" className="fill-zinc-100 dark:fill-zinc-900" />
           </svg>
         </div>
       </Link>
 
       {/* Main Heading & Subtitle */}
       <div className="text-center space-y-1.5 mb-8">
-        <h1 className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-neutral-900">
+        <h1 className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
           {mode === "login" ? "Welcome back!" : "Create an account"}
         </h1>
-        <p className="text-xs text-neutral-500 font-normal">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 font-normal">
           {mode === "login"
             ? "Please enter your details"
             : "Enter your information to get started"}
@@ -204,7 +204,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       {errorMessage && (
         <div
           role="alert"
-          className="w-full mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-700 animate-in fade-in duration-150"
+          className="w-full mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150"
         >
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="flex-1 font-medium">{errorMessage}</div>
@@ -214,7 +214,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       {successMessage && (
         <div
           role="status"
-          className="w-full mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-xs text-emerald-700 animate-in fade-in duration-150"
+          className="w-full mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300 animate-in fade-in duration-150"
         >
           <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="flex-1 font-medium">{successMessage}</div>
@@ -228,7 +228,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             <div className="space-y-1">
               <label
                 htmlFor="fullname-input"
-                className="block text-xs font-semibold text-neutral-700"
+                className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300"
               >
                 Full Name
               </label>
@@ -239,14 +239,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Alex Mercer"
-                className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 transition-colors"
+                className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100 transition-colors"
               />
             </div>
 
             <div className="space-y-1">
               <label
                 htmlFor="targetrole-input"
-                className="block text-xs font-semibold text-neutral-700"
+                className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300"
               >
                 Target Role
               </label>
@@ -254,12 +254,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 id="targetrole-input"
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
-                className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 text-neutral-900 focus:outline-none focus:border-neutral-900 transition-colors"
+                className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100 transition-colors"
               >
-                <option value="Full Stack Engineer">Full Stack Engineer</option>
-                <option value="Backend Engineer">Backend Engineer (Python / Go)</option>
-                <option value="Frontend Engineer">Frontend Engineer (React / Next.js)</option>
-                <option value="AI / ML Engineer">AI / ML Engineer</option>
+                <option value="Full Stack Engineer" className="dark:bg-neutral-900">Full Stack Engineer</option>
+                <option value="Backend Engineer" className="dark:bg-neutral-900">Backend Engineer (Python / Go)</option>
+                <option value="Frontend Engineer" className="dark:bg-neutral-900">Frontend Engineer (React / Next.js)</option>
+                <option value="AI / ML Engineer" className="dark:bg-neutral-900">AI / ML Engineer</option>
               </select>
             </div>
           </>
@@ -269,7 +269,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <div className="space-y-1">
           <label
             htmlFor="email-input"
-            className="block text-xs font-semibold text-neutral-700"
+            className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300"
           >
             Email
           </label>
@@ -281,7 +281,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder=""
-            className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 transition-colors"
+            className="w-full pb-2 pt-1 text-sm bg-transparent border-b border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-100 transition-colors"
           />
         </div>
 
@@ -289,11 +289,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <div className="space-y-1">
           <label
             htmlFor="password-input"
-            className="block text-xs font-semibold text-neutral-700"
+            className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300"
           >
             Password
           </label>
-          <div className="relative flex items-center border-b border-neutral-300 focus-within:border-neutral-900 transition-colors">
+          <div className="relative flex items-center border-b border-neutral-300 dark:border-neutral-700 focus-within:border-neutral-900 dark:focus-within:border-neutral-100 transition-colors">
             <input
               id="password-input"
               type={showPassword ? "text" : "password"}
@@ -304,12 +304,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               onFocus={handlePasswordFocus}
               onBlur={handlePasswordBlur}
               placeholder=""
-              className="w-full pb-2 pt-1 pr-8 text-sm bg-transparent text-neutral-900 placeholder-neutral-400 focus:outline-none"
+              className="w-full pb-2 pt-1 pr-8 text-sm bg-transparent text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none"
             />
             <button
               type="button"
               onClick={handleTogglePasswordVisibility}
-              className="absolute right-0 bottom-2 text-neutral-800 hover:text-black transition-colors"
+              className="absolute right-0 bottom-2 text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               title={showPassword ? "Hide password" : "Show password"}
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
@@ -330,9 +330,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               id="remember-me"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-0 cursor-pointer"
+              className="h-3.5 w-3.5 rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-indigo-600 focus:ring-0 cursor-pointer"
             />
-            <span className="text-neutral-600 text-[11px] sm:text-xs">
+            <span className="text-neutral-600 dark:text-neutral-400 text-[11px] sm:text-xs">
               Remember me
             </span>
           </label>
@@ -341,7 +341,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             <button
               type="button"
               onClick={() => setShowForgotModal(true)}
-              className="text-neutral-400 hover:text-neutral-700 text-[11px] sm:text-xs transition-colors"
+              className="text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 text-[11px] sm:text-xs transition-colors cursor-pointer"
             >
               Forgot password?
             </button>
@@ -353,7 +353,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 px-6 rounded-full font-medium text-xs sm:text-sm text-white bg-[#18181b] hover:bg-neutral-800 active:scale-[0.99] disabled:opacity-60 transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="w-full py-3 px-6 rounded-full font-medium text-xs sm:text-sm text-white bg-[#18181b] dark:bg-indigo-600 hover:bg-neutral-800 dark:hover:bg-indigo-500 active:scale-[0.99] disabled:opacity-60 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -365,12 +365,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             )}
           </button>
 
-          {/* Light Gray Pill "Log in with Google" Button matching reference */}
+          {/* Light Gray / Dark Pill "Log in with Google" Button matching reference */}
           <button
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full py-2.5 px-6 rounded-full font-medium text-xs sm:text-sm text-neutral-800 bg-[#f4f4f5] hover:bg-[#eaeaea] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5"
+            className="w-full py-2.5 px-6 rounded-full font-medium text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 bg-[#f4f4f5] dark:bg-neutral-800/80 hover:bg-[#eaeaea] dark:hover:bg-neutral-800 active:scale-[0.99] border border-transparent dark:border-neutral-700 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
           >
             {/* Google G SVG */}
             <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -398,7 +398,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* Bottom Switch Link matching reference */}
       <div className="mt-12 text-center">
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {mode === "login" ? (
             <>
               Don&apos;t have an account?{" "}
@@ -408,7 +408,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   setMode("signup");
                   setErrorMessage(null);
                 }}
-                className="font-semibold text-neutral-800 hover:text-black transition-colors"
+                className="font-semibold text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               >
                 Sign Up
               </button>
@@ -422,7 +422,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   setMode("login");
                   setErrorMessage(null);
                 }}
-                className="font-semibold text-neutral-800 hover:text-black transition-colors"
+                className="font-semibold text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               >
                 Log In
               </button>
@@ -436,20 +436,20 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-sm p-6 bg-white rounded-3xl shadow-2xl border border-neutral-100 space-y-4">
+          <div className="w-full max-w-sm p-6 bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-neutral-100 dark:border-neutral-800 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-neutral-100 text-neutral-900 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-2xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 flex items-center justify-center">
                 <HelpCircle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-neutral-900">Reset Password</h3>
-                <p className="text-xs text-neutral-500">SkillForge Candidate Account</p>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Reset Password</h3>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">SkillForge Candidate Account</p>
               </div>
             </div>
 
-            <p className="text-xs text-neutral-600 leading-relaxed">
+            <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
               SkillForge authenticates candidates securely via canonical UUID rows. You can log in directly using your registered email address to instantly restore your verified roadmap and evidence profile.
             </p>
 
@@ -457,7 +457,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                className="w-full py-2.5 px-4 rounded-full bg-neutral-900 text-white font-medium text-xs hover:bg-neutral-800 transition-colors"
+                className="w-full py-2.5 px-4 rounded-full bg-neutral-900 dark:bg-indigo-600 text-white font-medium text-xs hover:bg-neutral-800 dark:hover:bg-indigo-500 transition-colors cursor-pointer"
               >
                 Return to Login
               </button>

@@ -91,31 +91,31 @@ export default function IndustryDemandExplorer() {
   const selectedRole = roles.find((r) => r.role_id === selectedRoleId);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl text-slate-100 mb-8">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xl dark:shadow-2xl text-slate-800 dark:text-slate-100 mb-8 transition-colors">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-white">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               Industry Skill Demand
             </h2>
-            <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 rounded-full">
               Market Demand
             </span>
             {auditReport && auditReport.status === "VALID" && (
-              <span className="hidden sm:inline-flex px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
+              <span className="hidden sm:inline-flex px-2 py-0.5 text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-full">
                 ✓ Verified ({auditReport.total_demand_records} Market Records)
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Skill demand metrics derived from active industry hiring data and market signals.
           </p>
         </div>
-        <div className="text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center gap-3">
-          <span>Freshness: <strong className="text-slate-200 font-mono">{dataFreshness}</strong></span>
+        <div className="text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 flex items-center gap-3">
+          <span>Freshness: <strong className="text-slate-800 dark:text-slate-200 font-mono">{dataFreshness}</strong></span>
           <span>•</span>
-          <span>Location: <strong className="text-slate-200 font-mono">India</strong></span>
+          <span>Location: <strong className="text-slate-800 dark:text-slate-200 font-mono">India</strong></span>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export default function IndustryDemandExplorer() {
       {loadingRoles ? (
         <div className="animate-pulse flex gap-2 mb-6">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-10 bg-slate-800 rounded-lg w-32"></div>
+            <div key={i} className="h-10 bg-slate-200 dark:bg-slate-800 rounded-lg w-32"></div>
           ))}
         </div>
       ) : (
@@ -134,10 +134,10 @@ export default function IndustryDemandExplorer() {
               <button
                 key={r.role_id}
                 onClick={() => setSelectedRoleId(r.role_id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border cursor-pointer ${
                   isSelected
                     ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20"
-                    : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    : "bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 {r.title}
@@ -150,47 +150,47 @@ export default function IndustryDemandExplorer() {
       {/* Selected Role Meta & Aggregations */}
       {selectedRole && (
         <div className="space-y-4 mb-6">
-          <div className="bg-slate-800/40 border border-slate-800 rounded-lg p-4">
+          <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
             <div className="flex items-center gap-3 mb-1">
-              <span className="text-sm font-semibold text-white">{selectedRole.title}</span>
-              <span className="text-xs px-2 py-0.5 bg-slate-700 text-slate-300 rounded">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">{selectedRole.title}</span>
+              <span className="text-xs px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded font-medium">
                 {selectedRole.category}
               </span>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               {selectedRole.description}
             </p>
           </div>
 
           {/* SQL-Derived Aggregates Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3">
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Demanded Skills</div>
-              <div className="text-xl font-bold font-mono text-white mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Demanded Skills</div>
+              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
                 {aggregates.totalSkills ?? demandedSkills.length}
               </div>
             </div>
 
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3">
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Avg Demand Score</div>
-              <div className="text-xl font-bold font-mono text-indigo-300 mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avg Demand Score</div>
+              <div className="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-300 mt-0.5">
                 {aggregates.avgDemand !== undefined ? `${Math.round(aggregates.avgDemand * 100)}%` : "—"}
               </div>
             </div>
 
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3">
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Highest Demand</div>
-              <div className="text-xl font-bold font-mono text-emerald-400 mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Highest Demand</div>
+              <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
                 {aggregates.maxDemand !== undefined ? `${Math.round(aggregates.maxDemand * 100)}%` : "—"}
                 {aggregates.topSkill && (
-                  <span className="text-xs font-normal text-slate-400 ml-1.5">({aggregates.topSkill})</span>
+                  <span className="text-xs font-normal text-slate-500 dark:text-slate-400 ml-1.5">({aggregates.topSkill})</span>
                 )}
               </div>
             </div>
 
-            <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3">
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Avg Growth Trend</div>
-              <div className="text-xl font-bold font-mono text-teal-300 mt-0.5">
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avg Growth Trend</div>
+              <div className="text-xl font-bold font-mono text-teal-600 dark:text-teal-300 mt-0.5">
                 {aggregates.avgGrowth !== undefined ? `+${Math.round(aggregates.avgGrowth * 100)}% YoY` : "—"}
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function IndustryDemandExplorer() {
 
       {/* Error state */}
       {error && (
-        <div className="p-3 mb-4 rounded-lg bg-red-900/30 border border-red-700 text-red-200 text-sm">
+        <div className="p-3 mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-200 text-sm">
           {error}
         </div>
       )}
@@ -209,12 +209,12 @@ export default function IndustryDemandExplorer() {
       {loadingDemand ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-12 bg-slate-800/60 animate-pulse rounded-lg"></div>
+            <div key={i} className="h-12 bg-slate-100 dark:bg-slate-800/60 animate-pulse rounded-lg"></div>
           ))}
         </div>
       ) : (
         <div>
-          <div className="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+          <div className="flex justify-between items-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 px-1">
             <span>Demanded Skill</span>
             <span className="flex items-center gap-6">
               <span>Growth Trend (YoY)</span>
@@ -229,15 +229,15 @@ export default function IndustryDemandExplorer() {
               return (
                 <div
                   key={s.skill_id}
-                  className="bg-slate-800/50 hover:bg-slate-800 border border-slate-750 rounded-lg p-3 transition-colors"
+                  className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 transition-colors"
                 >
                   <div className="flex justify-between items-center mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-slate-100">
+                      <span className="font-medium text-sm text-slate-900 dark:text-slate-100">
                         {s.skill_name}
                       </span>
                       {s.category && (
-                        <span className="text-[11px] text-slate-400 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
                           {s.category}
                         </span>
                       )}
@@ -246,24 +246,24 @@ export default function IndustryDemandExplorer() {
                       <span
                         className={`text-xs font-mono font-medium ${
                           growthPct >= 10
-                            ? "text-emerald-400"
+                            ? "text-emerald-600 dark:text-emerald-400"
                             : growthPct >= 5
-                            ? "text-teal-300"
-                            : "text-slate-400"
+                            ? "text-teal-600 dark:text-teal-300"
+                            : "text-slate-500 dark:text-slate-400"
                         }`}
                       >
                         +{growthPct}% YoY
                       </span>
-                      <span className="font-mono font-semibold text-indigo-300 min-w-[3.5rem] text-right">
+                      <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-300 min-w-[3.5rem] text-right">
                         {pct}%
                       </span>
                     </div>
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
+                      className="bg-indigo-600 dark:bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
                       style={{ width: `${pct}%` }}
                     ></div>
                   </div>
@@ -275,7 +275,7 @@ export default function IndustryDemandExplorer() {
       )}
 
       {/* Evidence Analysis Note */}
-      <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>
           🛡️ <strong>Evidence-Based Analysis</strong>: Industry demand scores are derived directly from structured market data aggregations. Skills are evaluated using verified market demand signals.
         </span>

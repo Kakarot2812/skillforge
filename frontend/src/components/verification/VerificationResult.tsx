@@ -41,8 +41,8 @@ const STATUS_CONFIGS: Record<
     label: "VERIFIED",
     description:
       "Verification passed according to the deterministic backend verifier. Code deliverables and automated rubric criteria satisfied.",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-400",
+    bg: "bg-emerald-500/10 dark:bg-emerald-500/10",
+    text: "text-emerald-700 dark:text-emerald-400",
     border: "border-emerald-500/30",
     barColor: "bg-emerald-500",
     icon: CheckCircle2,
@@ -51,8 +51,8 @@ const STATUS_CONFIGS: Record<
     label: "PARTIAL",
     description:
       "Some evidence and criteria passed, but verification did not meet the verified threshold.",
-    bg: "bg-amber-500/10",
-    text: "text-amber-400",
+    bg: "bg-amber-500/10 dark:bg-amber-500/10",
+    text: "text-amber-700 dark:text-amber-400",
     border: "border-amber-500/30",
     barColor: "bg-amber-500",
     icon: AlertCircle,
@@ -61,18 +61,18 @@ const STATUS_CONFIGS: Record<
     label: "UNVERIFIED",
     description:
       "Available repository evidence did not meet the deterministic verification requirements.",
-    bg: "bg-neutral-800",
-    text: "text-neutral-400",
-    border: "border-neutral-700",
-    barColor: "bg-neutral-600",
+    bg: "bg-slate-100 dark:bg-neutral-800",
+    text: "text-slate-600 dark:text-neutral-400",
+    border: "border-slate-200 dark:border-neutral-700",
+    barColor: "bg-slate-400 dark:bg-neutral-600",
     icon: HelpCircle,
   },
   FAILED: {
     label: "FAILED",
     description:
       "Verification could not be completed because of an external or upstream infrastructure issue.",
-    bg: "bg-rose-500/10",
-    text: "text-rose-400",
+    bg: "bg-rose-500/10 dark:bg-rose-500/10",
+    text: "text-rose-700 dark:text-rose-400",
     border: "border-rose-500/30",
     barColor: "bg-rose-500",
     icon: AlertTriangle,
@@ -115,14 +115,14 @@ export default function VerificationResult({
               </span>
 
               {shortCommit && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-mono text-neutral-400 bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800">
-                  <GitCommit className="h-3 w-3 text-neutral-500" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-600 dark:text-neutral-400 bg-white dark:bg-neutral-950 px-2 py-0.5 rounded border border-slate-200 dark:border-neutral-800">
+                  <GitCommit className="h-3 w-3 text-slate-400 dark:text-neutral-500" />
                   <span>{shortCommit}</span>
                 </span>
               )}
             </div>
 
-            <p className="text-xs text-neutral-300 leading-relaxed max-w-xl">
+            <p className="text-xs text-slate-700 dark:text-neutral-300 leading-relaxed max-w-xl">
               {statusConfig.description}
             </p>
           </div>
@@ -133,7 +133,7 @@ export default function VerificationResult({
               type="button"
               onClick={onReverify}
               disabled={isReverifying}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold border border-neutral-700 transition-colors disabled:opacity-50 cursor-pointer shrink-0 ml-auto sm:ml-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-900 hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-700 dark:text-neutral-300 text-xs font-semibold border border-slate-300 dark:border-neutral-700 transition-colors disabled:opacity-50 cursor-pointer shrink-0 ml-auto sm:ml-0 shadow-sm"
             >
               <RotateCcw className={`h-3.5 w-3.5 ${isReverifying ? "animate-spin" : ""}`} />
               <span>Verify Again</span>
@@ -145,12 +145,12 @@ export default function VerificationResult({
         {confidencePercent !== null && (
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-neutral-400 font-medium">Deterministic Confidence</span>
+              <span className="text-slate-600 dark:text-neutral-400 font-medium">Deterministic Confidence</span>
               <span className={`font-mono font-bold ${statusConfig.text}`}>
                 {confidencePercent}%
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-neutral-950 overflow-hidden border border-neutral-800">
+            <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-neutral-950 overflow-hidden border border-slate-300 dark:border-neutral-800">
               <div
                 className={`h-full ${statusConfig.barColor} transition-all duration-500 rounded-full`}
                 style={{ width: `${Math.max(confidencePercent, 4)}%` }}
@@ -160,11 +160,11 @@ export default function VerificationResult({
         )}
 
         {/* Metadata Footer */}
-        <div className="pt-2 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-400">
+        <div className="pt-2 border-t border-slate-200 dark:border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-neutral-400">
           <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 text-neutral-500" />
+            <Calendar className="h-3 w-3 text-slate-400 dark:text-neutral-500" />
             <span>Verified at:</span>
-            <span className="text-neutral-300 font-mono">
+            <span className="text-slate-700 dark:text-neutral-300 font-mono">
               {verification.created_at
                 ? new Date(verification.created_at).toLocaleString()
                 : "--"}
@@ -172,8 +172,8 @@ export default function VerificationResult({
           </div>
 
           <div className="flex items-center gap-1.5 font-mono text-[10px]">
-            <span className="text-neutral-500">Milestone State:</span>
-            <span className="px-1.5 py-0.2 rounded bg-neutral-900 text-neutral-300 border border-neutral-800">
+            <span className="text-slate-500 dark:text-neutral-500">Milestone State:</span>
+            <span className="px-1.5 py-0.2 rounded bg-white dark:bg-neutral-900 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-800 font-semibold">
               {verification.milestone_status}
             </span>
           </div>
@@ -181,10 +181,10 @@ export default function VerificationResult({
       </div>
 
       {/* Authoritative Boundary Notice */}
-      <div className="p-3 rounded-xl bg-neutral-950/80 border border-neutral-800 flex items-start gap-2.5 text-xs text-neutral-400">
-        <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+      <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 flex items-start gap-2.5 text-xs text-slate-600 dark:text-neutral-400">
+        <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
         <div className="space-y-0.5 text-[11px] leading-relaxed">
-          <p className="font-semibold text-neutral-200">
+          <p className="font-semibold text-slate-900 dark:text-neutral-200">
             Authoritative Deterministic Verification
           </p>
           <p>
@@ -194,23 +194,23 @@ export default function VerificationResult({
       </div>
 
       {/* Expandable Deep Evidence Inspection */}
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 dark:border-neutral-800 bg-slate-50/50 dark:bg-neutral-900/60 overflow-hidden">
         <button
           type="button"
           onClick={() => setIsEvidenceOpen(!isEvidenceOpen)}
-          className="w-full p-3.5 flex items-center justify-between text-xs font-semibold text-neutral-200 hover:bg-neutral-800/50 transition-colors cursor-pointer"
+          className="w-full p-3.5 flex items-center justify-between text-xs font-semibold text-slate-800 dark:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
           aria-expanded={isEvidenceOpen}
         >
           <span>Deterministic Evidence &amp; Evaluation Details</span>
           {isEvidenceOpen ? (
-            <ChevronUp className="h-4 w-4 text-neutral-400" />
+            <ChevronUp className="h-4 w-4 text-slate-500 dark:text-neutral-400" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
+            <ChevronDown className="h-4 w-4 text-slate-500 dark:text-neutral-400" />
           )}
         </button>
 
         {isEvidenceOpen && (
-          <div className="p-4 border-t border-neutral-800 bg-neutral-950/40">
+          <div className="p-4 border-t border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-950/40">
             <VerificationEvidence
               details={verification.details || {}}
               commitSha={verification.commit_sha}

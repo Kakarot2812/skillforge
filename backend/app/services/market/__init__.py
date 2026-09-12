@@ -84,6 +84,18 @@ from app.services.market.repository import (
     MarketJobSkillRepository,
     PersistenceMetrics,
 )
+from app.services.market.orchestration import (
+    DEFAULT_ORCHESTRATOR_SOURCES,
+    DEFAULT_SOURCE_ORDER,
+    MarketRefreshStatus,
+    MarketSourceRefreshResult,
+    MarketSourceStatus,
+    MultiSourceMarketRefreshOrchestrator,
+    MultiSourceRefreshConfig,
+    MultiSourceRefreshGateDecision,
+    MultiSourceRefreshResult,
+    sanitize_error_message,
+)
 
 __all__ = [
     # Client & Exceptions (P1-A)
@@ -154,4 +166,15 @@ __all__ = [
     "UnknownMarketSourceError",
     "UnsupportedMarketSourceError",
     "MarketSourceConfigurationError",
+    # Multi-Source Market Refresh Orchestration Contract (P1-L)
+    "DEFAULT_ORCHESTRATOR_SOURCES",
+    "DEFAULT_SOURCE_ORDER",
+    "MarketRefreshStatus",
+    "MarketSourceStatus",
+    "MultiSourceRefreshGateDecision",
+    "MarketSourceRefreshResult",
+    "MultiSourceRefreshConfig",
+    "MultiSourceRefreshResult",
+    "MultiSourceMarketRefreshOrchestrator",
+    "sanitize_error_message",
 ]

@@ -1,5 +1,6 @@
 import io
 import os
+import tempfile
 import uuid
 from docx import Document
 from fastapi.testclient import TestClient
@@ -182,9 +183,9 @@ def test_docx_text_extraction():
         education="M.S. in Software Engineering, MIT",
     )
 
-    temp_path = "/tmp/test_alex_resume.docx"
-    with open(temp_path, "wb") as f:
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
         f.write(docx_bytes)
+        temp_path = f.name
 
     try:
         text = extract_text_from_file(temp_path, "docx")

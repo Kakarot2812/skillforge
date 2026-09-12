@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 client = TestClient(app)
@@ -10,7 +11,7 @@ def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["name"] == "SkillForge AI API"
+    assert data["name"] == settings.PROJECT_NAME
     assert data["status"] == "operational"
 
 

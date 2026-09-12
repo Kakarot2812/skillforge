@@ -67,6 +67,18 @@ from app.services.market.pipeline import (
     AdzunaMarketPipeline,
     MarketPipelineResult,
 )
+from app.services.market.adapters import (
+    AdzunaAdapter,
+    MarketSourceAdapter,
+    MarketSourceConfigurationError,
+    MarketSourceError,
+    MarketSourceRegistry,
+    MarketSourceType,
+    UnknownMarketSourceError,
+    UnsupportedMarketSourceError,
+    get_market_source_adapter,
+    market_source_registry,
+)
 from app.services.market.repository import (
     MarketJobRepository,
     MarketJobSkillRepository,
@@ -131,4 +143,15 @@ __all__ = [
     "classify_growth_rate",
     "MarketDemandRefreshService",
     "refresh_market_demand",
+    # Multi-Source Market Ingestion Foundation (P1-G)
+    "MarketSourceType",
+    "MarketSourceAdapter",
+    "AdzunaAdapter",
+    "MarketSourceRegistry",
+    "market_source_registry",
+    "get_market_source_adapter",
+    "MarketSourceError",
+    "UnknownMarketSourceError",
+    "UnsupportedMarketSourceError",
+    "MarketSourceConfigurationError",
 ]

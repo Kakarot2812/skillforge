@@ -36,6 +36,10 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    # Login Phase 2: Authentication & Sessions
+    hashed_password = Column(String(255), nullable=True)
+    auth_provider = Column(String(50), nullable=False, default="local", server_default="local")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
 
     resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
     claimed_skills = relationship("UserClaimedSkill", back_populates="user", cascade="all, delete-orphan")
@@ -44,9 +48,33 @@ class User(Base):
     demonstrated_skills = relationship("DemonstratedSkill", back_populates="user", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="user", cascade="all, delete-orphan")
     roadmaps = relationship("CandidateRoadmap", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    last_seen_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+
+    user = relationship("User", back_populates="sessions")
+
+    def __repr__(self) -> str:
+        return f"<UserSession user_id={self.user_id} expires_at={self.expires_at}>"
 
 
 class Skill(Base):

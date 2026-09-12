@@ -147,27 +147,31 @@ def test_migration_0018_lifecycle_upgrade_downgrade_reupgrade(alembic_cfg):
     Verify migration upgrade succeeds, downgrade removes objects cleanly,
     and upgrade can be reapplied without error.
     """
-    # 1. Downgrade to 0017
-    command.downgrade(alembic_cfg, "0017_roadmap_and_resources")
+    try:
+        # 1. Downgrade to 0017
+        command.downgrade(alembic_cfg, "0017_roadmap_and_resources")
 
-    # Table must be absent after downgrade
-    inspector = inspect(engine)
-    assert "milestone_verifications" not in inspector.get_table_names()
+        # Table must be absent after downgrade
+        inspector = inspect(engine)
+        assert "milestone_verifications" not in inspector.get_table_names()
 
-    # 2. Upgrade to 0018
-    command.upgrade(alembic_cfg, "0018_milestone_verifications")
-    inspector = inspect(engine)
-    assert "milestone_verifications" in inspector.get_table_names()
+        # 2. Upgrade to 0018
+        command.upgrade(alembic_cfg, "0018_milestone_verifications")
+        inspector = inspect(engine)
+        assert "milestone_verifications" in inspector.get_table_names()
 
-    # 3. Clean second downgrade
-    command.downgrade(alembic_cfg, "0017_roadmap_and_resources")
-    inspector = inspect(engine)
-    assert "milestone_verifications" not in inspector.get_table_names()
+        # 3. Clean second downgrade
+        command.downgrade(alembic_cfg, "0017_roadmap_and_resources")
+        inspector = inspect(engine)
+        assert "milestone_verifications" not in inspector.get_table_names()
 
-    # 4. Reapply cleanly
-    command.upgrade(alembic_cfg, "0018_milestone_verifications")
-    inspector = inspect(engine)
-    assert "milestone_verifications" in inspector.get_table_names()
+        # 4. Reapply cleanly
+        command.upgrade(alembic_cfg, "0018_milestone_verifications")
+        inspector = inspect(engine)
+        assert "milestone_verifications" in inspector.get_table_names()
+    finally:
+        # Restore migration state to current head so database schema matches application models
+        command.upgrade(alembic_cfg, "head")
 
 
 # -----------------------------------------------------------------------------

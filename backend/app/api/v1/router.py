@@ -11,11 +11,15 @@ from app.api.v1.gaps import router as gaps_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.roadmap import router as roadmap_router
 from app.api.v1.users import router as users_router
+from app.api.v1.auth import router as auth_router
 
 api_router = APIRouter()
 
 # Mount health routes under /api/v1 as well as root
 api_router.include_router(health_router)
+
+# Mount authentication routes under /api/v1/auth
+api_router.include_router(auth_router)
 
 # Mount user identity routes under /api/v1/users
 api_router.include_router(users_router)

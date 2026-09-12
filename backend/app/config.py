@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # CORS Origins
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
+    # Authentication & Session Settings (Login Phase 2)
+    SESSION_COOKIE_NAME: str = "skillforge_session"
+    SESSION_LIFETIME_DAYS: int = 7
+    SESSION_REMEMBER_ME_DAYS: int = 30
+    SESSION_COOKIE_SECURE: bool = False
+    SESSION_COOKIE_SAMESITE: str = "lax"
+
     # Adzuna API Settings (Post-MVP P1 Market Ingestion Foundation)
     ADZUNA_APP_ID: Optional[str] = None
     ADZUNA_APP_KEY: Optional[str] = None

@@ -12,11 +12,18 @@ from sqlalchemy import (
     func,
     UniqueConstraint,
     CheckConstraint,
+    Computed,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 
 from app.db.database import Base
+
+# Fixed at migration time (see alembic/versions/0012_rag_documents_and_chunks.py
+# and app/rag/config.py::RagSettings.RAG_EMBEDDING_DIMENSIONS). Changing this
+# requires a new migration that alters the column and a full re-ingest.
+RAG_EMBEDDING_DIMENSIONS = 1024
 
 
 class User(Base):
@@ -40,6 +47,7 @@ class User(Base):
     project_evidence = relationship("ProjectEvidence", back_populates="user", cascade="all, delete-orphan")
     demonstrated_skills = relationship("DemonstratedSkill", back_populates="user", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="user", cascade="all, delete-orphan")
+    rag_documents = relationship("RagDocument", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
@@ -344,4 +352,76 @@ class SkillGap(Base):
         return f"<SkillGap user={self.user_id} role={self.role_id} skill={self.skill_id} status={self.status}>"
 
 
+class RagDocument(Base):
+    """A normalised, versioned unit of RAG evidence (one GitHub artifact, one
+    resume, one manually-ingested document, ...). See app/rag/ingestion.py.
+    """
+
+    __tablename__ = "rag_documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # 'github_repository' | 'project_evidence' | 'resume' | 'manual'
+    source_type = Column(String(32), nullable=False, index=True)
+    # String form of the source's real PK (or a stable slug for 'manual' docs).
+    source_id = Column(String(128), nullable=False)
+    # NULL = globally visible corpus (e.g. curated learning resources).
+    # Non-NULL = private to that user; retrieval must never leak this cross-user.
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    source_url = Column(String(512), nullable=True)
+    content_hash = Column(String(64), nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    document_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source_type", "source_id", name="uq_rag_documents_source"),
+    )
+
+    user = relationship("User", back_populates="rag_documents")
+    chunks = relationship("RagChunk", back_populates="document", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<RagDocument {self.source_type}:{self.source_id} v{self.version}>"
+
+
+class RagChunk(Base):
+    """One embeddable/searchable slice of a RagDocument. See app/rag/chunking.py."""
+
+    __tablename__ = "rag_chunks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("rag_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    content_hash = Column(String(64), nullable=False)
+    embedding = Column(Vector(RAG_EMBEDDING_DIMENSIONS), nullable=True)
+    # DB-generated (see migration 0012). Computed(..., persisted=True) tells
+    # SQLAlchemy this column is server-generated so it is never sent on
+    # INSERT/UPDATE (Postgres rejects writes to generated columns) and is
+    # instead fetched back via RETURNING after a flush.
+    search_vector = Column(TSVECTOR, Computed("to_tsvector('english', content)", persisted=True), nullable=True)
+    chunk_metadata = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "chunk_index", name="uq_rag_chunks_document_index"),
+    )
+
+    document = relationship("RagDocument", back_populates="chunks")
+
+    def __repr__(self) -> str:
+        return f"<RagChunk {self.document_id}#{self.chunk_index}>"
 

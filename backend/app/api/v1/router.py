@@ -9,6 +9,7 @@ from app.api.v1.demand import router as demand_router
 from app.api.v1.demand_intelligence import router as intelligence_router
 from app.api.v1.gaps import router as gaps_router
 from app.api.v1.qwen_api import router as qwen_router
+from app.api.v1.rag_api import router as rag_router
 
 api_router = APIRouter()
 
@@ -41,3 +42,8 @@ api_router.include_router(gaps_router, prefix="/gaps")
 
 # Mount SkillForge AI (local Qwen via Ollama) routes under /api/v1/qwen
 api_router.include_router(qwen_router, prefix="/qwen")
+
+# Mount RAG evidence-management routes under /api/v1/rag. Internal/admin
+# surface (see app/api/v1/rag_api.py docstring) — the chat endpoint above
+# uses RagService internally rather than the frontend calling this directly.
+api_router.include_router(rag_router)

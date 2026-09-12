@@ -1,144 +1,139 @@
 # SkillForge AI — RAG Architecture & AI Assistant Design
 
+> Updated to reflect the actual implementation under `backend/app/rag/` (integrated with the local Qwen3 8B / Ollama stack in `backend/app/qwen_ai/`). The original design below this point predates that implementation and used illustrative values (a 1536-dim embedding, a single flat table) that no longer match the real schema — kept only for historical scenario context in section 5.
+
 ## 1. Role of RAG in SkillForge AI
 
-Retrieval-Augmented Generation (RAG) grounds the SkillForge AI Career Assistant in verified educational materials, project specifications, and contextual industry documentation.
+Retrieval-Augmented Generation (RAG) grounds the SkillForge AI Career Assistant in verified evidence: GitHub artifacts, resume text, and manually curated documents (learning resources, industry reports, official documentation summaries).
 
 ### Core Architectural Constraint
 
 > [!IMPORTANT]
-> **RAG must NOT be the source of truth for numerical industry-demand scores.**
-> All quantitative metrics (demand percentages, trend velocities, skill gap scores) are computed deterministically by the Industry Demand Engine and SQL database. RAG provides semantic explanation, qualitative depth, and resource discovery to support these numbers.
+> **RAG must NOT be the source of truth for numerical industry-demand scores, skill-gap scores, or roadmap ordering.**
+> All quantitative/deterministic outputs are computed by SkillForge's own engines (`app/services/*`) and the SQL database. RAG only retrieves and ranks textual evidence; Qwen explains and cites it — neither layer recomputes or overrides those numbers.
 
 ```text
 ┌──────────────────────────────────────────────┐
-│             NUMERICAL TRUTH                  │
-│    Industry Demand Engine (SQL / Tables)     │
-│        • Demand %  • Trend %  • Gap %        │
-└──────────────────────┬───────────────────────┘
-                       │ (Grounding Facts)
+│             DETERMINISTIC TRUTH               │
+│   Skill-gap / demand / roadmap engines (SQL)  │
+└──────────────────────┬────────────────────────┘
+                       │ (SkillForgeContext facts)
                        ▼
 ┌──────────────────────────────────────────────┐
-│           QUALITATIVE CONTEXT (RAG)          │
-│    PostgreSQL pgvector (Knowledge Chunks)    │
-│        • Official Docs  • Project Briefs     │
-│        • Learning Guides • Industry Reports  │
-└──────────────────────┬───────────────────────┘
-                       │
+│              RAG (app/rag/)                   │
+│   PostgreSQL + pgvector (rag_documents/chunks)│
+│   GitHub evidence · Resume text · Manual docs │
+└──────────────────────┬────────────────────────┘
+                       │ (SkillForgeContext.evidence, [E1]..[En])
                        ▼
 ┌──────────────────────────────────────────────┐
-│            LLM REASONING & OUTPUT            │
-│   Explainable Recommendations & Guidance     │
+│         QWEN3 8B REASONING (app/qwen_ai/)     │
+│   Explainable, cited recommendations          │
 └──────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Knowledge Base Corpora & Chunking
+## 2. Real architecture
 
-The RAG index ingests four curated corpora:
+```
+backend/app/rag/
+    config.py       RagSettings (RAG_*), isolated from QWEN_* — a bad value disables RAG, never chat
+    exceptions.py    RagError hierarchy (mirrors app/qwen_ai/exceptions.py)
+    schemas.py       Internal dataclasses (NormalizedDocument, RetrievalFilters, RetrievedChunk, IngestResult)
+    chunking.py      Deterministic character-based chunker (headings/paragraphs/sentences, overlap, content hashing)
+    embeddings.py    RagEmbeddingClient — async Ollama /api/embed client (batching, dimension validation)
+    repository.py    SQLAlchemy persistence: upsert/version documents, replace chunks, vector + FTS search, isolation
+    ranker.py        Reciprocal Rank Fusion over dense + sparse candidate lists
+    retriever.py     Orchestrates embed -> vector search + FTS search -> RRF -> top-K
+    ingestion.py     Idempotent pipeline: hash -> detect unchanged -> chunk -> embed -> upsert -> replace chunks
+    service.py       RagService — the only public facade; used by qwen_api.py and rag_api.py
+    sources/
+        base.py        SourceAdapter interface
+        github.py       Adapter over real GitHubRepository + ProjectEvidence rows
+        resume.py       Adapter over real Resume.raw_text
+        manual.py       Adapter for arbitrary pushed text (learning resources, industry reports, job postings —
+                        there is no dedicated SkillForge table for these, so they are ingested directly)
 
-| Corpus | Content Description | Metadata Tags |
-| :--- | :--- | :--- |
-| **Official Documentation** | Curated summaries of core frameworks, architectural patterns, and reference APIs. | `skill_id`, `doc_type: "official_guide"`, `version` |
-| **Learning Resources** | Course outlines, tutorial chapters, book recommendations, and video transcripts. | `skill_id`, `difficulty: "beginner" \| "intermediate" \| "advanced"`, `est_minutes` |
-| **Project Challenge Briefs** | Detailed functional specs, architectural diagrams, acceptance rubrics, and starter code hints. | `skill_id`, `role_id`, `project_type: "hands_on_lab"` |
-| **Industry Context Reports** | Whitepapers, engineering blogs, and market commentary explaining *why* technologies are emerging. | `role_id`, `topic`, `published_date` |
+backend/app/api/v1/
+    qwen_api.py     POST /qwen/chat now retrieves RAG evidence internally and merges it into
+                    SkillForgeContext.evidence before calling QwenService — the frontend never calls RAG directly.
+    rag_api.py      Internal/admin surface: POST /rag/ingest, POST /rag/reindex, DELETE /rag/documents/{id},
+                    GET /rag/health. No auth layer exists yet in SkillForge (MVP-stage), so these routes rely on
+                    network-level trust rather than inventing an auth mechanism.
 
-### Chunking Strategy
-
-- **Chunk Size**: $350 - 500$ tokens per chunk.
-- **Chunk Overlap**: $50$ tokens to preserve syntactic and semantic boundary context.
-- **Metadata Association**: Every vector embedding is coupled with a relational foreign key pointing directly to the canonical skill in the `skills` table.
-
----
-
-## 3. Storage & Retrieval Pipeline
-
-### 3.1 Vector Database Schema
-
-Embeddings are stored in PostgreSQL using the `pgvector` extension:
-
-```sql
-CREATE TABLE rag_documents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    skill_id UUID REFERENCES skills(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
-    corpus_type VARCHAR(64) NOT NULL,
-    metadata JSONB NOT NULL DEFAULT '{}',
-    embedding vector(1536),
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_rag_documents_embedding 
-ON rag_documents USING hnsw (embedding vector_cosine_ops);
-
-CREATE INDEX idx_rag_documents_skill_id 
-ON rag_documents (skill_id);
+backend/alembic/versions/0012_rag_documents_and_chunks.py
+    rag_documents(id, source_type, source_id, user_id, title, source_url, content_hash, version,
+                  document_metadata, created_at, updated_at)
+      - UNIQUE(source_type, source_id); user_id NULL = globally-visible shared corpus
+    rag_chunks(id, document_id, chunk_index, content, content_hash, embedding vector(1024),
+               search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
+               chunk_metadata, created_at, updated_at)
+      - UNIQUE(document_id, chunk_index); HNSW index (vector_cosine_ops) on embedding; GIN index on search_vector
 ```
 
-### 3.2 Hybrid Retrieval Pipeline
+### Embedding model & dimension
 
-To ensure precision and speed, the retrieval engine follows a two-stage hybrid process:
+Embeddings are generated by a **separate embedding model** (`RAG_EMBEDDING_MODEL`, default `qwen3-embedding:8b`) served by the same local Ollama runtime — never the Qwen3 8B *generation* model used for chat. The vector column is fixed at **1024 dimensions**, chosen to stay safely under pgvector's HNSW indexing ceiling (~2000 dims for the plain `vector` type) rather than assuming the embedding model's native output width is directly indexable. `RagEmbeddingClient` validates every returned vector's length against `RAG_EMBEDDING_DIMENSIONS` and raises a clear, loggable error on mismatch instead of silently corrupting data — if your local model's real output size differs, update the setting and re-run migration 0012 plus a full re-ingest.
+
+### Hybrid retrieval pipeline (as built)
 
 ```text
-[User Query + Active Context]
-             │
-             ├──► 1. Metadata Filtering (Active Skill IDs, Target Role, User Level)
-             │
-             ├──► 2. Semantic Dense Retrieval (pgvector cosine similarity)
-             │
-             └──► 3. Keyword Sparse Matching (PostgreSQL tsvector full-text search)
-             │
-             ▼
-     [Reciprocal Rank Fusion (RRF)]
-             │
-             ▼
-    [Top-K Grounding Chunks]
+User question
+     │
+     ▼
+RagService.retrieve_evidence(db, query, user_id=...)
+     │
+     ├──► embed query (RagEmbeddingClient, async Ollama /api/embed)
+     │
+     ├──► dense: repository.vector_search  (pgvector cosine distance, HNSW)
+     ├──► sparse: repository.fts_search     (PostgreSQL to_tsquery/ts_rank)
+     │         both filtered by RetrievalFilters (user isolation, source_type)
+     │
+     ▼
+ranker.reciprocal_rank_fusion(vector_candidates, fts_candidates, k=RAG_RRF_K)
+     │
+     ▼
+top RAG_TOP_K chunks -> EvidenceItem list -> SkillForgeContext.evidence
+     │
+     ▼
+QwenService (unchanged) -> Qwen3 8B -> cited answer ([E1], [E2], ...)
 ```
 
-1. **Structured Context Filter**: Restricts candidate chunks to the user's active roadmap milestone or target role skills.
-2. **Dense Vector Search**: Computes cosine distance against `rag_documents.embedding`.
-3. **Keyword Ranking**: Matches exact technical terms (e.g., function names, CLI flags, package versions).
-4. **Rank Fusion**: Selects the top $K=5$ most relevant and authoritative context passages.
+RAG failures (Ollama down, embedding model missing, timeout, etc.) are caught inside `RagService.retrieve_evidence` and degrade to an **empty evidence list** — chat always proceeds ungrounded rather than failing, exactly as it behaved before RAG existed.
+
+### User isolation
+
+Every retrieval query filters `rag_documents.user_id`: a caller with a known `user_id` (passed via the same `X-User-Id` header convention already used in `app/api/v1/gaps.py`) sees their own documents plus the global/shared corpus (`user_id IS NULL`); a caller with no `user_id` sees only the global corpus. A user's private resume or GitHub evidence can never be retrieved by another user or an anonymous caller.
+
+### Idempotent ingestion
+
+`app/rag/ingestion.py` hashes normalized document text (`sha256`, whitespace-normalized). Re-ingesting identical content is a pure no-op — no re-chunking, no embedding calls, no writes beyond refreshing cosmetic fields (title/URL). Changed content bumps `rag_documents.version` and fully replaces that document's chunks in one transaction.
 
 ---
 
-## 4. Grounding Constraints & Prompt Engineering
-
-System prompts enforce strict hallucination barriers:
+## 3. Grounding constraints (unchanged, already enforced in `app/qwen_ai/prompts.py`)
 
 ```text
-You are the SkillForge AI Career Copilot. Your role is to explain recommendations,
-assist with project challenges, and provide technical guidance.
-
-CRITICAL RULES:
-1. Grounding: Rely strictly on the provided SQL Data Facts and Retrieved Context.
-2. Demand Metrics: Never invent, guess, or modify industry demand numbers or percentages.
-   Always refer to the exact values provided in the Context:
-   - Target Role: {target_role}
-   - Skill Demand: {demand_percentage}%
-   - Trend: {growth_trend}
-3. Actionable Guidance: When explaining a skill gap, direct the user toward the assigned
-   practical project challenge and curated learning resources.
-4. Code Examples: Ensure all code snippets follow modern industry standards and include
-   type hints and error handling.
+SOURCE OF TRUTH
+- Data inside <skillforge_context> and <retrieved_evidence> comes from SkillForge and is the source of truth.
+- Never invent user details, skills, scores, demand figures, job requirements, roadmap steps, resources or URLs.
+- Do not recompute, re-rank or override SkillForge scores, priorities or roadmap order.
+- Cite retrieved evidence inline by id, e.g. [E1].
 ```
+
+RAG's job ends at producing well-ranked `EvidenceItem`s with an id, source, title and content — the citation/grounding rules above were already implemented before RAG existed and required no changes.
 
 ---
 
-## 5. Interaction Scenarios
+## 4. Historical scenario examples (from the original design, still representative)
 
 ### Scenario A: Explaining a Skill Gap Recommendation
 - **User Query**: *"Why is Docker ranked as my highest priority gap for Backend Engineer?"*
-- **System Action**: 
-  - Pulls exact demand facts from database: `Demand: 64%`, `Trend: +14%`, `User Evidence: 0%`.
-  - Retrieves official Docker backend architecture primer from `rag_documents`.
-- **Response**: Explains that 64% of backend listings require containerization, noting that while the user has strong Python and database skills, zero container manifests were found in their GitHub repositories. Outlines the milestone challenge to containerize their existing API.
+- **System Action**: Skill-gap engine supplies exact demand facts (`demand_score`, `growth_rate`, evidence level) via `SkillForgeContext`; RAG additionally retrieves a relevant Docker-related chunk (from a GitHub repo, a resume mention, or a curated learning resource) and cites it as `[E1]`.
+- **Response**: Explains the priority using the deterministic facts, and points to the cited evidence for supporting detail — never inventing a percentage RAG didn't retrieve.
 
 ### Scenario B: Clarifying a Project Challenge
-- **User Query**: *"What are the exact acceptance criteria for my FastAPI milestone project?"*
-- **System Action**:
-  - Retrieves the milestone rubric from `rag_documents` filtered by `milestone_id`.
-- **Response**: Outlines the required endpoints, Dockerfile multi-stage build structure, and Pytest coverage threshold necessary to pass the automated GitHub verification check.
+- **User Query**: *"What are the acceptance criteria for my FastAPI milestone project?"*
+- **System Action**: A manually-ingested project brief (`source_type="manual"`) is retrieved via FTS/vector search and surfaced as cited evidence.
+- **Response**: Outlines the retrieved criteria, citing the source chunk rather than paraphrasing from model memory.

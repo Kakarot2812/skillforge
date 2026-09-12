@@ -1,13 +1,13 @@
 """
 Market source registry and factory for SkillForge AI.
-Post-MVP Phase 1, Checkpoint P1-I.
+Post-MVP Phase 1, Checkpoint P1-J.
 
 Provides deterministic resolution of MarketSourceAdapter instances by MarketSourceType.
 Strict guarantees:
 - Resolves ADZUNA to AdzunaAdapter.
 - Resolves GREENHOUSE to GreenhouseAdapter.
 - Resolves LEVER to LeverAdapter.
-- Returns typed UnsupportedMarketSourceError for ASHBY.
+- Resolves ASHBY to AshbyAdapter.
 - Returns typed UnknownMarketSourceError for unknown source identifiers.
 - NEVER silently falls back to Adzuna.
 - Extensible for testing and future source providers via register_adapter.
@@ -20,6 +20,7 @@ from typing import Dict, List, Union
 from app.services.market.adapters.adzuna_adapter import AdzunaAdapter
 from app.services.market.adapters.greenhouse_adapter import GreenhouseAdapter
 from app.services.market.adapters.lever_adapter import LeverAdapter
+from app.services.market.adapters.ashby_adapter import AshbyAdapter
 from app.services.market.adapters.base import (
     MarketSourceAdapter,
     MarketSourceType,
@@ -61,6 +62,7 @@ class MarketSourceRegistry:
         self._adapters[MarketSourceType.ADZUNA] = AdzunaAdapter()
         self._adapters[MarketSourceType.GREENHOUSE] = GreenhouseAdapter()
         self._adapters[MarketSourceType.LEVER] = LeverAdapter()
+        self._adapters[MarketSourceType.ASHBY] = AshbyAdapter()
 
     def register_adapter(
         self,
@@ -91,7 +93,7 @@ class MarketSourceRegistry:
         Raises:
             UnknownMarketSourceError: If the source is unmapped or invalid.
             UnsupportedMarketSourceError: If the source is a valid MarketSourceType
-                (e.g., ASHBY) but has no operational adapter implementation.
+                but has no operational adapter implementation.
         """
         source_type = MarketSourceType.from_str(source)
 

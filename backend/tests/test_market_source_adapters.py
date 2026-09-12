@@ -19,6 +19,7 @@ import pytest
 
 from app.services.market.adapters import (
     AdzunaAdapter,
+    AshbyAdapter,
     LeverAdapter,
     MarketSourceAdapter,
     MarketSourceConfigurationError,
@@ -230,21 +231,33 @@ def test_06_registry_resolves_lever():
 
 
 # ===========================================================================
-# 7. Registry Rejects Unsupported Ashby
+# 7. Registry Resolves Ashby (and rejects when unregistered)
 # ===========================================================================
 
-def test_07_registry_rejects_unsupported_ashby():
-    """TEST 7: Registry rejects ASHBY with typed UnsupportedMarketSourceError."""
+def test_07_registry_resolves_ashby():
+    """TEST 7: Registry resolves ASHBY to AshbyAdapter (or raises UnsupportedMarketSourceError when unregistered)."""
     registry = MarketSourceRegistry()
 
+    # Via Enum
+    adapter_enum = registry.get_adapter(MarketSourceType.ASHBY)
+    assert isinstance(adapter_enum, AshbyAdapter)
+    assert adapter_enum.source_type == MarketSourceType.ASHBY
+    assert adapter_enum.source_name == "ashby"
+
+    # Via String
+    adapter_lower = registry.get_adapter("ashby")
+    assert isinstance(adapter_lower, AshbyAdapter)
+
+    # is_supported returns True
+    assert registry.is_supported(MarketSourceType.ASHBY) is True
+    assert registry.is_supported("ashby") is True
+
+    # Rejects when unregistered (e.g. custom registry initialized with register_defaults=False)
+    unregistered_registry = MarketSourceRegistry(register_defaults=False)
     with pytest.raises(UnsupportedMarketSourceError) as exc_info:
-        registry.get_adapter(MarketSourceType.ASHBY)
+        unregistered_registry.get_adapter(MarketSourceType.ASHBY)
     assert "Market source 'ashby' is not implemented yet" in str(exc_info.value)
-
-    with pytest.raises(UnsupportedMarketSourceError):
-        registry.get_adapter("ashby")
-
-    assert registry.is_supported(MarketSourceType.ASHBY) is False
+    assert unregistered_registry.is_supported(MarketSourceType.ASHBY) is False
 
 
 # ===========================================================================

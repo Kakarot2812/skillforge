@@ -28,6 +28,7 @@ import pytest
 from app.config import settings
 from app.services.market.adapters import (
     AdzunaAdapter,
+    AshbyAdapter,
     GreenhouseAdapter,
     LeverAPIError,
     LeverAdapter,
@@ -628,11 +629,10 @@ def test_15_registry_resolves_lever_greenhouse_adzuna_and_rejects_ashby():
     assert isinstance(adzuna_adapter, AdzunaAdapter)
     assert registry.is_supported(MarketSourceType.ADZUNA) is True
 
-    # Continues rejecting ASHBY with UnsupportedMarketSourceError
-    with pytest.raises(UnsupportedMarketSourceError) as exc_ashby:
-        registry.get_adapter(MarketSourceType.ASHBY)
-    assert "Market source 'ashby' is not implemented yet" in str(exc_ashby.value)
-    assert registry.is_supported(MarketSourceType.ASHBY) is False
+    # Resolves ASHBY (supported in P1-J)
+    ashby_adapter = registry.get_adapter(MarketSourceType.ASHBY)
+    assert isinstance(ashby_adapter, AshbyAdapter)
+    assert registry.is_supported(MarketSourceType.ASHBY) is True
 
     # Continues rejecting unknown sources with UnknownMarketSourceError
     with pytest.raises(UnknownMarketSourceError):

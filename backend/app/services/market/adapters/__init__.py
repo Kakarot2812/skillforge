@@ -20,6 +20,14 @@ from app.services.market.adapters.lever_adapter import (
     LeverResponseError,
     clean_lever_description,
 )
+from app.services.market.adapters.ashby_adapter import (
+    AshbyAPIError,
+    AshbyAdapter,
+    AshbyConnectionError,
+    AshbyError,
+    AshbyResponseError,
+    clean_ashby_description,
+)
 from app.services.market.adapters.base import (
     MarketSourceAdapter,
     MarketSourceConfigurationError,
@@ -44,6 +52,8 @@ __all__ = [
     "clean_greenhouse_html",
     "LeverAdapter",
     "clean_lever_description",
+    "AshbyAdapter",
+    "clean_ashby_description",
     # Registry
     "MarketSourceRegistry",
     "market_source_registry",
@@ -61,4 +71,8 @@ __all__ = [
     "LeverConnectionError",
     "LeverAPIError",
     "LeverResponseError",
+    "AshbyError",
+    "AshbyConnectionError",
+    "AshbyAPIError",
+    "AshbyResponseError",
 ]

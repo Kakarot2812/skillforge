@@ -42,7 +42,7 @@ export default function CareerAssistantSuggestions({
 }: CareerAssistantSuggestionsProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
         <span>Suggested Explorations</span>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -54,9 +54,9 @@ export default function CareerAssistantSuggestions({
               type="button"
               onClick={() => onSelectSuggestion(item.query)}
               disabled={disabled}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900/80 hover:bg-neutral-800 active:bg-neutral-700/80 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-neutral-900/80 hover:bg-slate-200 dark:hover:bg-neutral-800 active:bg-slate-300 dark:active:bg-neutral-700/80 border border-slate-200 dark:border-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             >
-              <IconComponent className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <IconComponent className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>{item.label}</span>
             </button>
           );

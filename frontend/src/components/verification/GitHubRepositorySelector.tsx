@@ -80,16 +80,16 @@ export default function GitHubRepositorySelector({
       <div className="flex items-center justify-between">
         <label
           htmlFor="github-repo-selector"
-          className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5"
+          className="text-xs font-semibold text-slate-700 dark:text-neutral-300 flex items-center gap-1.5"
         >
-          <FolderGit2 className="h-3.5 w-3.5 text-indigo-400" />
+          <FolderGit2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
           <span>Candidate GitHub Repository</span>
         </label>
         <button
           type="button"
           onClick={loadRepositories}
           disabled={isLoading || disabled}
-          className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-200 transition-colors disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-200 transition-colors disabled:opacity-50 cursor-pointer"
           aria-label="Refresh discovered repositories"
         >
           <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
@@ -98,22 +98,22 @@ export default function GitHubRepositorySelector({
       </div>
 
       {isLoading ? (
-        <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-center justify-center gap-2 text-xs text-neutral-400">
-          <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-neutral-400">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
           <span>Discovering candidate repositories...</span>
         </div>
       ) : error ? (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-medium">Repository Discovery Error</p>
-            <p className="text-rose-400/90 text-[11px]">{error}</p>
+            <p className="text-rose-600 dark:text-rose-400/90 text-[11px]">{error}</p>
           </div>
         </div>
       ) : repositories.length === 0 ? (
-        <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800 text-center space-y-1 text-xs text-neutral-400">
-          <p className="font-medium text-neutral-300">No Repositories Discovered</p>
-          <p className="text-[11px] text-neutral-500">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-center space-y-1 text-xs text-slate-500 dark:text-neutral-400">
+          <p className="font-medium text-slate-800 dark:text-neutral-300">No Repositories Discovered</p>
+          <p className="text-[11px] text-slate-400 dark:text-neutral-500">
             Connect your GitHub account or push code to populate discovered repositories.
           </p>
         </div>
@@ -131,7 +131,7 @@ export default function GitHubRepositorySelector({
                 }
               }}
               disabled={disabled || isLoading}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-slate-300 dark:border-neutral-800 text-slate-900 dark:text-neutral-200 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
               <option value="" disabled>
                 -- Select candidate repository --
@@ -151,19 +151,19 @@ export default function GitHubRepositorySelector({
           </div>
 
           {selectedRepo && (
-            <div className="p-3 rounded-xl bg-neutral-950/80 border border-neutral-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-neutral-200 font-semibold truncate max-w-[200px] sm:max-w-xs">
+                <span className="font-mono text-slate-900 dark:text-neutral-200 font-semibold truncate max-w-[200px] sm:max-w-xs">
                   {selectedRepo.full_name || selectedRepo.repo_name}
                 </span>
                 {selectedRepo.default_branch && (
-                  <span className="inline-flex items-center gap-1 font-mono text-neutral-400 px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px]">
-                    <GitBranch className="h-3 w-3 text-neutral-500" />
+                  <span className="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-neutral-400 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-neutral-900 border border-slate-300 dark:border-neutral-800 text-[10px]">
+                    <GitBranch className="h-3 w-3 text-slate-400 dark:text-neutral-500" />
                     {selectedRepo.default_branch}
                   </span>
                 )}
                 {selectedRepo.stars_count !== undefined && selectedRepo.stars_count > 0 && (
-                  <span className="inline-flex items-center gap-1 text-amber-400/90 text-[10px]">
+                  <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400/90 text-[10px] font-semibold">
                     <Star className="h-3 w-3 fill-amber-400/20" />
                     {selectedRepo.stars_count}
                   </span>
@@ -175,7 +175,7 @@ export default function GitHubRepositorySelector({
                   href={selectedRepo.repo_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors font-medium"
                 >
                   <span>View on GitHub</span>
                   <ExternalLink className="h-3 w-3" />

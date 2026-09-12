@@ -29,18 +29,18 @@ export default function CareerAssistantMessage({
     <div
       className={`flex gap-3 sm:gap-4 p-4 rounded-2xl transition-colors ${
         isUser
-          ? "bg-neutral-900/40 border border-neutral-800/80 ml-4 sm:ml-12"
-          : "bg-neutral-900/80 border border-neutral-800 mr-4 sm:mr-12 shadow-md"
+          ? "bg-slate-100/80 dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800/80 ml-4 sm:ml-12"
+          : "bg-white dark:bg-neutral-900/80 border border-slate-200 dark:border-neutral-800 mr-4 sm:mr-12 shadow-sm dark:shadow-md"
       }`}
     >
       {/* Avatar Icon */}
       <div className="shrink-0 mt-0.5">
         {isUser ? (
-          <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-inner">
+          <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
             <User className="h-4 w-4" />
           </div>
         ) : (
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shadow-inner">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-inner">
             <Bot className="h-4 w-4" />
           </div>
         )}
@@ -51,38 +51,38 @@ export default function CareerAssistantMessage({
         {/* Header: Sender Name, Badges, Timestamp */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white">
+            <span className="text-xs font-bold text-slate-900 dark:text-white">
               {isUser ? "You (Candidate)" : "SkillForge AI"}
             </span>
 
             {!isUser && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-semibold">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-semibold">
                 {message.model || "qwen3:8b"}
               </span>
             )}
 
             {!isUser && message.status === "EXPLANATORY" && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                 <ShieldCheck className="h-3 w-3" />
                 Grounded Explanation
               </span>
             )}
 
             {!isUser && message.status === "INSUFFICIENT_EVIDENCE" && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
                 <AlertTriangle className="h-3 w-3" />
                 Insufficient Evidence
               </span>
             )}
           </div>
 
-          <span className="text-[10px] text-neutral-500 font-mono">
+          <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono">
             {message.timestamp}
           </span>
         </div>
 
         {/* Text Body: Safe string rendering avoiding arbitrary HTML */}
-        <div className="text-xs sm:text-sm text-neutral-200 leading-relaxed space-y-2 break-words">
+        <div className="text-xs sm:text-sm text-slate-700 dark:text-neutral-200 leading-relaxed space-y-2 break-words">
           {message.content.split("\n\n").map((paragraph, pIdx) => (
             <p key={pIdx} className="whitespace-pre-line">
               {paragraph}
@@ -92,8 +92,8 @@ export default function CareerAssistantMessage({
 
         {/* Referenced Skills Chips if returned by backend */}
         {!isUser && message.referencedSkillIds && message.referencedSkillIds.length > 0 && (
-          <div className="pt-2 border-t border-neutral-800/60 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-mono text-neutral-500 flex items-center gap-1 uppercase">
+          <div className="pt-2 border-t border-slate-200 dark:border-neutral-800/60 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-mono text-slate-500 dark:text-neutral-500 flex items-center gap-1 uppercase">
               <Tag className="h-3 w-3" /> Referenced Context:
             </span>
             {message.referencedSkillIds.map((skillId) => {
@@ -101,7 +101,7 @@ export default function CareerAssistantMessage({
               return (
                 <span
                   key={skillId}
-                  className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800/80 text-neutral-300 border border-neutral-700/60"
+                  className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800/80 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700/60"
                   title={`Skill ID: ${skillId}`}
                 >
                   {label}
@@ -113,8 +113,8 @@ export default function CareerAssistantMessage({
 
         {/* Grounding Disclaimer on Assistant Responses */}
         {!isUser && (
-          <div className="pt-1 flex items-center gap-1.5 text-[10px] text-neutral-500">
-            <Sparkles className="h-3 w-3 text-neutral-500" />
+          <div className="pt-1 flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-neutral-500">
+            <Sparkles className="h-3 w-3 text-slate-400 dark:text-neutral-500" />
             <span>Explanatory guidance over verified evidence. Does not alter canonical records.</span>
           </div>
         )}

@@ -370,38 +370,38 @@ export default function CareerAssistant({
   return (
     <div id="ai-career-assistant-section" className="scroll-mt-20 space-y-4">
       {/* Container Card */}
-      <div className="bg-neutral-900/70 border border-neutral-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-2xl space-y-6">
+      <div className="bg-white/80 dark:bg-neutral-900/70 border border-slate-200/80 dark:border-neutral-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-xl dark:shadow-2xl space-y-6">
         {/* Subtle Background Glow */}
         <div className="absolute top-0 right-0 -mt-12 -mr-12 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Section Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-neutral-800 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-neutral-800 relative z-10">
           <div className="space-y-1.5 max-w-2xl">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-inner">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-inner">
                 <Bot className="h-5 w-5" />
               </div>
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 AI Career Intelligence Assistant
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-semibold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-semibold uppercase">
                 Qwen 3 8B Explanatory Layer
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-neutral-400 leading-relaxed">
               Natural-language coaching grounded strictly in your verified SkillForge evidence. Ask questions regarding your skill gaps, priority sequencing, market signals, or roadmap prerequisites.
             </p>
           </div>
 
           {/* Context Scope Indicator & Clear Button */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="px-3 py-1.5 rounded-xl bg-neutral-950/80 border border-neutral-800 flex items-center gap-2 text-xs">
-              <span className={`h-2 w-2 rounded-full ${selectedRoleId ? "bg-emerald-400" : "bg-amber-400"}`} />
-              <span className="text-neutral-300 font-medium">
+            <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 flex items-center gap-2 text-xs">
+              <span className={`h-2 w-2 rounded-full ${selectedRoleId ? "bg-emerald-500 dark:bg-emerald-400" : "bg-amber-500 dark:bg-amber-400"}`} />
+              <span className="text-slate-700 dark:text-neutral-300 font-medium">
                 {currentRoleTitle ? `Role: ${currentRoleTitle}` : "General Context"}
                 {candidateReady ? " • Profile Active" : ""}
               </span>
-              {contextLoading && <Loader2 className="h-3 w-3 text-neutral-400 animate-spin" />}
+              {contextLoading && <Loader2 className="h-3 w-3 text-slate-400 dark:text-neutral-400 animate-spin" />}
             </div>
 
             {messages.length > 0 && (
@@ -409,7 +409,7 @@ export default function CareerAssistant({
                 type="button"
                 onClick={handleClear}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800/80 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
                 title="Reset conversation state"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
@@ -420,24 +420,24 @@ export default function CareerAssistant({
         </div>
 
         {/* Visible AI Disclaimer (Strict Requirement 7) */}
-        <div className="p-3 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-start sm:items-center gap-2 text-xs text-neutral-400">
-          <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/70 border border-slate-200 dark:border-neutral-800 flex items-start sm:items-center gap-2 text-xs text-slate-600 dark:text-neutral-400">
+          <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
           <p className="leading-snug">
-            <strong className="text-neutral-300 font-medium">Authoritative Boundary:</strong> AI explanations are grounded in SkillForge&apos;s verified evidence. They do not change your skill status, market scores, priorities, or roadmap.
+            <strong className="text-slate-800 dark:text-neutral-300 font-medium">Authoritative Boundary:</strong> AI explanations are grounded in SkillForge&apos;s verified evidence. They do not change your skill status, market scores, priorities, or roadmap.
           </p>
         </div>
 
         {/* Conversation Thread Window */}
-        <div className="min-h-[260px] max-h-[500px] overflow-y-auto space-y-4 pr-1 rounded-2xl bg-neutral-950/50 p-4 sm:p-6 border border-neutral-800/80">
+        <div className="min-h-[260px] max-h-[500px] overflow-y-auto space-y-4 pr-1 rounded-2xl bg-slate-50/50 dark:bg-neutral-950/50 p-4 sm:p-6 border border-slate-200 dark:border-neutral-800/80">
           {/* Empty State */}
           {messages.length === 0 && !loading && (
             <div className="py-10 text-center space-y-4 max-w-md mx-auto">
-              <div className="h-12 w-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto shadow-inner">
+              <div className="h-12 w-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto shadow-inner">
                 <Sparkles className="h-6 w-6" />
               </div>
               <div className="space-y-1.5">
-                <h3 className="text-sm font-bold text-white">How can I assist your career progression?</h3>
-                <p className="text-xs text-neutral-400 leading-relaxed">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">How can I assist your career progression?</h3>
+                <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">
                   I can analyze your verified resume claims, GitHub repositories, and market demand to explain why specific skills are prioritized or how to tackle your roadmap milestones.
                 </p>
               </div>
@@ -462,15 +462,15 @@ export default function CareerAssistant({
 
           {/* Loading Indicator */}
           {loading && (
-            <div className="flex items-center gap-3 p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 mr-4 sm:mr-12 animate-pulse">
-              <div className="h-8 w-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-100/80 dark:bg-neutral-900/60 border border-slate-200 dark:border-neutral-800/80 mr-4 sm:mr-12 animate-pulse">
+              <div className="h-8 w-8 rounded-xl bg-purple-500/20 text-purple-700 dark:text-purple-300 flex items-center justify-center">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
               <div className="space-y-1">
-                <span className="text-xs font-semibold text-neutral-200">
+                <span className="text-xs font-semibold text-slate-800 dark:text-neutral-200">
                   Reasoning over verified SkillForge evidence...
                 </span>
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400">
                   Checking deterministic sufficiency and assembling grounded explanation.
                 </p>
               </div>
@@ -482,16 +482,16 @@ export default function CareerAssistant({
 
         {/* Error Alert Banner */}
         {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 flex items-start gap-3 text-xs">
-            <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 flex items-start gap-3 text-xs">
+            <AlertCircle className="h-4 w-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <strong className="text-rose-200 font-medium">Assistant Service Notice:</strong>
-              <p className="mt-0.5 text-neutral-300">{error}</p>
+              <strong className="text-rose-800 dark:text-rose-200 font-medium">Assistant Service Notice:</strong>
+              <p className="mt-0.5 text-slate-700 dark:text-neutral-300">{error}</p>
             </div>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="text-neutral-400 hover:text-neutral-200 text-xs transition-colors cursor-pointer"
+              className="text-slate-400 hover:text-slate-600 dark:text-neutral-400 dark:hover:text-neutral-200 text-xs transition-colors cursor-pointer"
             >
               Dismiss
             </button>
@@ -528,9 +528,9 @@ export default function CareerAssistant({
                 placeholder="Ask about your skill gaps, priority rationale, or roadmap prerequisites... (Enter to send, Shift+Enter for new line)"
                 disabled={loading}
                 maxLength={1000}
-                className="w-full px-4 py-3 rounded-2xl bg-neutral-950 border border-neutral-800 text-neutral-100 placeholder-neutral-500 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/50 resize-none transition-all disabled:opacity-50"
+                className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 text-slate-900 dark:text-neutral-100 placeholder-slate-400 dark:placeholder-neutral-500 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/50 resize-none transition-all disabled:opacity-50"
               />
-              <div className="absolute right-3 bottom-2 text-[10px] font-mono text-neutral-500 pointer-events-none">
+              <div className="absolute right-3 bottom-2 text-[10px] font-mono text-slate-400 dark:text-neutral-500 pointer-events-none">
                 {query.length}/1000
               </div>
             </div>
@@ -538,7 +538,7 @@ export default function CareerAssistant({
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="h-11 px-5 rounded-xl bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-xs font-bold transition-all shadow-lg shadow-purple-950/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 shrink-0"
+              className="h-11 px-5 rounded-xl bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-xs font-bold transition-all shadow-md dark:shadow-purple-950/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 shrink-0"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -551,7 +551,7 @@ export default function CareerAssistant({
             </button>
           </form>
 
-          <div className="flex items-center justify-between text-[11px] text-neutral-500 px-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-500 px-1">
             <span>Powered by local Qwen 3 8B • Zero chat persistence</span>
             <span>Deterministic facts remain authoritative</span>
           </div>

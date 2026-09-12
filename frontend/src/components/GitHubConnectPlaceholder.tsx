@@ -312,22 +312,22 @@ export default function GitHubConnectPlaceholder({
   };
 
   return (
-    <div id="github-intelligence-card" className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative flex flex-col justify-between">
+    <div id="github-intelligence-card" className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative flex flex-col justify-between shadow-xs transition-colors duration-200">
       <div>
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <GitHubLogo className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-neutral-200">GitHub Intelligence</h3>
-              <p className="text-xs text-neutral-500">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">GitHub Intelligence</h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 Repository Evidence & Demonstrated Skills
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
             {connectResult ? `@${connectResult.github_username}` : "Code Evidence"}
           </span>
         </div>
@@ -336,28 +336,29 @@ export default function GitHubConnectPlaceholder({
         {connectResult ? (
           /* Connected State */
           <div className="mt-5 space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-neutral-200 space-y-3">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-neutral-800 dark:text-neutral-200 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-xs">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
                   <span>Connected to GitHub (@{connectResult.github_username})</span>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+                <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/50">
                   {connectResult.discovered_repositories} non-forks
                 </span>
               </div>
 
               {/* Repositories List with Evidence Analysis */}
-              <div className="space-y-2 pt-2 border-t border-emerald-500/20">
-                <div className="flex items-center justify-between text-xs text-neutral-400">
+              <div className="space-y-2 pt-2 border-t border-emerald-200 dark:border-emerald-500/20">
+                <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-neutral-200">Discovered Repositories</span>
-                    <span className="text-[10px] font-mono text-emerald-400">({repositories.length})</span>
+                    <span className="font-medium text-neutral-800 dark:text-neutral-200">Discovered Repositories</span>
+                    <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">({repositories.length})</span>
                   </div>
                   <button
+                    type="button"
                     onClick={handleSyncRepositories}
                     disabled={isConnecting}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="text-[10px] text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-mono transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     title="Sync repositories from GitHub"
                   >
                     <RotateCcw className={`h-2.5 w-2.5 ${isConnecting ? "animate-spin" : ""}`} />
@@ -374,22 +375,22 @@ export default function GitHubConnectPlaceholder({
                       return (
                         <div
                           key={repo.repo_id}
-                          className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800 space-y-2"
+                          className="p-2.5 rounded-lg bg-white dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 space-y-2 shadow-xs"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-neutral-200 truncate">
+                                <span className="text-xs font-medium text-neutral-900 dark:text-neutral-200 truncate">
                                   {repo.repo_name}
                                 </span>
                                 {repo.primary_language && (
-                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
                                     {repo.primary_language}
                                   </span>
                                 )}
                               </div>
                               {repo.description && (
-                                <p className="text-[11px] text-neutral-400 truncate max-w-[240px]">
+                                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-[240px]">
                                   {repo.description}
                                 </p>
                               )}
@@ -397,9 +398,10 @@ export default function GitHubConnectPlaceholder({
 
                             <div className="flex items-center gap-2 shrink-0">
                               <button
+                                type="button"
                                 onClick={() => handleAnalyze(repo.repo_id)}
                                 disabled={isAnalyzing}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-[10px] font-medium transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/80 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-medium transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
                               >
                                 {isAnalyzing ? (
                                   <>
@@ -408,7 +410,7 @@ export default function GitHubConnectPlaceholder({
                                   </>
                                 ) : analysis ? (
                                   <>
-                                    <Check className="h-3 w-3 text-emerald-400" />
+                                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                                     <span>Re-scan</span>
                                   </>
                                 ) : (
@@ -423,7 +425,7 @@ export default function GitHubConnectPlaceholder({
                                 href={repo.repo_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 rounded text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors"
+                                className="p-1 rounded text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                                 title="View on GitHub"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -435,11 +437,12 @@ export default function GitHubConnectPlaceholder({
                     })}
                   </div>
                 ) : (
-                  <div className="p-3 text-center rounded-lg bg-neutral-950/60 border border-neutral-800 text-xs text-neutral-400 space-y-2">
-                    <p className="text-[11px] text-neutral-400">
+                  <div className="p-3 text-center rounded-lg bg-white dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 dark:text-neutral-400 space-y-2">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       No repositories currently indexed for @{connectResult.github_username}.
                     </p>
                     <button
+                      type="button"
                       onClick={handleSyncRepositories}
                       disabled={isConnecting}
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -462,13 +465,13 @@ export default function GitHubConnectPlaceholder({
             </div>
 
             {/* Checkpoint 3: Aggregated Demonstrated Skills Panel */}
-            <div className="p-4 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-3">
+            <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-semibold text-neutral-200">
-                  <Sparkles className="h-4 w-4 text-emerald-400" />
+                <div className="flex items-center gap-2 text-xs font-semibold text-neutral-900 dark:text-neutral-200">
+                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Demonstrated Skills ({demonstratedSkills.length})</span>
                 </div>
-                <span className="text-[9px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                <span className="text-[9px] font-mono text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900 px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-800">
                   Evidence-First
                 </span>
               </div>
@@ -482,34 +485,35 @@ export default function GitHubConnectPlaceholder({
                     return (
                       <div
                         key={skill.skill_id}
-                        className="p-2.5 rounded-lg bg-neutral-900/90 border border-neutral-800/80 hover:border-neutral-700 transition-all flex items-center justify-between gap-2"
+                        className="p-2.5 rounded-lg bg-white dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800/80 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-xs transition-all flex items-center justify-between gap-2"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-neutral-200">
+                            <span className="text-xs font-medium text-neutral-900 dark:text-neutral-200">
                               {skill.skill_name}
                             </span>
                             <span
                               className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
                                 isHigh
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
                                   : isMed
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                                  : "bg-neutral-800 text-neutral-400 border-neutral-700"
+                                  ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30"
+                                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700"
                               }`}
                             >
                               {skill.evidence_level} • {Math.round(skill.confidence_score * 100)}%
                             </span>
                           </div>
-                          <p className="text-[10px] text-neutral-400 mt-0.5">
+                          <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                             {skill.repository_count} {skill.repository_count === 1 ? "repo" : "repos"} •{" "}
                             {skill.evidence_count} evidence items
                           </p>
                         </div>
 
                         <button
+                          type="button"
                           onClick={() => handleInspectSkill(skill.skill_id)}
-                          className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-medium transition-colors border border-neutral-700/80 cursor-pointer"
+                          className="px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 text-[10px] font-medium transition-colors border border-neutral-200 dark:border-neutral-700/80 cursor-pointer"
                         >
                           Audit Trail
                         </button>
@@ -518,7 +522,7 @@ export default function GitHubConnectPlaceholder({
                   })}
                 </div>
               ) : (
-                <div className="p-3 text-center rounded-lg bg-neutral-900/40 border border-neutral-800 text-[11px] text-neutral-500">
+                <div className="p-3 text-center rounded-lg bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-500">
                   Click &quot;Analyze&quot; on a repository above to detect demonstrated skills.
                 </div>
               )}
@@ -526,20 +530,21 @@ export default function GitHubConnectPlaceholder({
 
             {/* Evidence Audit Trail Modal / Drawer */}
             {selectedSkillDetail && (
-              <div className="p-4 rounded-xl bg-neutral-950 border border-emerald-500/40 space-y-3">
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <div className="p-4 rounded-xl bg-white dark:bg-neutral-950 border border-emerald-500/40 space-y-3 shadow-md">
+                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-2">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <span className="text-xs font-semibold text-neutral-200">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-200">
                       Audit Trail: {selectedSkillDetail.skill_name}
                     </span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                       {selectedSkillDetail.evidence_level} ({Math.round(selectedSkillDetail.confidence_score * 100)}%)
                     </span>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setSelectedSkillDetail(null)}
-                    className="text-neutral-400 hover:text-neutral-200 p-1 cursor-pointer"
+                    className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 p-1 cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -549,10 +554,10 @@ export default function GitHubConnectPlaceholder({
                   {selectedSkillDetail.evidence.map((ev) => (
                     <div
                       key={ev.evidence_id}
-                      className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 space-y-1 text-[11px]"
+                      className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-1 text-[11px]"
                     >
-                      <div className="flex items-center justify-between text-neutral-300">
-                        <span className="font-mono text-[10px] text-emerald-400">
+                      <div className="flex items-center justify-between text-neutral-800 dark:text-neutral-300">
+                        <span className="font-mono text-[10px] text-emerald-700 dark:text-emerald-400">
                           {ev.artifact_name} ({ev.file_path})
                         </span>
                         <span className="text-[9px] font-mono text-neutral-500">
@@ -560,10 +565,10 @@ export default function GitHubConnectPlaceholder({
                         </span>
                       </div>
                       {ev.evidence_description && (
-                        <p className="text-[10px] text-neutral-400">{ev.evidence_description}</p>
+                        <p className="text-[10px] text-neutral-600 dark:text-neutral-400">{ev.evidence_description}</p>
                       )}
                       {ev.matched_content && (
-                        <div className="font-mono text-[9px] text-neutral-400 bg-neutral-950 p-1 rounded border border-neutral-800 truncate">
+                        <div className="font-mono text-[9px] text-neutral-700 dark:text-neutral-400 bg-white dark:bg-neutral-950 p-1 rounded border border-neutral-200 dark:border-neutral-800 truncate">
                           {ev.matched_content}
                         </div>
                       )}
@@ -573,20 +578,21 @@ export default function GitHubConnectPlaceholder({
               </div>
             )}
 
-            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
-              <div className="flex items-center gap-1.5 font-medium text-emerald-400">
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>Evidence-Based Analysis</span>
               </div>
               <p className="leading-relaxed">
                 Demonstrated skills are verified directly from repository artifacts, dependencies, and code configuration across projects.
-                <strong className="text-purple-300 font-normal"> Skills are evaluated strictly from verified evidence.</strong>
+                <strong className="text-purple-700 dark:text-purple-300 font-medium"> Skills are evaluated strictly from verified evidence.</strong>
               </p>
             </div>
 
             <button
+              type="button"
               onClick={handleDisconnect}
-              className="w-full py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 border border-neutral-200 dark:border-neutral-700 cursor-pointer"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Connect Different Account</span>
@@ -595,20 +601,20 @@ export default function GitHubConnectPlaceholder({
         ) : (
           /* Connect Form */
           <form onSubmit={handleConnect} className="mt-5 space-y-3">
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-              <GitHubLogo className="h-5 w-5 text-neutral-400 shrink-0" />
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800/80">
+              <GitHubLogo className="h-5 w-5 text-neutral-500 dark:text-neutral-400 shrink-0" />
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter GitHub username (e.g. octocat)"
                 disabled={isConnecting}
-                className="bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none w-full"
+                className="bg-transparent text-xs text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none w-full"
               />
               <button
                 type="submit"
                 disabled={isConnecting || !username.trim()}
-                className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 {isConnecting ? (
                   <>
@@ -626,7 +632,7 @@ export default function GitHubConnectPlaceholder({
               <button
                 type="button"
                 onClick={() => setShowTokenInput(!showTokenInput)}
-                className="text-[11px] text-neutral-500 hover:text-neutral-400 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-[11px] text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-400 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <span>{showTokenInput ? "− Hide" : "+ Add"} Personal Access Token (Optional for higher rate limits)</span>
               </button>
@@ -638,22 +644,22 @@ export default function GitHubConnectPlaceholder({
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (never logged or stored in plain text)"
                   disabled={isConnecting}
-                  className="w-full p-2.5 rounded-lg bg-neutral-950/80 border border-neutral-800 text-xs text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-emerald-500/50"
+                  className="w-full p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-emerald-500/50"
                 />
               )}
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-red-500/10 border border-rose-200 dark:border-red-500/30 text-rose-700 dark:text-red-400 text-xs flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
-            <div className="p-3.5 rounded-xl bg-neutral-950/40 border border-neutral-800/80 space-y-2">
+            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-neutral-400 font-medium flex items-center gap-1.5">
-                  <Code2 className="h-3.5 w-3.5 text-emerald-400" /> Evidence Scopes
+                <span className="text-neutral-700 dark:text-neutral-400 font-medium flex items-center gap-1.5">
+                  <Code2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Evidence Scopes
                 </span>
                 <span className="text-[10px] font-mono text-neutral-500">Read-Only</span>
               </div>
@@ -668,9 +674,9 @@ export default function GitHubConnectPlaceholder({
       </div>
 
       {/* Footer */}
-      <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500">
+      <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800/50 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
         <span>Evidence Source: GitHub Repositories</span>
-        <span className="text-neutral-400 font-medium">{connectResult ? "Account Connected" : "Not Connected"}</span>
+        <span className="text-neutral-700 dark:text-neutral-400 font-medium">{connectResult ? "Account Connected" : "Not Connected"}</span>
       </div>
     </div>
   );

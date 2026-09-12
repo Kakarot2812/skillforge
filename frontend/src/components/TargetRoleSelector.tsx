@@ -39,26 +39,26 @@ export default function TargetRoleSelector({
   const activeRole = roles.find((r) => r.role_id === selectedRoleId) || roles[0];
 
   return (
-    <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden">
+    <div className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden shadow-xs transition-colors duration-200">
       {/* Header Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+      <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
             <Briefcase className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-neutral-200">Target Career Role</h3>
-            <p className="text-xs text-neutral-500">Configure target industry profile</p>
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">Target Career Role</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">Configure target industry profile</p>
           </div>
         </div>
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
           Career Tracks
         </span>
       </div>
 
       <div className="mt-4 space-y-2.5">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-neutral-400">Select Target Role</label>
+          <label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Select Target Role</label>
           <span className="text-[11px] text-neutral-500 font-mono">5 Career Tracks</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -75,15 +75,15 @@ export default function TargetRoleSelector({
                   onClick={() => onSelectRole?.(role.role_id)}
                   className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
                     isSelected
-                      ? "bg-neutral-800/90 border-blue-500/50 text-neutral-100 shadow-sm ring-1 ring-blue-500/30"
-                      : "bg-neutral-950/40 border-neutral-800/80 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
+                      ? "bg-blue-50/80 dark:bg-neutral-800/90 border-blue-500/70 text-neutral-900 dark:text-neutral-100 shadow-xs ring-1 ring-blue-500/30"
+                      : "bg-neutral-50 dark:bg-neutral-950/40 border-neutral-200 dark:border-neutral-800/80 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-200"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold">{role.title}</span>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-blue-400" />}
+                    {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />}
                   </div>
-                  <p className="text-[11px] text-neutral-500 mt-1 truncate">{focusDesc}</p>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-500 mt-1 truncate">{focusDesc}</p>
                 </button>
               );
             })
@@ -91,9 +91,9 @@ export default function TargetRoleSelector({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-neutral-800/50 flex items-center justify-between text-xs text-neutral-500">
-        <span>Selected Track: <strong className="text-neutral-300 font-medium">{activeRole?.title || "None"}</strong></span>
-        <span className="text-[11px] text-emerald-400/80 font-medium">Synchronized with Career Intelligence</span>
+      <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800/50 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
+        <span>Selected Track: <strong className="text-neutral-900 dark:text-neutral-300 font-medium">{activeRole?.title || "None"}</strong></span>
+        <span className="text-[11px] text-emerald-600 dark:text-emerald-400/80 font-medium">Synchronized with Career Intelligence</span>
       </div>
     </div>
   );

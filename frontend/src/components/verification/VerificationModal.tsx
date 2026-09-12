@@ -186,32 +186,32 @@ export default function VerificationModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="verification-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-3xl max-h-[90vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="relative w-full max-w-3xl max-h-[90vh] bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-colors">
         {/* Modal Header */}
-        <div className="p-5 sm:p-6 border-b border-neutral-800 flex items-start justify-between gap-4 bg-neutral-950/70">
+        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-neutral-800 flex items-start justify-between gap-4 bg-slate-50/90 dark:bg-neutral-950/70">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 font-bold uppercase">
                 GitHub Verification Loop
               </span>
-              <span className="text-xs font-mono text-neutral-400">
+              <span className="text-xs font-mono text-slate-500 dark:text-neutral-400">
                 Milestone #{milestone.order_index}
               </span>
               {milestone.category && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 border border-slate-300 dark:border-neutral-700">
                   {milestone.category}
                 </span>
               )}
             </div>
             <h2
               id="verification-modal-title"
-              className="text-base sm:text-lg font-bold text-white tracking-tight"
+              className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight"
             >
               Verify {milestone.skill_name}
             </h2>
-            <p className="text-xs text-neutral-400 leading-relaxed max-w-xl">
+            <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed max-w-xl">
               Deterministic project verification against candidate-owned repository deliverables and automated rubric criteria.
             </p>
           </div>
@@ -220,7 +220,7 @@ export default function VerificationModal({
             type="button"
             onClick={onClose}
             disabled={isVerifying}
-            className="p-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-slate-100 dark:bg-neutral-800/80 hover:bg-slate-200 dark:hover:bg-neutral-800 text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer disabled:opacity-50"
             aria-label="Close verification dialog"
           >
             <X className="h-5 w-5" />
@@ -230,20 +230,20 @@ export default function VerificationModal({
         {/* Modal Content Scroll Area */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-6">
           {isLoadingHistory ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-neutral-400">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+            <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-slate-500 dark:text-neutral-400">
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-500 dark:text-indigo-400" />
               <span>Loading latest verification audit record...</span>
             </div>
           ) : latestVerification && !showReverifyForm ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-neutral-300">
+                <span className="text-xs font-semibold text-slate-700 dark:text-neutral-300">
                   Latest Verification Audit Result
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowReverifyForm(true)}
-                  className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Verify with another repository / commit</span>
@@ -259,15 +259,15 @@ export default function VerificationModal({
           ) : (
             <div className="space-y-5">
               {latestVerification && (
-                <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-center justify-between text-xs">
-                  <span className="text-neutral-400">Previous Status:</span>
-                  <span className="font-mono font-bold text-neutral-200">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-neutral-400">Previous Status:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-neutral-200">
                     {latestVerification.status}
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowReverifyForm(false)}
-                    className="text-indigo-400 hover:text-indigo-300 text-[11px] underline cursor-pointer"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-[11px] underline cursor-pointer"
                   >
                     View previous result
                   </button>
@@ -282,21 +282,21 @@ export default function VerificationModal({
               />
 
               {/* Optional PAT Input Section */}
-              <div className="space-y-2 p-4 rounded-xl bg-neutral-950/70 border border-neutral-800">
+              <div className="space-y-2 p-4 rounded-xl bg-slate-50 dark:bg-neutral-950/70 border border-slate-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="github-pat-input"
-                    className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5"
+                    className="text-xs font-semibold text-slate-700 dark:text-neutral-300 flex items-center gap-1.5"
                   >
-                    <KeyRound className="h-3.5 w-3.5 text-neutral-400" />
+                    <KeyRound className="h-3.5 w-3.5 text-slate-500 dark:text-neutral-400" />
                     <span>GitHub Personal Access Token (Optional)</span>
                   </label>
-                  <span className="text-[10px] font-mono text-neutral-500">
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-neutral-500">
                     Volatile memory only
                   </span>
                 </div>
 
-                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed">
                   Required if your repository has private artifacts or to avoid GitHub API rate limits. Your token is used only for this verification request and is not stored by SkillForge.
                 </p>
 
@@ -308,7 +308,7 @@ export default function VerificationModal({
                   disabled={isVerifying}
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                   autoComplete="off"
-                  className="w-full px-3.5 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs font-mono placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 transition-all"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-slate-300 dark:border-neutral-800 text-slate-900 dark:text-neutral-200 text-xs font-mono placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 transition-all"
                 />
               </div>
 
@@ -317,12 +317,12 @@ export default function VerificationModal({
                 <div
                   role="alert"
                   aria-live="polite"
-                  className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start gap-2.5"
+                  className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2.5"
                 >
-                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <AlertCircle className="h-4 w-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
                     <p className="font-semibold">Verification Request Failed</p>
-                    <p className="text-rose-400/90 text-[11px] leading-relaxed">
+                    <p className="text-rose-600 dark:text-rose-400/90 text-[11px] leading-relaxed">
                       {verificationError}
                     </p>
                   </div>
@@ -330,20 +330,20 @@ export default function VerificationModal({
               )}
 
               {/* Authoritative Boundary Banner */}
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-2.5 text-xs text-neutral-400">
-                <ShieldCheck className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800/80 flex items-start gap-2.5 text-xs text-slate-600 dark:text-neutral-400">
+                <ShieldCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] leading-relaxed">
                   GitHub verification is performed by SkillForge&apos;s deterministic backend verification engine. The result is authoritative for this verification attempt. AI explanations do not determine verification status.
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-3 border-t border-neutral-800">
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-neutral-800">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isVerifying}
-                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -352,7 +352,7 @@ export default function VerificationModal({
                   type="button"
                   onClick={handleVerify}
                   disabled={isVerifying || !selectedRepoId}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-950/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 dark:shadow-indigo-950/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isVerifying ? (
                     <>

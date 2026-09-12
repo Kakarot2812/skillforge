@@ -30,6 +30,7 @@ from app.services.market.adapters import (
     GreenhouseConnectionError,
     GreenhouseError,
     GreenhouseResponseError,
+    LeverAdapter,
     MarketSourceAdapter,
     MarketSourceConfigurationError,
     MarketSourceError,
@@ -492,11 +493,10 @@ def test_13_registry_resolves_greenhouse_and_rejects_unsupported():
     assert isinstance(adzuna_adapter, AdzunaAdapter)
     assert registry.is_supported(MarketSourceType.ADZUNA) is True
 
-    # Continues rejecting LEVER with UnsupportedMarketSourceError
-    with pytest.raises(UnsupportedMarketSourceError) as exc_lever:
-        registry.get_adapter(MarketSourceType.LEVER)
-    assert "Market source 'lever' is not implemented yet" in str(exc_lever.value)
-    assert registry.is_supported(MarketSourceType.LEVER) is False
+    # Resolves LEVER (supported in P1-I)
+    lever_adapter = registry.get_adapter(MarketSourceType.LEVER)
+    assert isinstance(lever_adapter, LeverAdapter)
+    assert registry.is_supported(MarketSourceType.LEVER) is True
 
     # Continues rejecting ASHBY with UnsupportedMarketSourceError
     with pytest.raises(UnsupportedMarketSourceError) as exc_ashby:

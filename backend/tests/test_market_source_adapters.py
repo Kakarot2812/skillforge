@@ -19,6 +19,7 @@ import pytest
 
 from app.services.market.adapters import (
     AdzunaAdapter,
+    LeverAdapter,
     MarketSourceAdapter,
     MarketSourceConfigurationError,
     MarketSourceError,
@@ -199,21 +200,33 @@ def test_05_registry_rejects_unsupported_greenhouse():
 
 
 # ===========================================================================
-# 6. Registry Rejects Unsupported Lever
+# 6. Registry Resolves Lever (and rejects when unregistered)
 # ===========================================================================
 
-def test_06_registry_rejects_unsupported_lever():
-    """TEST 6: Registry rejects LEVER with typed UnsupportedMarketSourceError."""
+def test_06_registry_resolves_lever():
+    """TEST 6: Registry resolves LEVER to LeverAdapter (or raises UnsupportedMarketSourceError when unregistered)."""
     registry = MarketSourceRegistry()
 
+    # Via Enum
+    adapter_enum = registry.get_adapter(MarketSourceType.LEVER)
+    assert isinstance(adapter_enum, LeverAdapter)
+    assert adapter_enum.source_type == MarketSourceType.LEVER
+    assert adapter_enum.source_name == "lever"
+
+    # Via String
+    adapter_lower = registry.get_adapter("lever")
+    assert isinstance(adapter_lower, LeverAdapter)
+
+    # is_supported returns True
+    assert registry.is_supported(MarketSourceType.LEVER) is True
+    assert registry.is_supported("lever") is True
+
+    # Rejects when unregistered (e.g. custom registry initialized with register_defaults=False)
+    unregistered_registry = MarketSourceRegistry(register_defaults=False)
     with pytest.raises(UnsupportedMarketSourceError) as exc_info:
-        registry.get_adapter(MarketSourceType.LEVER)
+        unregistered_registry.get_adapter(MarketSourceType.LEVER)
     assert "Market source 'lever' is not implemented yet" in str(exc_info.value)
-
-    with pytest.raises(UnsupportedMarketSourceError):
-        registry.get_adapter("lever")
-
-    assert registry.is_supported(MarketSourceType.LEVER) is False
+    assert unregistered_registry.is_supported(MarketSourceType.LEVER) is False
 
 
 # ===========================================================================

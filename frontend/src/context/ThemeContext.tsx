@@ -15,40 +15,46 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>("dark");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
 
-  // Initialize theme from localStorage or system preference on mount
+  // Initialize theme from localStorage and system preference on client mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("skillforge_theme") as Theme | null;
-      if (stored && (stored === "light" || stored === "dark" || stored === "system")) {
-        setThemeState(stored);
-      } else {
-        // Default to dark mode to maintain current aesthetic
+    let isCancelled = false;
+    Promise.resolve().then(() => {
+      if (isCancelled) return;
+      try {
+        const stored = localStorage.getItem("skillforge_theme") as Theme | null;
+        if (stored && (stored === "light" || stored === "dark" || stored === "system")) {
+          setThemeState(stored);
+        } else {
+          setThemeState("dark");
+        }
+
+        if (typeof window !== "undefined" && window.matchMedia) {
+          const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          setSystemTheme(isDark ? "dark" : "light");
+        }
+      } catch {
         setThemeState("dark");
       }
-    } catch {
-      setThemeState("dark");
-    }
-    setMounted(true);
+      setMounted(true);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
+
+  // Compute resolvedTheme purely from current theme state and system preference
+  const resolvedTheme: "light" | "dark" = theme === "system" ? systemTheme : theme;
 
   // Sync class and data-theme attribute on <html> element
   useEffect(() => {
     if (!mounted) return;
 
     const root = document.documentElement;
-    let effectiveTheme: "light" | "dark" = "dark";
-
-    if (theme === "system") {
-      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      effectiveTheme = systemDark ? "dark" : "light";
-    } else {
-      effectiveTheme = theme;
-    }
-
-    setResolvedTheme(effectiveTheme);
+    const effectiveTheme = resolvedTheme;
 
     if (effectiveTheme === "dark") {
       root.classList.add("dark");
@@ -65,25 +71,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
 
     // Listen to system changes if theme is "system"
-    if (theme === "system") {
+    if (theme === "system" && typeof window !== "undefined" && window.matchMedia) {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const handleChange = (e: MediaQueryListEvent) => {
-        const nextTheme = e.matches ? "dark" : "light";
-        setResolvedTheme(nextTheme);
-        if (nextTheme === "dark") {
-          root.classList.add("dark");
-          root.classList.remove("light");
-          root.setAttribute("data-theme", "dark");
-        } else {
-          root.classList.remove("dark");
-          root.classList.add("light");
-          root.setAttribute("data-theme", "light");
-        }
+        setSystemTheme(e.matches ? "dark" : "light");
       };
       mediaQuery.addEventListener("change", handleChange);
       return () => mediaQuery.removeEventListener("change", handleChange);
     }
-  }, [theme, mounted]);
+  }, [theme, resolvedTheme, mounted]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -93,7 +89,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setThemeState((prev) => {
       const currentResolved =
         prev === "system"
-          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
             ? "dark"
             : "light"
           : prev;

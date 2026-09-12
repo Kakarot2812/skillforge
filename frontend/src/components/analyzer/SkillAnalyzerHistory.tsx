@@ -314,7 +314,15 @@ export const SkillAnalyzerHistory: React.FC<SkillAnalyzerHistoryProps> = ({
 
   // Initial load
   useEffect(() => {
-    loadHistory();
+    let isCancelled = false;
+    Promise.resolve().then(() => {
+      if (!isCancelled) {
+        loadHistory();
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
   }, [loadHistory]);
 
   // Listen for real-time analysis updates or identity shifts

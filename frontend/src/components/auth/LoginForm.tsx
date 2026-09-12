@@ -53,12 +53,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   // Initialize remembered email on client mount
   useEffect(() => {
-    const remembered = getRememberedEmail();
-    const rememberActive = isRememberMeActive();
-    if (remembered) {
-      setEmail(remembered);
-      setRememberMe(rememberActive);
-    }
+    let isCancelled = false;
+    Promise.resolve().then(() => {
+      if (isCancelled) return;
+      const remembered = getRememberedEmail();
+      const rememberActive = isRememberMeActive();
+      if (remembered) {
+        setEmail(remembered);
+        setRememberMe(rememberActive);
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   // Handle password input changes & propagate to parent for mascot eyes

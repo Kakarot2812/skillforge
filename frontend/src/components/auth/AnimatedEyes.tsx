@@ -81,36 +81,40 @@ export const CharacterEyes: React.FC<EyeProps> = ({
 
   // Calculate pupil tracking
   useEffect(() => {
-    if (isClosed) {
-      setLeftOffset({ x: 0, y: 0 });
-      setRightOffset({ x: 0, y: 0 });
-      return;
-    }
+    const handle = requestAnimationFrame(() => {
+      if (isClosed) {
+        setLeftOffset({ x: 0, y: 0 });
+        setRightOffset({ x: 0, y: 0 });
+        return;
+      }
 
-    const calc = (el: HTMLDivElement | null) => {
-      if (!el) return { x: 0, y: 0 };
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
+      const calc = (el: HTMLDivElement | null) => {
+        if (!el) return { x: 0, y: 0 };
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
 
-      const dx = cursorX - cx;
-      const dy = cursorY - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 1) return { x: 0, y: 0 };
+        const dx = cursorX - cx;
+        const dy = cursorY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1) return { x: 0, y: 0 };
 
-      const maxDist = 450;
-      const norm = Math.min(dist / maxDist, 1);
-      const pupilDist = norm * dim.maxRadius;
-      const angle = Math.atan2(dy, dx);
+        const maxDist = 450;
+        const norm = Math.min(dist / maxDist, 1);
+        const pupilDist = norm * dim.maxRadius;
+        const angle = Math.atan2(dy, dx);
 
-      return {
-        x: Math.cos(angle) * pupilDist,
-        y: Math.sin(angle) * pupilDist,
+        return {
+          x: Math.cos(angle) * pupilDist,
+          y: Math.sin(angle) * pupilDist,
+        };
       };
-    };
 
-    setLeftOffset(calc(leftEyeRef.current));
-    setRightOffset(calc(rightEyeRef.current));
+      setLeftOffset(calc(leftEyeRef.current));
+      setRightOffset(calc(rightEyeRef.current));
+    });
+
+    return () => cancelAnimationFrame(handle);
   }, [cursorX, cursorY, isClosed, dim.maxRadius]);
 
   const shouldClose = isClosed || isBlinking;

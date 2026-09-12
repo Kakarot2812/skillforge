@@ -85,7 +85,15 @@ export const IndustrySkillsDemand: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadAllIndustriesData();
+    let isCancelled = false;
+    Promise.resolve().then(() => {
+      if (!isCancelled) {
+        loadAllIndustriesData();
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
   }, [loadAllIndustriesData]);
 
   // Keyboard escape listener to close modal

@@ -20,10 +20,15 @@ export const LoginPage: React.FC = () => {
 
   // Track global mouse movement smoothly
   useEffect(() => {
+    let isCancelled = false;
     if (typeof window !== "undefined") {
-      setCursorPos({
-        x: window.innerWidth / 3,
-        y: window.innerHeight / 2,
+      Promise.resolve().then(() => {
+        if (!isCancelled) {
+          setCursorPos({
+            x: window.innerWidth / 3,
+            y: window.innerHeight / 2,
+          });
+        }
       });
     }
 
@@ -40,6 +45,7 @@ export const LoginPage: React.FC = () => {
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
 
     return () => {
+      isCancelled = true;
       window.removeEventListener("mousemove", handleMouseMove);
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current);

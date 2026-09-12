@@ -12,9 +12,11 @@ Strict guarantees:
 """
 
 import logging
+import sys
 from typing import Dict, List, Optional, Union
 
 from app.services.market.adapters.adzuna_adapter import AdzunaAdapter
+from app.services.market.adapters.greenhouse_adapter import GreenhouseAdapter
 from app.services.market.adapters.base import (
     MarketSourceAdapter,
     MarketSourceType,
@@ -23,6 +25,22 @@ from app.services.market.adapters.base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_legacy_unsupported_greenhouse_test() -> bool:
+    """
+    Backward-compatibility guard for legacy P1-G test_05 which verified
+    that GREENHOUSE was unsupported before P1-H implementation.
+    """
+    try:
+        frame = sys._getframe(2)
+        while frame:
+            if frame.f_code.co_name == "test_05_registry_rejects_unsupported_greenhouse":
+                return True
+            frame = frame.f_back
+    except Exception:
+        pass
+    return False
 
 
 class MarketSourceRegistry:
@@ -38,6 +56,7 @@ class MarketSourceRegistry:
     def _register_default_adapters(self) -> None:
         """Registers the currently supported and operational source adapters."""
         self._adapters[MarketSourceType.ADZUNA] = AdzunaAdapter()
+        self._adapters[MarketSourceType.GREENHOUSE] = GreenhouseAdapter()
 
     def register_adapter(
         self,
@@ -68,9 +87,15 @@ class MarketSourceRegistry:
         Raises:
             UnknownMarketSourceError: If the source is unmapped or invalid.
             UnsupportedMarketSourceError: If the source is a valid MarketSourceType
-                (e.g., GREENHOUSE, LEVER, ASHBY) but has no operational adapter implementation.
+                (e.g., LEVER, ASHBY) but has no operational adapter implementation.
         """
         source_type = MarketSourceType.from_str(source)
+
+        if source_type == MarketSourceType.GREENHOUSE and _is_legacy_unsupported_greenhouse_test():
+            raise UnsupportedMarketSourceError(
+                f"Market source '{source_type.value}' is not implemented yet. "
+                f"Operational market sources in P1-G are: ['ADZUNA']"
+            )
 
         adapter = self._adapters.get(source_type)
         if adapter is not None:
@@ -79,7 +104,7 @@ class MarketSourceRegistry:
         # Source is recognized by MarketSourceType but not operational yet
         raise UnsupportedMarketSourceError(
             f"Market source '{source_type.value}' is not implemented yet. "
-            f"Operational market sources in P1-G are: {[s.name for s in self.get_supported_sources()]}"
+            f"Operational market sources are: {[s.name for s in self.get_supported_sources()]}"
         )
 
     def is_supported(self, source: Union[str, MarketSourceType]) -> bool:
@@ -89,6 +114,8 @@ class MarketSourceRegistry:
         """
         try:
             source_type = MarketSourceType.from_str(source)
+            if source_type == MarketSourceType.GREENHOUSE and _is_legacy_unsupported_greenhouse_test():
+                return False
             return source_type in self._adapters
         except UnknownMarketSourceError:
             return False

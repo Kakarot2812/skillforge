@@ -4,6 +4,14 @@ Post-MVP Phase 1, Checkpoint P1-G.
 """
 
 from app.services.market.adapters.adzuna_adapter import AdzunaAdapter
+from app.services.market.adapters.greenhouse_adapter import (
+    GreenhouseAPIError,
+    GreenhouseAdapter,
+    GreenhouseConnectionError,
+    GreenhouseError,
+    GreenhouseResponseError,
+    clean_greenhouse_html,
+)
 from app.services.market.adapters.base import (
     MarketSourceAdapter,
     MarketSourceConfigurationError,
@@ -24,6 +32,8 @@ __all__ = [
     "MarketSourceAdapter",
     # Adapters
     "AdzunaAdapter",
+    "GreenhouseAdapter",
+    "clean_greenhouse_html",
     # Registry
     "MarketSourceRegistry",
     "market_source_registry",
@@ -33,4 +43,8 @@ __all__ = [
     "UnknownMarketSourceError",
     "UnsupportedMarketSourceError",
     "MarketSourceConfigurationError",
+    "GreenhouseError",
+    "GreenhouseConnectionError",
+    "GreenhouseAPIError",
+    "GreenhouseResponseError",
 ]

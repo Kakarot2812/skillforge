@@ -106,6 +106,7 @@ export interface CareerChatRequest {
   user_query: string;
   max_tokens?: number;
   temperature?: number;
+  conversation_id?: string | null;
 }
 
 export interface CareerChatResponse {
@@ -115,4 +116,22 @@ export interface CareerChatResponse {
   referenced_skill_ids: string[];
   retrieved_evidence: unknown[];
   usage?: ChatUsageStats | null;
+  conversation_id?: string | null;
+  message_id?: string | null;
+}
+
+export interface ConversationItem {
+  id: string;
+  user_id: string;
+  title?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationMessageItem {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
 }

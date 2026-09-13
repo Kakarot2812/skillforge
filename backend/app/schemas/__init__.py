@@ -6,6 +6,11 @@ from app.schemas.user_profile import (
     UserProfileUpdate,
     UserProfileResponse,
 )
+from app.schemas.conversation import (
+    ConversationCreate,
+    ConversationResponse,
+    MessageResponse,
+)
 from app.schemas.skill import (
     SkillBase,
     SkillCreate,
@@ -152,5 +157,8 @@ __all__ = [
     "UserProfileCreate",
     "UserProfileUpdate",
     "UserProfileResponse",
+    "ConversationCreate",
+    "ConversationResponse",
+    "MessageResponse",
 ]
 

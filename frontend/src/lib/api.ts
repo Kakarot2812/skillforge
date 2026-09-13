@@ -1722,6 +1722,8 @@ import {
 import {
   CareerChatRequest,
   CareerChatResponse,
+  ConversationItem,
+  ConversationMessageItem,
 } from "./types/chat";
 
 
@@ -2049,12 +2051,12 @@ export async function batchVerifyRoadmap(
 }
 
 // -----------------------------------------------------------------------------
-// Post-MVP Phase 2: Evidence-Grounded Career Chatbot API Method
+// Post-MVP Phase 2 & Checkpoint 6: Career Chatbot & Persistent History APIs
 // -----------------------------------------------------------------------------
 
 /**
  * Execute evidence-grounded career chatbot reasoning from POST /api/v1/ai/chat.
- * Consumes pre-constructed VerifiedContext. Never sends credentials or chat history.
+ * Consumes pre-constructed VerifiedContext. Sends X-User-Id when authenticated or persistent.
  */
 export async function sendCareerChat(
   request: CareerChatRequest
@@ -2064,9 +2066,95 @@ export async function sendCareerChat(
   error?: string;
   status?: number;
 }> {
+  const shouldAuth = Boolean(request.conversation_id || getCandidateUserId());
   return postMvpFetch<CareerChatResponse>("/api/v1/ai/chat", {
     method: "POST",
     body: request,
-    includeAuth: false,
+    includeAuth: shouldAuth,
+  });
+}
+
+/**
+ * Retrieves all conversations belonging to the authenticated candidate.
+ * Ordered deterministically by updated_at DESC.
+ */
+export async function fetchConversations(
+  limit?: number,
+  offset: number = 0
+): Promise<{
+  success: boolean;
+  data?: ConversationItem[];
+  error?: string;
+  status?: number;
+}> {
+  const queryParams = new URLSearchParams();
+  if (limit) queryParams.set("limit", String(limit));
+  if (offset) queryParams.set("offset", String(offset));
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  return postMvpFetch<ConversationItem[]>(`/api/v1/conversations${qs}`, {
+    method: "GET",
+    includeAuth: true,
+  });
+}
+
+/**
+ * Creates a new conversation session for the authenticated candidate.
+ */
+export async function createConversation(
+  title?: string
+): Promise<{
+  success: boolean;
+  data?: ConversationItem;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<ConversationItem>("/api/v1/conversations", {
+    method: "POST",
+    body: title ? { title } : {},
+    includeAuth: true,
+  });
+}
+
+/**
+ * Retrieves chronological message history for an owned conversation.
+ */
+export async function fetchConversationMessages(
+  conversationId: string,
+  limit?: number,
+  offset: number = 0
+): Promise<{
+  success: boolean;
+  data?: ConversationMessageItem[];
+  error?: string;
+  status?: number;
+}> {
+  const queryParams = new URLSearchParams();
+  if (limit) queryParams.set("limit", String(limit));
+  if (offset) queryParams.set("offset", String(offset));
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  return postMvpFetch<ConversationMessageItem[]>(
+    `/api/v1/conversations/${conversationId}/messages${qs}`,
+    {
+      method: "GET",
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Deletes an owned conversation and all associated messages.
+ */
+export async function deleteConversation(
+  conversationId: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<void>(`/api/v1/conversations/${conversationId}`, {
+    method: "DELETE",
+    includeAuth: true,
   });
 }

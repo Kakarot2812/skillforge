@@ -536,7 +536,7 @@ def test_16_orchestrator_execution_gate_skips_when_snapshot_recent() -> None:
     }
     orchestrator, mock_db, mocks = _build_test_orchestrator(adapters)
 
-    now = datetime(2026, 9, 12, 12, 0, 0, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     recent_snapshot = now - timedelta(hours=4)
     mock_db.query.return_value.order_by.return_value.first.return_value = (recent_snapshot,)
 

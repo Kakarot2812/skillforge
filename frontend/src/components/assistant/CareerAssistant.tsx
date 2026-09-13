@@ -32,7 +32,8 @@ import {
   PriorityTier,
   GrowthClass,
 } from "@/lib/types/chat";
-import { getCandidateUserId, isValidUUID } from "@/lib/identity";
+import { isValidUUID } from "@/lib/identity";
+import { useCandidate } from "@/context/CandidateContext";
 import CareerAssistantMessage, { ChatMessageItem } from "./CareerAssistantMessage";
 import CareerAssistantSuggestions from "./CareerAssistantSuggestions";
 
@@ -56,6 +57,8 @@ export default function CareerAssistant({
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { userProfile } = useCandidate();
 
   // Deterministic context data from backend APIs
   const [roles, setRoles] = useState<JobRole[]>([]);
@@ -97,7 +100,7 @@ export default function CareerAssistant({
     }
 
     setContextLoading(true);
-    const effectiveUserId = getCandidateUserId() || undefined;
+    const effectiveUserId = userProfile?.id || undefined;
 
     try {
       const [gapsRes, prioRes, demandRes] = await Promise.allSettled([
@@ -181,7 +184,7 @@ export default function CareerAssistant({
 
   // Construct VerifiedContext conforming strictly to backend contract
   const buildVerifiedContext = useCallback((): VerifiedContext => {
-    const userId = getCandidateUserId();
+    const userId = userProfile?.id;
     const candidate: VerifiedCandidateContext = {
       candidate_id: userId && isValidUUID(userId) ? userId : null,
       target_role_id: selectedRoleId && isValidUUID(selectedRoleId) ? selectedRoleId : null,

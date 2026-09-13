@@ -1,9 +1,4 @@
-import {
-  getCandidateUserId,
-  ensureCandidateIdentity,
-  clearCandidateUserId,
-  isValidUUID,
-} from "./identity";
+import { clearCandidateUserId } from "./identity";
 
 export interface HealthResponse {
   status: "ok" | "error";
@@ -22,19 +17,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /**
  * Resolves candidate identity headers for client requests.
- * Uses the stable candidate user ID from identity.ts.
+ * Post-MVP Login Phase 5: Authentication is handled automatically via HttpOnly session cookies (skillforge_session).
+ * No X-User-Id header is transmitted by authenticated frontend requests.
  */
-async function resolveCandidateHeaders(userId?: string): Promise<Record<string, string>> {
-  let effectiveUserId: string | null | undefined = userId || getCandidateUserId();
-  if (!effectiveUserId && typeof window !== "undefined") {
-    effectiveUserId = (await ensureCandidateIdentity()) || undefined;
-  }
-  const headers: Record<string, string> = {};
-  if (effectiveUserId && isValidUUID(effectiveUserId)) {
-    headers["X-User-Id"] = effectiveUserId;
-  }
-  return headers;
+async function resolveCandidateHeaders(_userId?: string): Promise<Record<string, string>> {
+  return {};
 }
+
 
 /**
  * Check backend application health via GET /health.
@@ -205,7 +194,7 @@ export interface ResumeUploadResult {
 
 /**
  * Upload a candidate resume file (PDF or DOCX) to the backend.
- * Automatically attaches candidate identity via X-User-Id header.
+ * Automatically attaches session credentials via HttpOnly cookie.
  */
 export async function uploadResume(
   file: File,
@@ -223,6 +212,7 @@ export async function uploadResume(
     const res = await fetch(`${API_BASE_URL}/api/v1/resumes/upload`, {
       method: "POST",
       headers,
+      credentials: "include",
       body: formData,
     });
 
@@ -265,7 +255,7 @@ export async function fetchClaimedSkills(
       ? `${API_BASE_URL}/api/v1/skills/claimed?resume_id=${encodeURIComponent(resumeId)}`
       : `${API_BASE_URL}/api/v1/skills/claimed`;
     const headers = await resolveCandidateHeaders(userId);
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, credentials: "include" });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
     }
@@ -294,7 +284,7 @@ export async function fetchResumes(
   try {
     const url = `${API_BASE_URL}/api/v1/resumes?limit=${limit}&offset=${offset}`;
     const headers = await resolveCandidateHeaders(userId);
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, credentials: "include" });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
     }
@@ -324,7 +314,7 @@ export async function fetchResumeDetail(
   try {
     const url = `${API_BASE_URL}/api/v1/resumes/${encodeURIComponent(resumeId)}`;
     const headers = await resolveCandidateHeaders(userId);
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, credentials: "include" });
     if (!res.ok) {
       let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
       try {
@@ -363,7 +353,7 @@ export async function deleteResume(
   try {
     const url = `${API_BASE_URL}/api/v1/resumes/${encodeURIComponent(resumeId)}`;
     const headers = await resolveCandidateHeaders(userId);
-    const res = await fetch(url, { method: "DELETE", headers });
+    const res = await fetch(url, { method: "DELETE", headers, credentials: "include" });
     if (res.status === 204 || res.ok) {
       return { success: true };
     }
@@ -372,6 +362,48 @@ export async function deleteResume(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to delete resume",
+    };
+  }
+}
+
+export interface ActiveResumeResult {
+  message: string;
+  active_resume_id: string;
+  filename: string;
+}
+
+/**
+ * Set active resume for the authenticated user via PUT /api/v1/resumes/{resume_id}/activate.
+ */
+export async function activateResume(
+  resumeId: string
+): Promise<{
+  success: boolean;
+  data?: ActiveResumeResult;
+  error?: string;
+  status?: number;
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/resumes/${encodeURIComponent(resumeId)}/activate`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      const errorMessage =
+        errJson?.error?.message || errJson?.detail || `HTTP ${res.status}: ${res.statusText}`;
+      return { success: false, error: errorMessage, status: res.status };
+    }
+
+    const data: ActiveResumeResult = await res.json();
+    return { success: true, data, status: res.status };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to activate resume",
+      status: 0,
     };
   }
 }
@@ -427,6 +459,7 @@ export async function connectGitHub(
     const res = await fetch(`${API_BASE_URL}/api/v1/github/connect`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...candidateHeaders },
+      credentials: "include",
       body: JSON.stringify({
         github_username: username,
         access_token: accessToken || undefined,
@@ -446,6 +479,38 @@ export async function connectGitHub(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Network error during GitHub connection",
+    };
+  }
+}
+
+/**
+ * Disconnects the connected GitHub account from the authenticated candidate via POST /api/v1/github/disconnect.
+ */
+export async function disconnectGitHubAccount(): Promise<{
+  success: boolean;
+  error?: string;
+  status?: number;
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/github/disconnect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      const errorMessage =
+        errJson?.error?.message || errJson?.detail || `HTTP ${res.status}: ${res.statusText}`;
+      return { success: false, error: errorMessage, status: res.status };
+    }
+
+    return { success: true, status: res.status };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to disconnect GitHub account",
+      status: 0,
     };
   }
 }
@@ -473,7 +538,7 @@ export async function fetchGitHubRepositories(
     const candidateHeaders = await resolveCandidateHeaders(userId);
     const res = await fetch(
       `${API_BASE_URL}/api/v1/github/repositories?${params.toString()}`,
-      { headers: candidateHeaders }
+      { headers: candidateHeaders, credentials: "include" }
     );
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
@@ -497,7 +562,9 @@ export async function fetchGitHubRepositoryDetail(repoId: string): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/github/repositories/${encodeURIComponent(repoId)}`);
+    const res = await fetch(`${API_BASE_URL}/api/v1/github/repositories/${encodeURIComponent(repoId)}`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
     }
@@ -578,6 +645,7 @@ export async function analyzeGitHubRepository(
         "Content-Type": "application/json",
         ...candidateHeaders,
       },
+      credentials: "include",
       body: JSON.stringify({ repository_id: repositoryId }),
     });
 
@@ -621,7 +689,9 @@ export async function fetchEvidence(
     if (skillId) params.append("skill_id", skillId);
     if (evidenceType) params.append("evidence_type", evidenceType);
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/evidence?${params.toString()}`);
+    const res = await fetch(`${API_BASE_URL}/api/v1/evidence?${params.toString()}`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
     }
@@ -644,7 +714,9 @@ export async function fetchEvidenceDetail(evidenceId: string): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/evidence/${encodeURIComponent(evidenceId)}`);
+    const res = await fetch(`${API_BASE_URL}/api/v1/evidence/${encodeURIComponent(evidenceId)}`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
     }
@@ -723,6 +795,7 @@ export async function fetchDemonstratedSkills(
 
     const res = await fetch(`${API_BASE_URL}/api/v1/skills/demonstrated?${params.toString()}`, {
       headers: candidateHeaders,
+      credentials: "include",
     });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
@@ -752,6 +825,7 @@ export async function fetchDemonstratedSkillDetail(
     const candidateHeaders = await resolveCandidateHeaders(userId);
     const res = await fetch(`${API_BASE_URL}/api/v1/skills/demonstrated/${encodeURIComponent(skillId)}`, {
       headers: candidateHeaders,
+      credentials: "include",
     });
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
@@ -1410,7 +1484,7 @@ export async function fetchSkillGaps(
     const headers = await resolveCandidateHeaders(userId);
     const res = await fetch(
       `${API_BASE_URL}/api/v1/gaps/${encodeURIComponent(roleId)}?${params.toString()}`,
-      { headers }
+      { headers, credentials: "include" }
     );
     if (!res.ok) {
       const errJson = await res.json().catch(() => null);
@@ -1447,6 +1521,7 @@ export async function analyzeSkillGaps(
     const res = await fetch(`${API_BASE_URL}/api/v1/gaps/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...candidateHeaders },
+      credentials: "include",
       body: JSON.stringify({
         target_role_id: targetRoleId,
         location,
@@ -1545,7 +1620,7 @@ export async function fetchPrioritizedGaps(
     const headers = await resolveCandidateHeaders(userId);
     const res = await fetch(
       `${API_BASE_URL}/api/v1/gaps/${encodeURIComponent(roleId)}/priorities?${params.toString()}`,
-      { headers }
+      { headers, credentials: "include" }
     );
     if (!res.ok) {
       const errJson = await res.json().catch(() => null);
@@ -1676,7 +1751,7 @@ export async function fetchSkillGapEvidence(
     const headers = await resolveCandidateHeaders(userId);
     const res = await fetch(
       `${API_BASE_URL}/api/v1/gaps/${encodeURIComponent(roleId)}/skills/${encodeURIComponent(skillId)}/evidence?${params.toString()}`,
-      { headers }
+      { headers, credentials: "include" }
     );
     if (!res.ok) {
       const errJson = await res.json().catch(() => null);
@@ -1704,7 +1779,7 @@ export * from "./types/verification";
 export * from "./types/chat";
 export * from "./identity";
 
-import {
+import type {
   CanonicalRoadmapData,
   RoadmapGenerateRequest,
   AIRoadmapExplainRequest,
@@ -1712,14 +1787,14 @@ import {
   ApprovedResourceListResponse,
 } from "./types/roadmap";
 
-import {
+import type {
   MilestoneVerifyRequest,
   MilestoneVerificationResponse,
   RoadmapBatchVerifyRequest,
   RoadmapBatchVerificationResponse,
 } from "./types/verification";
 
-import {
+import type {
   CareerChatRequest,
   CareerChatResponse,
 } from "./types/chat";
@@ -1736,7 +1811,7 @@ interface PostMvpRequestOptions {
 
 /**
  * Lightweight internal fetch wrapper for Post-MVP endpoints requiring candidate identity.
- * Automatically injects `X-User-Id` and optional `Authorization: Bearer <token>` header.
+ * Transmits session credentials via HttpOnly cookie and optional `Authorization: Bearer <token>` header.
  * Ensures tokens are NEVER sent via body, URL, or query parameters.
  */
 async function postMvpFetch<T>(
@@ -1764,17 +1839,6 @@ async function postMvpFetch<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  // Inject candidate identity context if authenticated execution is required
-  if (includeAuth) {
-    let effectiveUserId: string | null | undefined = userId || getCandidateUserId();
-    if (!effectiveUserId && typeof window !== "undefined") {
-      effectiveUserId = (await ensureCandidateIdentity()) || undefined;
-    }
-    if (effectiveUserId && isValidUUID(effectiveUserId)) {
-      headers["X-User-Id"] = effectiveUserId;
-    }
-  }
-
   // Personal Access Token: ONLY transmitted via Authorization Bearer header
   if (patToken && patToken.trim()) {
     headers["Authorization"] = `Bearer ${patToken.trim()}`;
@@ -1784,6 +1848,7 @@ async function postMvpFetch<T>(
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method,
       headers,
+      credentials: "include",
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
@@ -1859,7 +1924,7 @@ async function postMvpFetch<T>(
 
 /**
  * Generate canonical career roadmap from POST /api/v1/roadmap/generate.
- * In-memory if unauthenticated, persisted if X-User-Id is provided.
+ * In-memory if unauthenticated, persisted if session-authenticated.
  */
 export async function generateRoadmap(
   request: RoadmapGenerateRequest,

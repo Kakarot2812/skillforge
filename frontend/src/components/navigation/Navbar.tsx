@@ -123,8 +123,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
             <div className="flex items-center gap-1.5">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-300">
                 <UserIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="max-w-[100px] truncate font-medium text-xs">
-                  {userProfile.email.split("@")[0]}
+                <span className="max-w-[120px] truncate font-medium text-xs">
+                  {userProfile.full_name || userProfile.email.split("@")[0]}
                 </span>
               </div>
               <button

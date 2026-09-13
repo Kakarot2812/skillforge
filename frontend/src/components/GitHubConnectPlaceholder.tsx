@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import {
   connectGitHub,
+  disconnectGitHubAccount,
   fetchGitHubRepositories,
   analyzeGitHubRepository,
   fetchDemonstratedSkills,
@@ -32,6 +33,7 @@ import {
   DemonstratedSkillSummary,
   DemonstratedSkillDetailData,
 } from "@/lib/api";
+import { useCandidate } from "@/context/CandidateContext";
 
 function GitHubLogo({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -76,6 +78,8 @@ export default function GitHubConnectPlaceholder({
     onGitHubChangeRef.current = onGitHubChange;
   }, [onGitHubChange]);
 
+  const { connectedGitHubUser: contextGitHubUser, handleGitHubChange } = useCandidate();
+
   // Refresh demonstrated skills helper strictly scoped to active GitHub username
   const reloadDemonstratedSkills = async (activeUser?: string) => {
     const userToQuery = activeUser || connectResult?.github_username || username.trim();
@@ -97,76 +101,61 @@ export default function GitHubConnectPlaceholder({
     }
   };
 
-  // Load existing repos and demonstrated skills on mount strictly for stored connected user
+  // Sync initial state from CandidateContext (server-owned session)
   useEffect(() => {
-    async function loadInitial() {
-      const savedUser =
-        typeof window !== "undefined"
-          ? localStorage.getItem("skillforge_connected_github_user")
-          : null;
-
-      if (savedUser && savedUser.trim()) {
-        const cleanUser = savedUser.trim();
-        setUsername(cleanUser);
-        setIsConnecting(true);
-        try {
-          let repoList: GitHubRepositoryItem[] = [];
-          let totalCount = 0;
-
-          const [repoRes, demRes] = await Promise.all([
-            fetchGitHubRepositories(20, 0, cleanUser),
-            fetchDemonstratedSkills(undefined, undefined, undefined, 20, 0, cleanUser),
-          ]);
-
-          if (repoRes.success && repoRes.data) {
-            repoList = repoRes.data.data;
-            totalCount = repoRes.data.meta.total;
-          }
-
-          // If local DB has 0 discovered repositories for this user (e.g. DB reset or cache cleared),
-          // automatically perform GitHub connection/discovery to restore the repositories
-          if (repoList.length === 0) {
-            const connectRes = await connectGitHub(cleanUser);
-            if (connectRes.success && connectRes.data) {
-              if (connectRes.data.repositories && connectRes.data.repositories.length > 0) {
-                repoList = connectRes.data.repositories;
-                totalCount = connectRes.data.discovered_repositories;
-              } else {
-                const freshRepoRes = await fetchGitHubRepositories(20, 0, cleanUser);
-                if (freshRepoRes.success && freshRepoRes.data) {
-                  repoList = freshRepoRes.data.data;
-                  totalCount = freshRepoRes.data.meta.total;
-                }
-              }
-            }
-          }
-
-          setRepositories(repoList);
-          setConnectResult({
-            github_username: cleanUser,
-            connected: true,
-            discovered_repositories: totalCount,
-            connected_at: new Date().toISOString(),
-          });
-          onGitHubChangeRef.current?.(cleanUser);
-
-          if (demRes.success && demRes.data) {
-            setDemonstratedSkills(demRes.data.data);
-          } else {
-            await reloadDemonstratedSkills(cleanUser);
-          }
-        } finally {
-          setIsConnecting(false);
-        }
-      } else {
-        // Disconnected state: ensure no residual data
+    let isCancelled = false;
+    async function syncGitHub() {
+      if (!contextGitHubUser) {
+        setConnectResult(null);
+        setUsername("");
         setRepositories([]);
         setDemonstratedSkills([]);
-        onGitHubChangeRef.current?.(null);
+        return;
+      }
+
+      const cleanUser = contextGitHubUser.trim();
+      setUsername(cleanUser);
+      setIsConnecting(true);
+      try {
+        const [repoRes, demRes] = await Promise.all([
+          fetchGitHubRepositories(20, 0, cleanUser),
+          fetchDemonstratedSkills(undefined, undefined, undefined, 20, 0, cleanUser),
+        ]);
+        if (isCancelled) return;
+
+        let repoList: GitHubRepositoryItem[] = [];
+        let totalCount = 0;
+
+        if (repoRes.success && repoRes.data) {
+          repoList = repoRes.data.data;
+          totalCount = repoRes.data.meta.total;
+          setRepositories(repoList);
+        }
+
+        if (demRes.success && demRes.data) {
+          setDemonstratedSkills(demRes.data.data);
+        }
+
+        setConnectResult({
+          github_username: cleanUser,
+          connected: true,
+          discovered_repositories: totalCount,
+          connected_at: new Date().toISOString(),
+          repositories: repoList,
+        });
+      } catch {
+        // ignore
+      } finally {
+        if (!isCancelled) {
+          setIsConnecting(false);
+        }
       }
     }
-    loadInitial();
-  }, []);
+    syncGitHub();
+    return () => {
+      isCancelled = true;
+    };
+  }, [contextGitHubUser]);
 
   const handleSyncRepositories = async () => {
     const cleanUser = connectResult?.github_username || username.trim();
@@ -218,10 +207,8 @@ export default function GitHubConnectPlaceholder({
       const res = await connectGitHub(cleanUser, token.trim() || undefined);
       if (res.success && res.data) {
         setConnectResult(res.data);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("skillforge_connected_github_user", cleanUser);
-        }
         onGitHubChange?.(cleanUser);
+        handleGitHubChange(cleanUser);
         if (res.data.repositories && res.data.repositories.length > 0) {
           setRepositories(res.data.repositories);
         } else {
@@ -256,11 +243,7 @@ export default function GitHubConnectPlaceholder({
           ...prev,
           [repoId]: res.data!,
         }));
-        // Refresh demonstrated skills strictly scoped to current active user
         const activeUser = connectResult?.github_username || username.trim();
-        if (activeUser && typeof window !== "undefined") {
-          localStorage.setItem("skillforge_connected_github_user", activeUser);
-        }
         await reloadDemonstratedSkills(activeUser);
 
         // Notify dashboard and skill-gap explorer that fresh GitHub evidence was analyzed
@@ -291,14 +274,11 @@ export default function GitHubConnectPlaceholder({
     }
   };
 
-  const handleDisconnect = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("skillforge_connected_github_user");
-      window.dispatchEvent(
-        new CustomEvent("skillforge:github-evidence-updated", {
-          detail: { githubUsername: null },
-        })
-      );
+  const handleDisconnect = async () => {
+    try {
+      await disconnectGitHubAccount();
+    } catch {
+      // ignore
     }
     setConnectResult(null);
     setUsername("");
@@ -309,6 +289,14 @@ export default function GitHubConnectPlaceholder({
     setAnalysisResults({});
     setSelectedSkillDetail(null);
     onGitHubChange?.(null);
+    handleGitHubChange(null);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("skillforge:github-evidence-updated", {
+          detail: { githubUsername: null },
+        })
+      );
+    }
   };
 
   return (

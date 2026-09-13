@@ -7,7 +7,6 @@ import {
   JobRole,
   SkillGapResponse,
 } from "@/lib/api";
-import { getCandidateUserId, ensureCandidateIdentity } from "@/lib/identity";
 import {
   History,
   ArrowRight,
@@ -60,7 +59,8 @@ export function recordCandidateAnalysis(
 ) {
   if (typeof window === "undefined" || !roleId) return;
   try {
-    const userId = localStorage.getItem("skillforge_candidate_user_id") || "guest";
+    const profile = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("skillforge_user_profile") || "null") : null;
+    const userId = profile?.id || "guest";
     const key = `skillforge_analysis_history_${userId}`;
     const raw = localStorage.getItem(key);
     let history: Array<{
@@ -146,18 +146,10 @@ export const SkillAnalyzerHistory: React.FC<SkillAnalyzerHistoryProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // Determine effective candidate credentials
-  const effectiveResumeId =
-    resumeId ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("skillforge_active_resume_id")
-      : null);
+  const effectiveResumeId = resumeId || null;
   const effectiveHasResume = hasResume ?? Boolean(effectiveResumeId);
 
-  const effectiveConnectedGitHub =
-    connectedGitHubUsername ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("skillforge_connected_github_user")
-      : null);
+  const effectiveConnectedGitHub = connectedGitHubUsername || null;
   const effectiveHasGitHub = hasGitHub ?? Boolean(effectiveConnectedGitHub);
 
   const loadHistory = useCallback(async () => {
@@ -165,8 +157,8 @@ export const SkillAnalyzerHistory: React.FC<SkillAnalyzerHistoryProps> = ({
     setError(null);
 
     try {
-      const candidateId = await ensureCandidateIdentity();
-      const userIdKey = candidateId || "guest";
+      const profile = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("skillforge_user_profile") || "null") : null;
+      const userIdKey = profile?.id || "guest";
       const storageKey = `skillforge_analysis_history_${userIdKey}`;
 
       let storedEntries: Array<{
@@ -219,7 +211,7 @@ export const SkillAnalyzerHistory: React.FC<SkillAnalyzerHistoryProps> = ({
           const res = await fetchSkillGaps(
             entry.roleId,
             entry.location || "India",
-            candidateId || undefined,
+            undefined,
             incResume,
             incGitHub,
             ghUser,

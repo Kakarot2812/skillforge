@@ -12,7 +12,8 @@ import {
   HelpCircle,
 } from "lucide-react";
 import {
-  authenticateCandidate,
+  loginCandidate,
+  signupCandidate,
   getRememberedEmail,
   isRememberMeActive,
 } from "@/lib/auth";
@@ -99,20 +100,32 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       return;
     }
 
-    if (!password || password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.");
+    const minPassLength = mode === "signup" ? 8 : 6;
+    if (!password || password.length < minPassLength) {
+      setErrorMessage(
+        mode === "signup"
+          ? "Password must be at least 8 characters."
+          : "Password must be at least 6 characters."
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const res = await authenticateCandidate({
-        email,
-        fullName: mode === "signup" ? fullName : undefined,
-        targetRole: mode === "signup" ? targetRole : undefined,
-        rememberMe,
-      });
+      const res =
+        mode === "signup"
+          ? await signupCandidate({
+              email,
+              password,
+              fullName: fullName?.trim() || undefined,
+              targetRole: targetRole || undefined,
+            })
+          : await loginCandidate({
+              email,
+              password,
+              rememberMe,
+            });
 
       if (res.success && res.user) {
         setSuccessMessage(

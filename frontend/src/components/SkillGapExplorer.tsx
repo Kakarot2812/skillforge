@@ -61,27 +61,12 @@ export default function SkillGapExplorer({
   resumeFileName,
   resumeId,
 }: SkillGapExplorerProps = {}) {
-  // Determine effective candidate profile readiness (supporting direct props or localStorage fallback)
-  const effectiveResumeId =
-    resumeId ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("skillforge_active_resume_id")
-      : null);
-
-  const effectiveHasResume =
-    hasResume ?? Boolean(effectiveResumeId);
-
-  const effectiveConnectedGitHub =
-    connectedGitHubUsername ??
-    (typeof window !== "undefined"
-      ? localStorage.getItem("skillforge_connected_github_user")
-      : null);
-
-  const effectiveHasGitHub =
-    hasGitHub ?? Boolean(effectiveConnectedGitHub);
-
-  const isCandidateReady =
-    candidateReady ?? Boolean(effectiveHasResume || effectiveHasGitHub);
+  // Determine effective candidate profile readiness from server-backed CandidateContext props
+  const effectiveResumeId = resumeId || null;
+  const effectiveHasResume = hasResume ?? Boolean(effectiveResumeId);
+  const effectiveConnectedGitHub = connectedGitHubUsername || null;
+  const effectiveHasGitHub = hasGitHub ?? Boolean(effectiveConnectedGitHub);
+  const isCandidateReady = candidateReady ?? Boolean(effectiveHasResume || effectiveHasGitHub);
 
   const [roles, setRoles] = useState<JobRole[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>(controlledRoleId || "");
@@ -156,8 +141,8 @@ export default function SkillGapExplorer({
 
     const activeGh = overrideGhUser !== undefined
       ? overrideGhUser
-      : (effectiveConnectedGitHub || (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null));
-    const activeResume = effectiveResumeId || (typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null);
+      : effectiveConnectedGitHub;
+    const activeResume = effectiveResumeId;
 
     const effectiveReady = ready || Boolean(activeResume || activeGh);
 
@@ -264,8 +249,8 @@ export default function SkillGapExplorer({
 
     const activeGh = overrideGhUser !== undefined
       ? overrideGhUser
-      : (effectiveConnectedGitHub || (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null));
-    const activeResume = effectiveResumeId || (typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null);
+      : effectiveConnectedGitHub;
+    const activeResume = effectiveResumeId;
 
     const incResume = Boolean(effectiveHasResume || activeResume);
     const incGitHub = Boolean(effectiveHasGitHub || activeGh);
@@ -296,8 +281,8 @@ export default function SkillGapExplorer({
       const customEv = event as CustomEvent<{ repoId?: string; githubUsername?: string | null }>;
       const ghUser = customEv.detail?.githubUsername !== undefined
         ? customEv.detail.githubUsername
-        : (typeof window !== "undefined" ? localStorage.getItem("skillforge_connected_github_user") : null);
-      const activeResume = typeof window !== "undefined" ? localStorage.getItem("skillforge_active_resume_id") : null;
+        : effectiveConnectedGitHub;
+      const activeResume = effectiveResumeId;
       const ready = Boolean(activeResume || ghUser);
 
       if (selectedRoleId) {

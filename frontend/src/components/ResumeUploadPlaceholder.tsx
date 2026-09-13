@@ -16,10 +16,10 @@ import {
   uploadResume,
   deleteResume,
   fetchResumeDetail,
-  ensureCandidateIdentity,
-  getCandidateUserId,
+  activateResume,
   ResumeUploadResult,
 } from "@/lib/api";
+import { useCandidate } from "@/context/CandidateContext";
 
 const MAX_SIZE_MB = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
@@ -43,6 +43,8 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
   const [uploadResult, setUploadResult] = useState<ResumeUploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { resumeId: contextResumeId, handleResumeChange } = useCandidate();
+
   const onResumeChangeRef = useRef(onResumeChange);
   useEffect(() => {
     onResumeChangeRef.current = onResumeChange;
@@ -62,36 +64,27 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
     };
   }, []);
 
-  // Sync initial state from localStorage on client mount, verifying backend ownership
-  React.useEffect(() => {
-    async function verifyResumeState() {
-      if (typeof window === "undefined") return;
-      const activeId = localStorage.getItem("skillforge_active_resume_id");
-      const activeName = localStorage.getItem("skillforge_active_resume_filename");
-      if (!activeId) {
+  // Sync state with server-provided active resume from CandidateContext
+  useEffect(() => {
+    let isCancelled = false;
+    async function syncResume() {
+      if (!contextResumeId) {
+        setUploadResult(null);
         onResumeChangeRef.current?.(false);
         return;
       }
-      try {
-        const candidateId = (await ensureCandidateIdentity()) || getCandidateUserId();
-        const res = await fetchResumeDetail(activeId, candidateId || undefined);
 
-        // If not found (404), access denied (403), or resume.user_id does not match active candidate identity:
-        if (
-          !res.success ||
-          !res.data ||
-          res.status === 403 ||
-          res.status === 404 ||
-          (candidateId && res.data.user_id !== candidateId)
-        ) {
-          localStorage.removeItem("skillforge_active_resume_id");
-          localStorage.removeItem("skillforge_active_resume_filename");
+      try {
+        const res = await fetchResumeDetail(contextResumeId);
+        if (isCancelled) return;
+
+        if (!res.success || !res.data || res.status === 403 || res.status === 404) {
           setUploadResult(null);
           onResumeChangeRef.current?.(false);
           return;
         }
 
-        onResumeChangeRef.current?.(true, res.data.filename || activeName || "Resume", res.data.resume_id);
+        onResumeChangeRef.current?.(true, res.data.filename, res.data.resume_id);
         setUploadResult({
           resume_id: res.data.resume_id,
           user_id: res.data.user_id,
@@ -105,14 +98,17 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
           claimed_skills: res.data.claimed_skills || [],
         });
       } catch {
-        localStorage.removeItem("skillforge_active_resume_id");
-        localStorage.removeItem("skillforge_active_resume_filename");
-        setUploadResult(null);
-        onResumeChangeRef.current?.(false);
+        if (!isCancelled) {
+          setUploadResult(null);
+          onResumeChangeRef.current?.(false);
+        }
       }
     }
-    verifyResumeState();
-  }, []);
+    syncResume();
+    return () => {
+      isCancelled = true;
+    };
+  }, [contextResumeId]);
 
   const handleFileSelection = (file: File) => {
     setErrorMessage(null);
@@ -173,18 +169,15 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
     setIsUploading(true);
     setErrorMessage(null);
 
-    const candidateId = (await ensureCandidateIdentity()) || getCandidateUserId();
-    const result = await uploadResume(selectedFile, candidateId || undefined);
+    const result = await uploadResume(selectedFile);
     setIsUploading(false);
 
     if (result.success && result.data) {
       setUploadResult(result.data);
       setSelectedFile(null);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("skillforge_active_resume_id", result.data.resume_id);
-        localStorage.setItem("skillforge_active_resume_filename", result.data.filename);
-      }
+      await activateResume(result.data.resume_id);
       onResumeChange?.(true, result.data.filename, result.data.resume_id);
+      handleResumeChange(true, result.data.filename, result.data.resume_id);
     } else {
       setErrorMessage(result.error || "Upload failed. Please try again.");
     }
@@ -194,11 +187,8 @@ export default function ResumeUploadPlaceholder({ onResumeChange }: ResumeUpload
     setSelectedFile(null);
     setUploadResult(null);
     setErrorMessage(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("skillforge_active_resume_id");
-      localStorage.removeItem("skillforge_active_resume_filename");
-    }
     onResumeChange?.(false);
+    handleResumeChange(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }

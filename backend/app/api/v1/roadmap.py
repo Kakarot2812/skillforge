@@ -27,8 +27,10 @@ from app.ai.qwen.exceptions import (
 )
 from app.ai.roadmap import AIRoadmapExplanationService
 from app.api.v1.gaps import resolve_user_id
+from app.core.dependencies import get_current_active_user, get_optional_current_user
 from app.db.database import get_db
 from app.db.models import (
+    User,
     CandidateRoadmap,
     GitHubRepository,
     MilestoneVerification,
@@ -174,11 +176,11 @@ def map_failed_status_code(error_msg: str) -> int:
 )
 def generate_roadmap(
     payload: RoadmapGenerateRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> RoadmapResponse:
     """Generates a deterministic career roadmap for the candidate and target role."""
-    effective_user_id = resolve_user_id(payload.user_id, x_user_id)
+    effective_user_id = current_user.id if current_user else None
 
     try:
         roadmap_data = roadmap_service.generate_candidate_roadmap(
@@ -218,17 +220,11 @@ def generate_roadmap(
 )
 def get_active_roadmap(
     role_id: UUID = Query(..., description="Target job role UUID"),
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> RoadmapResponse:
     """Retrieves active persisted roadmap for target role."""
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to query persisted active roadmaps.",
-        )
+    effective_user_id = current_user.id
 
     roadmap_data = roadmap_service.get_active_roadmap(
         db=db,
@@ -247,17 +243,11 @@ def get_active_roadmap(
 )
 def get_roadmap_by_id(
     roadmap_id: UUID,
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> RoadmapResponse:
     """Retrieves persisted roadmap by ID with candidate ownership verification."""
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to query persisted roadmaps by ID.",
-        )
+    effective_user_id = current_user.id
 
     roadmap_data = roadmap_service.get_roadmap_by_id(
         db=db,
@@ -280,17 +270,11 @@ def get_roadmap_by_id(
 def explain_roadmap(
     roadmap_id: UUID,
     payload: AIRoadmapExplainRequest = AIRoadmapExplainRequest(),
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> AIRoadmapExplainResponse:
     """Explains a canonical roadmap using local Qwen 3 8B."""
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to access roadmap AI coaching.",
-        )
+    effective_user_id = current_user.id
 
     roadmap_data = roadmap_service.get_roadmap_by_id(
         db=db,
@@ -369,9 +353,9 @@ def verify_milestone(
     request: Request,
     payload: Optional[MilestoneVerifyRequest] = None,
     authorization: Optional[str] = Header(None, alias="Authorization", description="Bearer GitHub personal access token"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
     x_github_username: Optional[str] = Header(None, alias="X-GitHub-Username", description="Connected GitHub account handle"),
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
+    user_id: Optional[UUID] = Query(None, description="Optional user ID for cross-user mismatch validation"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> MilestoneVerificationResponse:
     """
@@ -382,11 +366,11 @@ def verify_milestone(
     validate_no_forbidden_query_params(request)
 
     # 2. Authenticate user context
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id or not x_user_id:
+    effective_user_id = current_user.id
+    if user_id is not None and user_id != effective_user_id:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required for milestone verification.",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: user_id parameter cannot be used to impersonate another user.",
         )
 
     # 3. Extract volatile PAT from Authorization header
@@ -420,6 +404,7 @@ def verify_milestone(
 
     connected_username = (
         (x_github_username.strip() if x_github_username and x_github_username.strip() else None)
+        or current_user.connected_github_username
         or (roadmap.summary_metadata or {}).get("github_username")
     )
 
@@ -519,8 +504,7 @@ def get_latest_milestone_verification(
     roadmap_id: UUID,
     milestone_id: UUID,
     request: Request,
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> MilestoneVerificationResponse:
     """
@@ -531,12 +515,7 @@ def get_latest_milestone_verification(
     validate_no_forbidden_query_params(request)
 
     # 2. Authenticate user context
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id or not x_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to query milestone verification.",
-        )
+    effective_user_id = current_user.id
 
     # 3. Authorize roadmap ownership
     roadmap = db.query(CandidateRoadmap).filter(CandidateRoadmap.id == roadmap_id).first()
@@ -613,9 +592,8 @@ def batch_verify_roadmap(
     request: Request,
     payload: Optional[RoadmapBatchVerifyRequest] = None,
     authorization: Optional[str] = Header(None, alias="Authorization", description="Bearer GitHub personal access token"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated user context"),
     x_github_username: Optional[str] = Header(None, alias="X-GitHub-Username", description="Connected GitHub account handle"),
-    user_id: Optional[UUID] = Query(None, description="Candidate user UUID"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> RoadmapBatchVerificationResponse:
     """
@@ -626,12 +604,7 @@ def batch_verify_roadmap(
     validate_no_forbidden_query_params(request)
 
     # 2. Authenticate user context
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if not effective_user_id or not x_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required for batch roadmap verification.",
-        )
+    effective_user_id = current_user.id
 
     # 3. Extract volatile PAT from Authorization header
     token = extract_bearer_pat(authorization)
@@ -651,6 +624,7 @@ def batch_verify_roadmap(
 
     connected_username = (
         (x_github_username.strip() if x_github_username and x_github_username.strip() else None)
+        or current_user.connected_github_username
         or (roadmap.summary_metadata or {}).get("github_username")
     )
 

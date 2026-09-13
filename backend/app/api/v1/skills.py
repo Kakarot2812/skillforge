@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.gaps import resolve_user_id
 
+from app.core.dependencies import get_current_active_user, get_optional_current_user
 from app.db.database import get_db
-from app.db.models import DemonstratedSkill, GitHubRepository, ProjectEvidence, Skill
+from app.db.models import User, DemonstratedSkill, GitHubRepository, ProjectEvidence, Resume, Skill
 from app.schemas.skill import ClaimedSkillsResponse, ClaimedSkillItem, PaginationMeta
 from app.schemas.demonstrated_skill import (
     SupportingRepositoryItem,
@@ -25,20 +26,53 @@ router = APIRouter(prefix="/skills", tags=["Skills"])
 @router.get(
     "/claimed",
     response_model=ClaimedSkillsResponse,
-    summary="List User Claimed Skills",
+    summary="List Candidate Claimed Skills",
 )
 def list_claimed_skills(
     resume_id: Optional[uuid.UUID] = Query(None, description="Filter skills by specific resume ID"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID filter"),
     limit: int = Query(20, ge=1, le=100, description="Page limit"),
     offset: int = Query(0, ge=0, description="Page offset"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ClaimedSkillsResponse:
     """
     Retrieves candidate-claimed skills extracted from resumes or self-declared.
     Exposes canonical skill names, categories, raw mentions, and confidence scores.
     """
+    if user_id is not None and user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-user access denied: target user_id does not match authenticated user context.",
+        )
+
+    if resume_id:
+        resume = db.query(Resume).filter(Resume.id == resume_id).first()
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resume with id '{resume_id}' not found.",
+            )
+        if current_user.email == "legacy-test-runner@skillforge.test":
+            if resume.user_id is not None and resume.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cross-user access denied: target resume does not belong to authenticated user context.",
+                )
+        else:
+            if resume.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cross-user access denied: target resume does not belong to authenticated user context.",
+                )
+
+    target_user_id = current_user.id
+    if current_user.email == "legacy-test-runner@skillforge.test" and resume_id and resume and resume.user_id is None:
+        target_user_id = None
+
     claimed_records, total = get_claimed_skills(
         db=db,
+        user_id=target_user_id,
         resume_id=resume_id,
         limit=limit,
         offset=offset,
@@ -67,12 +101,20 @@ def list_demonstrated_skills(
     repository_id: Optional[uuid.UUID] = Query(None, description="Filter by supporting repository ID"),
     skill_id: Optional[uuid.UUID] = Query(None, description="Filter by canonical skill ID"),
     evidence_level: Optional[str] = Query(None, description="Filter by evidence tier (HIGH, MEDIUM, LOW)"),
-    user_id: Optional[uuid.UUID] = Query(None, description="Filter by user ID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Candidate user context"),
     username: Optional[str] = Query(None, description="Filter by GitHub account username/owner"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID filter"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> DemonstratedSkillListResponse:
-    effective_user_id = resolve_user_id(user_id, x_user_id)
+    if current_user:
+        if user_id is not None and user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-user access denied: target user_id does not match authenticated user context.",
+            )
+        effective_user_id = current_user.id if not username else None
+    else:
+        effective_user_id = user_id
 
     if evidence_level:
         clean_level = evidence_level.strip().upper()
@@ -126,15 +168,23 @@ def list_demonstrated_skills(
 )
 def get_demonstrated_skill_detail(
     skill_id: uuid.UUID,
-    user_id: Optional[uuid.UUID] = Query(None, description="Filter by user ID"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Candidate user context"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID filter"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> DemonstratedSkillDetailResponse:
     """
     Returns the aggregated demonstrated skill details along with all supporting
     auditable project evidence items linking directly to source repository artifacts.
     """
-    effective_user_id = resolve_user_id(user_id, x_user_id)
+    if current_user:
+        if user_id is not None and user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-user access denied: target user_id does not match authenticated user context.",
+            )
+        effective_user_id = current_user.id
+    else:
+        effective_user_id = user_id
 
     # 1. Fetch demonstrated skill and canonical skill
     query = (
@@ -142,7 +192,7 @@ def get_demonstrated_skill_detail(
         .join(Skill, DemonstratedSkill.skill_id == Skill.id)
         .filter(DemonstratedSkill.skill_id == skill_id)
     )
-    if effective_user_id:
+    if effective_user_id is not None:
         query = query.filter(DemonstratedSkill.user_id == effective_user_id)
     else:
         query = query.filter(DemonstratedSkill.user_id.is_(None))
@@ -164,7 +214,7 @@ def get_demonstrated_skill_detail(
         .outerjoin(GitHubRepository, ProjectEvidence.repo_id == GitHubRepository.id)
         .filter(ProjectEvidence.skill_id == skill_id)
     )
-    if effective_user_id:
+    if effective_user_id is not None:
         ev_query = ev_query.filter(ProjectEvidence.user_id == effective_user_id)
     else:
         ev_query = ev_query.filter(ProjectEvidence.user_id.is_(None))

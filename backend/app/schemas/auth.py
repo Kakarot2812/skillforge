@@ -52,6 +52,8 @@ class UserAuthResponse(BaseModel):
     target_role: Optional[str] = None
     auth_provider: str
     is_active: bool
+    active_resume_id: Optional[UUID] = None
+    connected_github_username: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

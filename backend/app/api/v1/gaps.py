@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_active_user, get_optional_current_user
 from app.db.database import get_db
 from app.db.models import User, Resume
 from app.schemas.demand import JobRoleItem
@@ -126,6 +127,43 @@ def verify_resume_context(
                 )
 
 
+def resolve_gap_context(
+    current_user: Optional[User],
+    requested_user_id: Optional[uuid.UUID],
+    resume_id: Optional[uuid.UUID],
+    username: Optional[str],
+    db: Session,
+) -> Tuple[Optional[uuid.UUID], Optional[uuid.UUID], Optional[str]]:
+    """
+    Resolves effective user ID, resume ID, and GitHub username for skill gap operations.
+    If authenticated via current_user, current_user is authoritative and requested_user_id
+    mismatches trigger 403 Forbidden.
+    If unauthenticated, requested_user_id is verified (404 if nonexistent) or remains None for global market.
+    """
+    if current_user:
+        if requested_user_id is not None and requested_user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-user access denied: target user_id does not match authenticated user context.",
+            )
+        effective_user_id = current_user.id
+        target_resume_id = resume_id or current_user.active_resume_id
+        target_username = username or current_user.connected_github_username
+    else:
+        if requested_user_id is not None:
+            verify_user_exists(db, requested_user_id)
+            effective_user_id = requested_user_id
+            target_resume_id = resume_id
+            target_username = username
+        else:
+            effective_user_id = None
+            target_resume_id = resume_id
+            target_username = username
+
+    verify_resume_context(db, target_resume_id, effective_user_id)
+    return effective_user_id, target_resume_id, target_username
+
+
 def validate_gap_status_filter(status_filter: Optional[str]) -> Optional[str]:
     """Validates optional gap status filter."""
     if status_filter is not None:
@@ -174,12 +212,12 @@ def get_skill_gaps_for_role(
     status_filter: Optional[str] = Query(None, alias="status", description="Optional status filter: STRONG, PARTIAL, MISSING"),
     limit: Optional[int] = Query(None, ge=1, le=100, description="Optional page size limit (1-100)"),
     offset: int = Query(0, ge=0, description="Pagination offset (>= 0)"),
-    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID scope"),
     include_resume: bool = Query(True, description="Whether to include resume claims"),
     include_github: bool = Query(True, description="Whether to include GitHub demonstrated evidence"),
     username: Optional[str] = Query(None, description="Optional GitHub username scope"),
     resume_id: Optional[uuid.UUID] = Query(None, description="Optional specific resume ID scope"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> SkillGapResponse:
     """
@@ -193,9 +231,13 @@ def get_skill_gaps_for_role(
     """
     clean_location = validate_location(location)
     clean_status = validate_gap_status_filter(status_filter)
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    verify_user_exists(db, effective_user_id)
-    verify_resume_context(db, resume_id, effective_user_id)
+    effective_user_id, target_resume_id, target_username = resolve_gap_context(
+        current_user=current_user,
+        requested_user_id=user_id,
+        resume_id=resume_id,
+        username=username,
+        db=db,
+    )
 
     try:
         role, summary, items = skill_gap_service.compute_and_persist_skill_gaps(
@@ -205,8 +247,8 @@ def get_skill_gaps_for_role(
             location=clean_location,
             include_resume=include_resume,
             include_github=include_github,
-            github_username=username,
-            resume_id=resume_id,
+            github_username=target_username,
+            resume_id=target_resume_id,
         )
     except KeyError as e:
         raise HTTPException(
@@ -259,12 +301,12 @@ def get_prioritized_gaps_for_role(
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by gap severity: MISSING, PARTIAL"),
     limit: Optional[int] = Query(None, ge=1, le=100, description="Optional page size limit (1-100)"),
     offset: int = Query(0, ge=0, description="Pagination offset (>= 0)"),
-    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID scope"),
     include_resume: bool = Query(True, description="Whether to include resume claims"),
     include_github: bool = Query(True, description="Whether to include GitHub demonstrated evidence"),
     username: Optional[str] = Query(None, description="Optional GitHub username scope"),
     resume_id: Optional[uuid.UUID] = Query(None, description="Optional specific resume ID scope"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> PrioritizedGapsResponse:
     """
@@ -278,9 +320,13 @@ def get_prioritized_gaps_for_role(
     """
     clean_location = validate_location(location)
     norm_prio, norm_status = validate_priority_filters(priority_level, status_filter)
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    verify_user_exists(db, effective_user_id)
-    verify_resume_context(db, resume_id, effective_user_id)
+    effective_user_id, target_resume_id, target_username = resolve_gap_context(
+        current_user=current_user,
+        requested_user_id=user_id,
+        resume_id=resume_id,
+        username=username,
+        db=db,
+    )
 
     try:
         role, summary, items = skill_gap_service.get_prioritized_gaps(
@@ -290,8 +336,8 @@ def get_prioritized_gaps_for_role(
             location=clean_location,
             include_resume=include_resume,
             include_github=include_github,
-            github_username=username,
-            resume_id=resume_id,
+            github_username=target_username,
+            resume_id=target_resume_id,
         )
     except KeyError as e:
         raise HTTPException(
@@ -343,17 +389,21 @@ def get_prioritized_gaps_for_role(
 )
 def analyze_skill_gaps(
     payload: SkillGapAnalyzeRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> SkillGapResponse:
     """
     Executes skill gap analysis for a target canonical role and candidate evidence profile.
     Deterministic, auditable, and idempotent.
     """
-    effective_user_id = resolve_user_id(payload.user_id, x_user_id)
-    verify_user_exists(db, effective_user_id)
-    verify_resume_context(db, payload.resume_id, effective_user_id)
     clean_location = validate_location(payload.location)
+    effective_user_id, target_resume_id, target_username = resolve_gap_context(
+        current_user=current_user,
+        requested_user_id=payload.user_id,
+        resume_id=payload.resume_id,
+        username=payload.username,
+        db=db,
+    )
 
     try:
         role, summary, items = skill_gap_service.compute_and_persist_skill_gaps(
@@ -363,8 +413,8 @@ def analyze_skill_gaps(
             location=clean_location,
             include_resume=payload.include_resume,
             include_github=payload.include_github,
-            github_username=payload.username,
-            resume_id=payload.resume_id,
+            github_username=target_username,
+            resume_id=target_resume_id,
         )
     except KeyError as e:
         raise HTTPException(
@@ -406,12 +456,12 @@ def get_gap_evidence_for_skill(
     role_id: uuid.UUID,
     skill_id: uuid.UUID,
     location: str = Query("India", description="Geographic market location"),
-    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID scope"),
     include_resume: bool = Query(True, description="Whether to include resume claims"),
     include_github: bool = Query(True, description="Whether to include GitHub demonstrated evidence"),
     username: Optional[str] = Query(None, description="Optional GitHub username scope"),
     resume_id: Optional[uuid.UUID] = Query(None, description="Optional specific resume ID scope"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ID"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> SkillGapEvidenceResponse:
     """
@@ -422,9 +472,13 @@ def get_gap_evidence_for_skill(
     4. Deterministic Reasoning explaining why the status and priority were assigned.
     """
     clean_location = validate_location(location)
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    verify_user_exists(db, effective_user_id)
-    verify_resume_context(db, resume_id, effective_user_id)
+    effective_user_id, target_resume_id, target_username = resolve_gap_context(
+        current_user=current_user,
+        requested_user_id=user_id,
+        resume_id=resume_id,
+        username=username,
+        db=db,
+    )
 
     try:
         evidence_data = skill_gap_evidence_service.get_gap_evidence(
@@ -435,8 +489,8 @@ def get_gap_evidence_for_skill(
             location=clean_location,
             include_resume=include_resume,
             include_github=include_github,
-            github_username=username,
-            resume_id=resume_id,
+            github_username=target_username,
+            resume_id=target_resume_id,
         )
     except (KeyError, ValueError) as e:
         raise HTTPException(

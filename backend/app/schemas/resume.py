@@ -57,3 +57,9 @@ class ResumeDetailResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ActiveResumeResponse(BaseModel):
+    message: str = "Active resume updated successfully"
+    active_resume_id: UUID
+    filename: str

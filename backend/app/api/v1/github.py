@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.gaps import resolve_user_id, verify_user_exists
+from app.core.dependencies import get_current_active_user
 from app.db.database import get_db
-from app.db.models import GitHubRepository, Skill, ProjectEvidence
+from app.db.models import User, GitHubRepository, Skill, ProjectEvidence
 from app.schemas.github import (
     GitHubConnectRequest,
     GitHubConnectData,
@@ -38,8 +39,7 @@ router = APIRouter(prefix="/github", tags=["GitHub Intelligence"])
 )
 def connect_github(
     payload: GitHubConnectRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    user_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GitHubConnectResponse:
     """
@@ -47,10 +47,12 @@ def connect_github(
     and idempotently persists repository metadata into PostgreSQL.
     Tokens are strictly handled as volatile secrets and never returned.
     """
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    verify_user_exists(db, effective_user_id)
+    effective_user_id = current_user.id
 
     clean_username = payload.github_username.strip()
+    current_user.connected_github_username = clean_username
+    db.commit()
+
     synced_records = github_service.sync_repositories(
         db=db,
         username=clean_username,
@@ -89,6 +91,23 @@ def connect_github(
     )
 
 
+@router.post(
+    "/disconnect",
+    status_code=status.HTTP_200_OK,
+    summary="Disconnect GitHub Account",
+)
+def disconnect_github(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Disconnects the connected GitHub account from the authenticated user.
+    """
+    current_user.connected_github_username = None
+    db.commit()
+    return {"message": "GitHub account disconnected successfully", "connected": False}
+
+
 @router.get(
     "/repositories",
     response_model=GitHubRepositoryListResponse,
@@ -97,8 +116,8 @@ def connect_github(
 def list_repositories(
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
-    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ownership filter"),
     username: Optional[str] = Query(None, description="Optional GitHub account username/owner filter"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GitHubRepositoryListResponse:
     """
@@ -106,9 +125,10 @@ def list_repositories(
     ordered deterministically by last_pushed_at descending.
     If username is provided, restricts strictly to repositories owned by that GitHub account.
     """
-    query = db.query(GitHubRepository).filter(GitHubRepository.is_fork.is_(False))
-    if user_id:
-        query = query.filter(GitHubRepository.user_id == user_id)
+    query = db.query(GitHubRepository).filter(
+        GitHubRepository.is_fork.is_(False),
+        GitHubRepository.user_id == current_user.id,
+    )
     if username:
         safe_username = validate_github_username(username)
         query = query.filter(
@@ -161,18 +181,21 @@ def list_repositories(
 )
 def get_repository(
     repo_id: uuid.UUID,
-    user_id: Optional[uuid.UUID] = Query(None, description="Optional user ownership scope"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GitHubRepositoryDetailResponse:
     """
     Retrieves stored repository metadata and artifact scanning indicators.
     Reads from the local database without making redundant GitHub API calls.
     """
-    query = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id)
-    if user_id:
-        query = query.filter(GitHubRepository.user_id == user_id)
-
-    repo = query.first()
+    repo = (
+        db.query(GitHubRepository)
+        .filter(
+            GitHubRepository.id == repo_id,
+            GitHubRepository.user_id == current_user.id,
+        )
+        .first()
+    )
     if not repo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,18 +232,13 @@ def get_repository(
 )
 def analyze_repository(
     payload: GitHubAnalyzeRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    user_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GitHubAnalyzeResponse:
     """
     Scans connected repository manifests, Dockerfiles, and CI workflows
     to extract concrete, auditable evidence of demonstrated skills.
     """
-    effective_user_id = resolve_user_id(user_id, x_user_id)
-    if effective_user_id is not None:
-        verify_user_exists(db, effective_user_id)
-
     repo_ids: List[uuid.UUID] = []
     if payload.repository_id:
         repo_ids.append(payload.repository_id)
@@ -236,7 +254,7 @@ def analyze_repository(
     all_evidence: List[ProjectEvidence] = []
     analyzed_repo_names: List[str] = []
     all_affected_skill_ids: Set[uuid.UUID] = set()
-    target_user_id = effective_user_id
+    target_user_id = current_user.id
 
     for r_id in repo_ids:
         repo = db.query(GitHubRepository).filter(GitHubRepository.id == r_id).first()
@@ -246,14 +264,16 @@ def analyze_repository(
                 detail=f"GitHub repository with id '{r_id}' not found.",
             )
 
-        if effective_user_id is not None and repo.user_id != effective_user_id:
+        if repo.user_id is not None and repo.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cross-user access denied: repository does not belong to authenticated user context.",
             )
 
-        if target_user_id is None:
-            target_user_id = repo.user_id
+        if repo.user_id is None:
+            target_user_id = None
+        else:
+            target_user_id = current_user.id
 
         if repo.is_fork and not payload.include_forks:
             continue

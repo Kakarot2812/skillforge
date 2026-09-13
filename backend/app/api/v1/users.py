@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_active_user
 from app.db.database import get_db
 from app.db.models import User
 from app.schemas.user import UserCreate, UserRead
@@ -41,7 +42,10 @@ def create_candidate_user(
         email = payload.email.strip().lower()
         existing = db.query(User).filter(User.email == email).first()
         if existing:
-            return UserRead.model_validate(existing)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
     else:
         email = f"candidate-{new_id}@skillforge.local"
 
@@ -63,32 +67,12 @@ def create_candidate_user(
     response_model=UserRead,
     status_code=status.HTTP_200_OK,
     summary="Get Authenticated Candidate User",
-    description="Retrieves the candidate User record corresponding to the provided X-User-Id header.",
+    description="Retrieves the candidate User record corresponding to the authenticated session.",
 )
 def get_current_user(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> UserRead:
-    if not x_user_id or not x_user_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required: X-User-Id header missing.",
-        )
-    try:
-        user_uuid = uuid.UUID(x_user_id.strip())
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid user ID format in X-User-Id header.",
-        )
-
-    user = db.query(User).filter(User.id == user_uuid).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id '{user_uuid}' not found.",
-        )
-    return UserRead.model_validate(user)
+    return UserRead.model_validate(current_user)
 
 
 @router.get(

@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     SESSION_REMEMBER_ME_DAYS: int = 30
     SESSION_COOKIE_SECURE: bool = False
     SESSION_COOKIE_SAMESITE: str = "lax"
+    SECRET_KEY: str = "dev-insecure-secret-key-change-in-production"
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # Google OAuth Settings (Login Phase 3)
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     # Adzuna API Settings (Post-MVP P1 Market Ingestion Foundation)
     ADZUNA_APP_ID: Optional[str] = None

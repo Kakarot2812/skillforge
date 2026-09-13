@@ -40,6 +40,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=True)
     auth_provider = Column(String(50), nullable=False, default="local", server_default="local")
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    # Login Phase 3: Google OAuth Identity
+    google_sub = Column(String(255), unique=True, index=True, nullable=True)
 
     resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
     claimed_skills = relationship("UserClaimedSkill", back_populates="user", cascade="all, delete-orphan")

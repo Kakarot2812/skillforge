@@ -93,18 +93,24 @@ def get_langchain_history(
     user_id: UUID,
     conversation_service: Optional[ConversationService] = None,
     limit: int = DEFAULT_HISTORY_MESSAGE_LIMIT,
+    exclude_message_id: Optional[UUID] = None,
 ) -> List[BaseMessage]:
     """
     Loads conversation history through ConversationService and converts it into
     LangChain message objects.
     - Delegates all persistence and ownership checks to ConversationService.
     - Does NOT query the database directly.
+    - If exclude_message_id is provided, omits that message (e.g. current user message)
+      to represent strictly previous dialogue history.
     - Bounds history to the latest `limit` messages in chronological order.
     """
     service = conversation_service or default_conversation_service
     db_messages = service.get_messages(
         db, conversation_id=conversation_id, user_id=user_id
     )
+
+    if exclude_message_id is not None:
+        db_messages = [m for m in db_messages if m.id != exclude_message_id]
 
     if limit and len(db_messages) > limit:
         db_messages = db_messages[-limit:]

@@ -84,12 +84,28 @@ def career_chat(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with id '{effective_user_id}' not found.",
             )
+    else:
+        # Stateless mode: optional X-User-Id enables profile personalization
+        if x_user_id and x_user_id.strip():
+            try:
+                effective_user_id = uuid.UUID(x_user_id.strip())
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid user ID format in X-User-Id header.",
+                )
+            user = db.query(User).filter(User.id == effective_user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with id '{effective_user_id}' not found.",
+                )
 
     service = CareerChatService()
     try:
         return service.chat(
             request=request,
-            db=db if request.conversation_id is not None else None,
+            db=db if effective_user_id is not None else None,
             user_id=effective_user_id,
         )
     except (CareerChatValidationError, ContextValidationError) as exc:

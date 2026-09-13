@@ -1,5 +1,11 @@
 from app.schemas.health import HealthResponse, DbHealthResponse
 from app.schemas.user import UserBase, UserCreate, UserRead
+from app.schemas.user_profile import (
+    UserProfileBase,
+    UserProfileCreate,
+    UserProfileUpdate,
+    UserProfileResponse,
+)
 from app.schemas.skill import (
     SkillBase,
     SkillCreate,
@@ -142,5 +148,9 @@ __all__ = [
     "DeterministicReasoningData",
     "SkillGapEvidenceResponseData",
     "SkillGapEvidenceResponse",
+    "UserProfileBase",
+    "UserProfileCreate",
+    "UserProfileUpdate",
+    "UserProfileResponse",
 ]
 

@@ -20,8 +20,14 @@ from app.ai.chatbot.models import (
 )
 from app.ai.chatbot.prompts import (
     CAREER_CHATBOT_SYSTEM_PROMPT,
+    build_career_chat_langchain_messages,
     build_career_chat_messages,
     serialize_verified_context,
+)
+from app.ai.chatbot.personalization import (
+    PersonalizationContext,
+    ProfileContext,
+    assemble_personalization_context,
 )
 from app.ai.chatbot.langchain_history import (
     SkillForgeChatMessageHistory,
@@ -40,6 +46,10 @@ __all__ = [
     "CAREER_CHATBOT_SYSTEM_PROMPT",
     "serialize_verified_context",
     "build_career_chat_messages",
+    "build_career_chat_langchain_messages",
+    "ProfileContext",
+    "PersonalizationContext",
+    "assemble_personalization_context",
     "CareerChatError",
     "CareerChatValidationError",
     "CareerChatServiceUnavailableError",

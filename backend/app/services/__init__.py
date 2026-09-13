@@ -13,6 +13,15 @@ from app.services.conversation_service import (
     InvalidMessageRoleError,
     InvalidMessageContentError,
 )
+from app.services.user_profile_service import (
+    UserProfileService,
+    user_profile_service,
+    UserProfileError,
+    UserProfileNotFoundError,
+    UserProfileAlreadyExistsError,
+    UserProfileOwnershipError,
+    InvalidUserProfileError,
+)
 
 __all__ = [
     "extract_text_from_file",
@@ -26,5 +35,12 @@ __all__ = [
     "UserNotFoundError",
     "InvalidMessageRoleError",
     "InvalidMessageContentError",
+    "UserProfileService",
+    "user_profile_service",
+    "UserProfileError",
+    "UserProfileNotFoundError",
+    "UserProfileAlreadyExistsError",
+    "UserProfileOwnershipError",
+    "InvalidUserProfileError",
 ]
 

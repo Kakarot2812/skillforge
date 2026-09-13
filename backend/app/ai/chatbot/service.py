@@ -30,8 +30,20 @@ from app.ai.chatbot.models import (
     ChatResponseStatus,
     ChatUsageStats,
 )
-from app.ai.chatbot.langchain_history import get_langchain_history
-from app.ai.chatbot.prompts import build_career_chat_messages
+from app.ai.chatbot.langchain_history import (
+    get_langchain_history,
+    langchain_messages_to_provider,
+)
+from app.ai.chatbot.personalization import (
+    PersonalizationContext,
+    ProfileContext,
+    assemble_personalization_context,
+)
+from app.ai.chatbot.prompts import (
+    build_career_chat_langchain_messages,
+    build_career_chat_messages,
+)
+from langchain_core.messages import BaseMessage
 from app.ai.context.exceptions import ContextValidationError
 from app.ai.context.models import VerifiedContext
 from app.ai.context.validation import validate_verified_context
@@ -46,6 +58,12 @@ from app.ai.qwen.exceptions import (
 from app.services.conversation_service import (
     ConversationService,
     conversation_service as default_conversation_service,
+)
+from app.services.user_profile_service import (
+    UserProfileNotFoundError,
+    UserProfileService,
+    user_profile_service as default_user_profile_service,
+    UserNotFoundError,
 )
 from sqlalchemy.orm import Session
 from app.rag.exceptions import (
@@ -85,6 +103,7 @@ class CareerChatService:
         qwen_client: Optional[QwenClient] = None,
         rag_service: Optional[RAGService] = None,
         conversation_service: Optional[ConversationService] = None,
+        user_profile_service: Optional[UserProfileService] = None,
         client: Optional[QwenClient] = None,
     ):
         effective_client = qwen_client or client
@@ -92,6 +111,9 @@ class CareerChatService:
         self.client = effective_client or QwenClient()
         self.rag_service = rag_service
         self.conversation_service = conversation_service or default_conversation_service
+        self.user_profile_service = user_profile_service or default_user_profile_service
+        self._last_messages: Optional[List[Dict[str, str]]] = None
+        self._last_langchain_messages: Optional[List[BaseMessage]] = None
 
     def __enter__(self) -> "CareerChatService":
         return self
@@ -264,19 +286,30 @@ class CareerChatService:
         """
         # Step 0: Persistent Conversation Validation & User Message Persistence
         is_persistent = request.conversation_id is not None
+        user_msg_rec = None
         if is_persistent:
             if db is None or user_id is None:
                 raise CareerChatValidationError(
                     "Database session and user_id are required when conversation_id is provided."
                 )
             # Verify ownership and persist user message via ConversationService
-            self.conversation_service.add_message(
+            user_msg_rec = self.conversation_service.add_message(
                 db=db,
                 conversation_id=request.conversation_id,
                 user_id=user_id,
                 role="user",
                 content=request.user_query,
             )
+
+        # Step 0b: Load User Profile via UserProfileService (service layer access only)
+        profile_model = None
+        if db is not None and user_id is not None:
+            try:
+                profile_model = self.user_profile_service.get_profile(db=db, user_id=user_id)
+            except (UserProfileNotFoundError, UserNotFoundError):
+                profile_model = None
+
+        profile_context = ProfileContext.from_model(profile_model)
 
         # Step 1: Pre-validation of VerifiedContext
         try:
@@ -336,7 +369,7 @@ class CareerChatService:
                 logger.error("Unexpected error during RAG retrieval: %s", exc)
                 raise CareerChatGenerationError(f"RAG retrieval failure: {str(exc)}") from exc
 
-        # Step 4: Prompt Construction with Verified Ground Truth + Supporting Evidence + LangChain History
+        # Step 4: Prompt Construction with Verified Ground Truth + Supporting Evidence + LangChain History + Profile
         history_messages = None
         if is_persistent and db is not None and user_id is not None:
             history_messages = get_langchain_history(
@@ -345,14 +378,26 @@ class CareerChatService:
                 user_id=user_id,
                 conversation_service=self.conversation_service,
                 limit=20,
+                exclude_message_id=user_msg_rec.id if user_msg_rec else None,
             )
 
-        messages = build_career_chat_messages(
+        # Assemble immutable PersonalizationContext
+        personalization_context = assemble_personalization_context(
+            verified_context=request.verified_context,
+            profile=profile_model,
+            chat_history=history_messages,
+        )
+
+        lc_messages = build_career_chat_langchain_messages(
             context=request.verified_context,
             user_query=request.user_query,
             retrieved_evidence=retrieved_evidence,
             history_messages=history_messages,
+            profile_context=profile_context,
         )
+        self._last_langchain_messages = lc_messages
+        messages = langchain_messages_to_provider(lc_messages)
+        self._last_messages = messages
 
         options: Dict[str, float] = {
             "temperature": float(request.temperature),

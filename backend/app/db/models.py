@@ -45,6 +45,7 @@ class User(Base):
     skill_gaps = relationship("SkillGap", back_populates="user", cascade="all, delete-orphan")
     roadmaps = relationship("CandidateRoadmap", back_populates="user", cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
@@ -875,4 +876,45 @@ class Message(Base):
 
     def __repr__(self) -> str:
         return f"<Message id={self.id} conversation_id={self.conversation_id} role={self.role!r}>"
+
+
+class UserProfile(Base):
+    """
+    Persistent candidate user profile for personalization.
+    Phase: Persistent Personalization Architecture (Checkpoint 4: User Profile Foundation).
+    One-to-one relationship with User.
+    """
+    __tablename__ = "user_profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=True)
+    education = Column(String(255), nullable=True)
+    college = Column(String(255), nullable=True)
+    degree = Column(String(255), nullable=True)
+    branch = Column(String(255), nullable=True)
+    semester = Column(Integer, nullable=True)
+    target_role = Column(String(255), nullable=True)
+    experience_level = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_user_profiles_user_id"),
+    )
+
+    user = relationship("User", back_populates="profile")
+
+    def __repr__(self) -> str:
+        return f"<UserProfile id={self.id} user_id={self.user_id} name={self.name!r}>"
+
 

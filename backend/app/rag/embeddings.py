@@ -14,6 +14,7 @@ Core architectural boundaries:
 from abc import ABC, abstractmethod
 import logging
 import math
+import threading
 from typing import Dict, List, Optional
 
 from app.config import settings
@@ -190,3 +191,113 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return [self.embed_text(t) for t in texts]
+
+
+class LazySentenceTransformerProvider(EmbeddingProvider):
+    """
+    Thread-safe lazy sentence-transformers embedding provider.
+    Defers importing and loading the local model into PyTorch memory until
+    the first actual embed_text() or embed_documents() call.
+    Provides dimension immediately (384) without I/O overhead for fast startup and validation.
+    """
+
+    def __init__(
+        self,
+        model_name: Optional[str] = None,
+        expected_dim: Optional[int] = None,
+    ):
+        self.model_name = model_name or settings.EMBEDDING_MODEL_NAME
+        self._expected_dim = expected_dim if expected_dim is not None else settings.EMBEDDING_DIMENSION
+        self._dimension: int = self._expected_dim
+        self._model = None
+        self._lock = threading.Lock()
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    @property
+    def is_loaded(self) -> bool:
+        """Returns True if the underlying model has already been loaded into memory."""
+        return self._model is not None
+
+    def _ensure_model(self):
+        if self._model is not None:
+            return self._model
+        with self._lock:
+            if self._model is None:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    model = SentenceTransformer(self.model_name)
+                except Exception as exc:
+                    raise RAGEmbeddingError(
+                        f"Failed to load local embedding model '{self.model_name}': {str(exc)}"
+                    ) from exc
+
+                if hasattr(model, "get_embedding_dimension"):
+                    actual_dim = model.get_embedding_dimension()
+                else:
+                    actual_dim = model.get_sentence_embedding_dimension()
+                if actual_dim is None:
+                    raise RAGEmbeddingError(f"Could not determine embedding dimension for '{self.model_name}'.")
+
+                if int(actual_dim) != self._expected_dim:
+                    raise RAGDimensionMismatchError(
+                        expected=self._expected_dim,
+                        actual=int(actual_dim),
+                        model_name=self.model_name,
+                    )
+
+                self._dimension = int(actual_dim)
+                self._model = model
+        return self._model
+
+    def embed_text(self, text: str) -> List[float]:
+        if not text or not text.strip():
+            raise RAGEmbeddingError("Cannot generate embedding for empty text.")
+        model = self._ensure_model()
+        try:
+            vec = model.encode(
+                text.strip(),
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+            return [float(x) for x in vec]
+        except Exception as exc:
+            raise RAGEmbeddingError(f"Embedding inference error for text: {str(exc)}") from exc
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        for idx, t in enumerate(texts):
+            if not t or not t.strip():
+                raise RAGEmbeddingError(f"Cannot embed document list with empty text at index {idx}.")
+        model = self._ensure_model()
+        try:
+            cleaned = [t.strip() for t in texts]
+            embeddings = model.encode(
+                cleaned,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+            return [[float(x) for x in vec] for vec in embeddings]
+        except Exception as exc:
+            raise RAGEmbeddingError(f"Batch embedding inference error: {str(exc)}") from exc
+
+
+_shared_embedding_provider: Optional[EmbeddingProvider] = None
+_provider_lock = threading.Lock()
+
+
+def get_shared_embedding_provider() -> EmbeddingProvider:
+    """
+    Returns the process-wide shared lazy SentenceTransformer embedding provider.
+    Thread-safe and initialized lazily on first access without loading model weights.
+    """
+    global _shared_embedding_provider
+    if _shared_embedding_provider is None:
+        with _provider_lock:
+            if _shared_embedding_provider is None:
+                _shared_embedding_provider = LazySentenceTransformerProvider()
+    return _shared_embedding_provider
+

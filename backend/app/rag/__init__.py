@@ -9,8 +9,10 @@ pgvector storage, and metadata-filtered similarity retrieval.
 from app.rag.chunking import DeterministicChunker
 from app.rag.embeddings import (
     EmbeddingProvider,
+    LazySentenceTransformerProvider,
     LocalSentenceTransformerProvider,
     MockEmbeddingProvider,
+    get_shared_embedding_provider,
 )
 from app.rag.exceptions import (
     RAGDimensionMismatchError,
@@ -37,6 +39,7 @@ from app.rag.service import RAGService
 __all__ = [
     "DeterministicChunker",
     "EmbeddingProvider",
+    "LazySentenceTransformerProvider",
     "LocalSentenceTransformerProvider",
     "MockEmbeddingProvider",
     "RAGChunk",
@@ -56,4 +59,6 @@ __all__ = [
     "RAGSourceType",
     "RAGStorageError",
     "RAGValidationError",
+    "get_shared_embedding_provider",
 ]
+

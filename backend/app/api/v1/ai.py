@@ -31,6 +31,7 @@ from app.ai.chatbot import (
 from app.ai.context.exceptions import ContextValidationError
 from app.db.database import get_db
 from app.db.models import User
+from app.rag import RAGService, get_shared_embedding_provider
 from app.services.conversation_service import (
     ConversationNotFoundError,
     UserNotFoundError,
@@ -101,7 +102,11 @@ def career_chat(
                     detail=f"User with id '{effective_user_id}' not found.",
                 )
 
-    service = CareerChatService()
+    rag_service = RAGService(
+        session=db,
+        embedding_provider=get_shared_embedding_provider(),
+    )
+    service = CareerChatService(rag_service=rag_service)
     try:
         return service.chat(
             request=request,

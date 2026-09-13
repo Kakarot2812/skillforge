@@ -23,6 +23,12 @@ from app.ai.chatbot.prompts import (
     build_career_chat_messages,
     serialize_verified_context,
 )
+from app.ai.chatbot.langchain_history import (
+    SkillForgeChatMessageHistory,
+    get_langchain_history,
+    message_to_langchain,
+    messages_to_langchain,
+)
 from app.ai.chatbot.service import CareerChatService
 
 __all__ = [
@@ -39,4 +45,9 @@ __all__ = [
     "CareerChatServiceUnavailableError",
     "CareerChatTimeoutError",
     "CareerChatGenerationError",
+    "SkillForgeChatMessageHistory",
+    "get_langchain_history",
+    "message_to_langchain",
+    "messages_to_langchain",
 ]
+

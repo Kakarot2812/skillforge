@@ -30,6 +30,7 @@ from app.ai.chatbot.models import (
     ChatResponseStatus,
     ChatUsageStats,
 )
+from app.ai.chatbot.langchain_history import get_langchain_history
 from app.ai.chatbot.prompts import build_career_chat_messages
 from app.ai.context.exceptions import ContextValidationError
 from app.ai.context.models import VerifiedContext
@@ -42,6 +43,11 @@ from app.ai.qwen.exceptions import (
     QwenResponseError,
     QwenTimeoutError,
 )
+from app.services.conversation_service import (
+    ConversationService,
+    conversation_service as default_conversation_service,
+)
+from sqlalchemy.orm import Session
 from app.rag.exceptions import (
     RAGEmbeddingError,
     RAGRetrievalError,
@@ -78,10 +84,14 @@ class CareerChatService:
         self,
         qwen_client: Optional[QwenClient] = None,
         rag_service: Optional[RAGService] = None,
+        conversation_service: Optional[ConversationService] = None,
+        client: Optional[QwenClient] = None,
     ):
-        self._owns_client = qwen_client is None
-        self.client = qwen_client or QwenClient()
+        effective_client = qwen_client or client
+        self._owns_client = effective_client is None
+        self.client = effective_client or QwenClient()
         self.rag_service = rag_service
+        self.conversation_service = conversation_service or default_conversation_service
 
     def __enter__(self) -> "CareerChatService":
         return self
@@ -234,17 +244,40 @@ class CareerChatService:
         # General, programming, or casual questions proceed to Qwen
         return True, None, ()
 
-    def chat(self, request: CareerChatRequest) -> CareerChatResponse:
+    def chat(
+        self,
+        request: CareerChatRequest,
+        db: Optional[Session] = None,
+        user_id: Optional[UUID] = None,
+    ) -> CareerChatResponse:
         """
         Executes an evidence-grounded chat interaction.
 
-        1. Deterministically validates VerifiedContext.
-        2. Validates query boundaries.
-        3. Checks deterministic evidence sufficiency.
-        4. Serializes context and builds deterministic prompt.
-        5. Calls local QwenClient.
-        6. Returns typed CareerChatResponse (status='EXPLANATORY').
+        1. If persistent conversation requested, verifies ownership and persists user message.
+        2. Deterministically validates VerifiedContext.
+        3. Validates query boundaries.
+        4. Checks deterministic evidence sufficiency.
+        5. Serializes context, incorporates LangChain dialogue history, and builds prompt.
+        6. Calls local QwenClient.
+        7. If persistent conversation, persists assistant message on success.
+        8. Returns typed CareerChatResponse.
         """
+        # Step 0: Persistent Conversation Validation & User Message Persistence
+        is_persistent = request.conversation_id is not None
+        if is_persistent:
+            if db is None or user_id is None:
+                raise CareerChatValidationError(
+                    "Database session and user_id are required when conversation_id is provided."
+                )
+            # Verify ownership and persist user message via ConversationService
+            self.conversation_service.add_message(
+                db=db,
+                conversation_id=request.conversation_id,
+                user_id=user_id,
+                role="user",
+                content=request.user_query,
+            )
+
         # Step 1: Pre-validation of VerifiedContext
         try:
             validate_verified_context(request.verified_context)
@@ -259,13 +292,27 @@ class CareerChatService:
 
         if not is_sufficient:
             logger.info("Chatbot query rejected by deterministic sufficiency gate: %s", reason)
+            insufficient_text = reason or "The available verified evidence is insufficient to answer this question."
+            asst_msg_id = None
+            if is_persistent and db is not None and user_id is not None:
+                asst_rec = self.conversation_service.add_message(
+                    db=db,
+                    conversation_id=request.conversation_id,
+                    user_id=user_id,
+                    role="assistant",
+                    content=insufficient_text,
+                )
+                asst_msg_id = asst_rec.id
+
             return CareerChatResponse(
-                explanation=reason or "The available verified evidence is insufficient to answer this question.",
+                explanation=insufficient_text,
                 model=self.client.model,
                 status=ChatResponseStatus.INSUFFICIENT_EVIDENCE,
                 referenced_skill_ids=referenced_skill_ids,
                 retrieved_evidence=(),
                 usage=None,
+                conversation_id=request.conversation_id,
+                message_id=asst_msg_id,
             )
 
         # Step 3: Retrieve Supporting Evidence (if RAG service configured)
@@ -289,11 +336,22 @@ class CareerChatService:
                 logger.error("Unexpected error during RAG retrieval: %s", exc)
                 raise CareerChatGenerationError(f"RAG retrieval failure: {str(exc)}") from exc
 
-        # Step 4: Prompt Construction with Verified Ground Truth + Supporting Evidence
+        # Step 4: Prompt Construction with Verified Ground Truth + Supporting Evidence + LangChain History
+        history_messages = None
+        if is_persistent and db is not None and user_id is not None:
+            history_messages = get_langchain_history(
+                db=db,
+                conversation_id=request.conversation_id,
+                user_id=user_id,
+                conversation_service=self.conversation_service,
+                limit=20,
+            )
+
         messages = build_career_chat_messages(
             context=request.verified_context,
             user_query=request.user_query,
             retrieved_evidence=retrieved_evidence,
+            history_messages=history_messages,
         )
 
         options: Dict[str, float] = {
@@ -302,7 +360,6 @@ class CareerChatService:
         }
 
         # Step 5: Qwen Execution with typed exception mapping
-        # Note: QwenTimeoutError is a subclass of QwenConnectionError, so catch it first!
         try:
             chat_resp = self.client.chat(
                 messages=messages,
@@ -329,7 +386,20 @@ class CareerChatService:
                 f"Unexpected generation failure: {str(exc)}"
             ) from exc
 
-        # Step 6: Format strongly typed explanatory response
+        # Step 6: Persist Assistant Response on Successful Generation
+        asst_msg_id = None
+        explanation_text = chat_resp.message.content.strip()
+        if is_persistent and db is not None and user_id is not None:
+            asst_rec = self.conversation_service.add_message(
+                db=db,
+                conversation_id=request.conversation_id,
+                user_id=user_id,
+                role="assistant",
+                content=explanation_text,
+            )
+            asst_msg_id = asst_rec.id
+
+        # Step 7: Format strongly typed explanatory response
         usage_stats = ChatUsageStats(
             total_duration=chat_resp.total_duration,
             load_duration=chat_resp.load_duration,
@@ -338,10 +408,13 @@ class CareerChatService:
         )
 
         return CareerChatResponse(
-            explanation=chat_resp.message.content.strip(),
+            explanation=explanation_text,
             model=chat_resp.model,
             status=ChatResponseStatus.EXPLANATORY,
             referenced_skill_ids=referenced_skill_ids,
             retrieved_evidence=tuple(retrieved_evidence),
             usage=usage_stats,
+            conversation_id=request.conversation_id,
+            message_id=asst_msg_id,
         )
+

@@ -67,6 +67,10 @@ class CareerChatRequest(BaseModel):
         le=1.0,
         description="Generation temperature for deterministic explanation",
     )
+    conversation_id: Optional[UUID] = Field(
+        default=None,
+        description="Optional conversation UUID for persistent chat history",
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -117,5 +121,14 @@ class CareerChatResponse(BaseModel):
         default=None,
         description="Strongly-typed Ollama execution telemetry",
     )
+    conversation_id: Optional[UUID] = Field(
+        default=None,
+        description="Conversation session UUID if persistent chat history was used",
+    )
+    message_id: Optional[UUID] = Field(
+        default=None,
+        description="Assistant message UUID if persisted",
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+

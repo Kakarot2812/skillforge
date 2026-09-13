@@ -1704,6 +1704,32 @@ export * from "./types/verification";
 export * from "./types/chat";
 export * from "./identity";
 
+export type {
+  RoadmapSkillStatus,
+  PracticeProblemStatus,
+  RoadmapOrdering,
+  LearningResourceType,
+  PracticeProblemDifficulty,
+  LearningResourceItem,
+  StaticRoadmapPrerequisiteItem,
+  PracticeProblemItem,
+  RoadmapSkillItem,
+  RoadmapStageItem,
+  RoadmapListItem,
+  RoadmapListResponse,
+  RoadmapSummary,
+  RoadmapDetailData,
+  RoadmapDetailResponse,
+  UserProgressUpdateRequest,
+  UserProgressItem,
+  UserProgressResponse,
+  UserPracticeProgressUpdateRequest,
+  UserPracticeProgressItem,
+  UserPracticeProgressResponse,
+  UserRoadmapProgressSummary,
+  UserRoadmapProgressMap,
+} from "./types/skill_roadmap";
+
 import {
   CanonicalRoadmapData,
   RoadmapGenerateRequest,
@@ -1725,6 +1751,21 @@ import {
   ConversationItem,
   ConversationMessageItem,
 } from "./types/chat";
+
+import {
+  RoadmapListItem,
+  RoadmapDetailData,
+  RoadmapSkillItem,
+  RoadmapOrdering,
+  RoadmapSkillStatus,
+  PracticeProblemStatus,
+  UserProgressItem,
+  UserProgressUpdateRequest,
+  UserPracticeProgressItem,
+  UserPracticeProgressUpdateRequest,
+  UserRoadmapProgressMap,
+  UserRoadmapProgressSummary,
+} from "./types/skill_roadmap";
 
 
 interface PostMvpRequestOptions {
@@ -2158,3 +2199,230 @@ export async function deleteConversation(
     includeAuth: true,
   });
 }
+
+// -----------------------------------------------------------------------------
+// Static Skill Roadmap API Methods (/api/v1/roadmaps & /api/v1/users/me/roadmap-progress)
+// -----------------------------------------------------------------------------
+
+/**
+ * Retrieves all 12 static skill roadmaps from the catalog.
+ * Public endpoint: does not require candidate authentication.
+ * GET /api/v1/roadmaps
+ */
+export async function fetchRoadmapsCatalog(): Promise<{
+  success: boolean;
+  data?: RoadmapListItem[];
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<RoadmapListItem[]>("/api/v1/roadmaps", {
+    method: "GET",
+    includeAuth: false,
+  });
+}
+
+/**
+ * Retrieves full static roadmap detail including stages, skills, resources, and practice problems.
+ * Supports "curated" (default) or "recommended" (deterministic prerequisite DAG sort) ordering.
+ * Attaches authenticated user progress if candidate identity is established.
+ * GET /api/v1/roadmaps/{roadmap_id}
+ */
+export async function fetchRoadmapDetail(
+  roadmapId: string,
+  ordering: RoadmapOrdering = "curated",
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: RoadmapDetailData;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const params = new URLSearchParams();
+  if (ordering) params.set("ordering", ordering);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+
+  return postMvpFetch<RoadmapDetailData>(
+    `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}${qs}`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Retrieves flat list of skills belonging to a static roadmap.
+ * Supports "curated" (default) or "recommended" ordering.
+ * GET /api/v1/roadmaps/{roadmap_id}/skills
+ */
+export async function fetchRoadmapSkills(
+  roadmapId: string,
+  ordering: RoadmapOrdering = "curated",
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: RoadmapSkillItem[];
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const params = new URLSearchParams();
+  if (ordering) params.set("ordering", ordering);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+
+  return postMvpFetch<RoadmapSkillItem[]>(
+    `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/skills${qs}`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Retrieves detailed information for a single static roadmap skill.
+ * Strictly verifies that the skill belongs to the requested roadmap domain.
+ * GET /api/v1/roadmaps/{roadmap_id}/skills/{skill_id}
+ */
+export async function fetchRoadmapSkillDetail(
+  roadmapId: string,
+  skillId: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: RoadmapSkillItem;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<RoadmapSkillItem>(
+    `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/skills/${encodeURIComponent(skillId)}`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Retrieves current candidate's roadmap learning progress map ({ skill_id: status }).
+ * Optionally filtered by roadmapId.
+ * When summary=true and roadmapId is provided, returns domain summary metrics.
+ * Requires authenticated candidate identity via X-User-Id.
+ * GET /api/v1/users/me/roadmap-progress
+ */
+export async function fetchUserRoadmapProgress(
+  roadmapId?: string,
+  summary?: boolean,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: UserRoadmapProgressMap | UserRoadmapProgressSummary;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const params = new URLSearchParams();
+  if (roadmapId) params.set("roadmap_id", roadmapId);
+  if (summary) params.set("summary", "true");
+  const qs = params.toString() ? `?${params.toString()}` : "";
+
+  return postMvpFetch<UserRoadmapProgressMap | UserRoadmapProgressSummary>(
+    `/api/v1/users/me/roadmap-progress${qs}`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Convenience helper to retrieve aggregate progress metrics for a roadmap domain.
+ * Requires authenticated candidate identity via X-User-Id.
+ * GET /api/v1/users/me/roadmap-progress?roadmap_id={roadmap_id}&summary=true
+ */
+export async function fetchUserRoadmapSummary(
+  roadmapId: string,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: UserRoadmapProgressSummary;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  return postMvpFetch<UserRoadmapProgressSummary>(
+    `/api/v1/users/me/roadmap-progress?roadmap_id=${encodeURIComponent(roadmapId)}&summary=true`,
+    {
+      method: "GET",
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Updates candidate's learning status for a roadmap skill.
+ * Status: "NOT_STARTED" | "LEARNING" | "DONE" | "SKIPPED".
+ * Enforces user ownership and prevents duplicate progress records.
+ * PUT /api/v1/users/me/roadmap-progress/{skill_id}
+ */
+export async function updateSkillProgress(
+  skillId: string,
+  status: RoadmapSkillStatus,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: UserProgressItem;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const body: UserProgressUpdateRequest = { status };
+  return postMvpFetch<UserProgressItem>(
+    `/api/v1/users/me/roadmap-progress/${encodeURIComponent(skillId)}`,
+    {
+      method: "PUT",
+      body,
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+
+/**
+ * Updates candidate's status for a practice problem within a roadmap skill.
+ * Status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED".
+ * Automatically tracks and clears completed_at timestamp on backend.
+ * PUT /api/v1/users/me/roadmap-progress/{skill_id}/problems/{problem_id}
+ */
+export async function updatePracticeProblemProgress(
+  skillId: string,
+  problemId: string,
+  status: PracticeProblemStatus,
+  userId?: string
+): Promise<{
+  success: boolean;
+  data?: UserPracticeProgressItem;
+  meta?: Record<string, unknown>;
+  error?: string;
+  status?: number;
+}> {
+  const body: UserPracticeProgressUpdateRequest = { status };
+  return postMvpFetch<UserPracticeProgressItem>(
+    `/api/v1/users/me/roadmap-progress/${encodeURIComponent(skillId)}/problems/${encodeURIComponent(problemId)}`,
+    {
+      method: "PUT",
+      body,
+      userId,
+      includeAuth: true,
+    }
+  );
+}
+

@@ -136,9 +136,9 @@ class CareerChatService:
 
         matched_skill_ids = tuple(all_context_skills[name] for name in matched_skills)
 
-        # 2. Check if query targets a specific unknown skill that does NOT exist in context
+        # 2. Check if candidate query targets a specific unknown skill classification not in context
         target_skill_match = re.search(
-            r"\b(?:weak at|strong in|partial in|missing in|status of|why is|how is)\s+([a-zA-Z0-9\+\#\.\-]+)\b",
+            r"\b(?:weak at|strong in|partial in|missing in|status of)\s+([a-zA-Z0-9\+\#\.\-]+)\b",
             normalized_query,
         )
         if target_skill_match:
@@ -159,7 +159,7 @@ class CareerChatService:
         is_candidate_intent = any(
             re.search(r"\b" + re.escape(w) + r"\b", normalized_query)
             for w in [
-                "my", "me", "i", "resume", "github", "weak", "weakness",
+                "my", "resume", "github", "weak", "weakness",
                 "weaknesses", "strong", "strength", "partial", "missing",
                 "demonstrated", "score", "profile", "am i", "have i",
             ]
@@ -231,14 +231,7 @@ class CareerChatService:
                 )
             return True, None, ()
 
-        # If general career question, ensure at least some verified facts exist
-        if context.total_facts_count == 0:
-            return (
-                False,
-                "The available verified evidence is empty. Cannot generate an evidence-grounded explanation.",
-                (),
-            )
-
+        # General, programming, or casual questions proceed to Qwen
         return True, None, ()
 
     def chat(self, request: CareerChatRequest) -> CareerChatResponse:

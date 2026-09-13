@@ -773,3 +773,51 @@ def test_api_endpoint_service_unavailable(sample_verified_context: VerifiedConte
         }
         response = client.post("/api/v1/ai/chat", json=payload)
         assert response.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# General-Purpose AI Assistant Behavior Tests
+# ---------------------------------------------------------------------------
+
+def test_system_prompt_is_general_purpose_assistant():
+    """Verify CAREER_CHATBOT_SYSTEM_PROMPT contains the required general-purpose instructions."""
+    from app.ai.chatbot.prompts import CAREER_CHATBOT_SYSTEM_PROMPT
+
+    assert "You are a general-purpose AI assistant." in CAREER_CHATBOT_SYSTEM_PROMPT
+    assert "Answer any question the user asks. Do not restrict yourself to career-related questions." in CAREER_CHATBOT_SYSTEM_PROMPT
+    assert "When a question is related to programming, AI/ML, open source, GitHub, DSA, projects, internships, GSoC, academics, or career development, prioritize practical and career-oriented guidance." in CAREER_CHATBOT_SYSTEM_PROMPT
+    assert "Do not force unrelated questions into a career context or refuse them simply because they are unrelated to career development." in CAREER_CHATBOT_SYSTEM_PROMPT
+    assert "Be accurate, honest, practical, and transparent when you are unsure." in CAREER_CHATBOT_SYSTEM_PROMPT
+
+
+def test_general_purpose_question_categories_allowed(sample_verified_context: VerifiedContext):
+    """Test that career, programming, general non-career, and casual questions are all accepted by the sufficiency gate."""
+    service = CareerChatService()
+
+    queries = [
+        ("Career question", "What skills should I prioritize developing to become a Cloud Engineer?"),
+        ("Programming question", "Explain how to find a cycle in a linked list using Floyd's algorithm in Python."),
+        ("General non-career question", "What is photosynthesis and why is it important for the Earth?"),
+        ("Unrelated casual question", "What is a good recipe for homemade lemonade?"),
+    ]
+
+    for label, query in queries:
+        is_suff, reason, ids = service.check_evidence_sufficiency(sample_verified_context, query)
+        assert is_suff is True, f"{label} was incorrectly rejected: {reason}"
+        assert reason is None
+
+
+def test_general_question_on_empty_context_allowed():
+    """Test that general non-candidate questions proceed even when verified context is empty."""
+    service = CareerChatService()
+    empty_context = VerifiedContext()
+
+    queries = [
+        "How do I implement binary search in Python?",
+        "What is the capital of France?",
+        "Hello! How are you doing today?",
+    ]
+
+    for query in queries:
+        is_suff, reason, ids = service.check_evidence_sufficiency(empty_context, query)
+        assert is_suff is True, f"Empty context query '{query}' was incorrectly rejected: {reason}"

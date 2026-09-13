@@ -138,31 +138,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    try {
-      const demoGoogleEmail = email.trim() || "candidate.google@skillforge.ai";
-      const res = await authenticateCandidate({
-        email: demoGoogleEmail,
-        fullName: "Verified Google Candidate",
-        targetRole: "Full Stack Engineer",
-        rememberMe: true,
-      });
-
-      if (res.success) {
-        setSuccessMessage("Authenticated via Google SSO. Redirecting...");
-        setTimeout(() => {
-          router.push("/");
-        }, 700);
-      } else {
-        setErrorMessage(res.error || "Google authentication failed.");
-      }
-    } catch {
-      setErrorMessage("Google authentication service currently unavailable.");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleGoogleLogin = () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    window.location.href = `${apiBase}/api/v1/auth/google/login`;
   };
 
   return (

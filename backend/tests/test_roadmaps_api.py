@@ -545,6 +545,43 @@ def test_idor_protection_conflicting_user_id_and_header_returns_400(client, user
     assert res_detail.status_code == 400
 
 
+def test_idor_protection_query_user_id_without_header_returns_401(client, user_a):
+    """
+    Verifies that providing query user_id without X-User-Id header cannot bypass authentication
+    or mutate another user's progress. All /users/me/* endpoints must return 401 Unauthorized.
+    """
+    # 1. GET progress mapping without header must return 401
+    res_get = client.get(f"/api/v1/users/me/roadmap-progress?user_id={user_a.id}")
+    assert res_get.status_code == 401
+    assert "Authentication required: X-User-Id header missing" in res_get.json()["detail"]
+
+    # 2. PUT skill progress without header must return 401
+    res_put_skill = client.put(
+        f"/api/v1/users/me/roadmap-progress/python?user_id={user_a.id}",
+        json={"status": "DONE"},
+    )
+    assert res_put_skill.status_code == 401
+    assert "Authentication required: X-User-Id header missing" in res_put_skill.json()["detail"]
+
+    # 3. PUT practice problem progress without header must return 401
+    res_put_problem = client.put(
+        f"/api/v1/users/me/roadmap-progress/python/problems/backend-python-p1?user_id={user_a.id}",
+        json={"status": "COMPLETED"},
+    )
+    assert res_put_problem.status_code == 401
+    assert "Authentication required: X-User-Id header missing" in res_put_problem.json()["detail"]
+
+
+def test_user_progress_malformed_header_returns_422(client):
+    """Verifies that a malformed X-User-Id header returns 422 Unprocessable Entity."""
+    res = client.get(
+        "/api/v1/users/me/roadmap-progress",
+        headers={"X-User-Id": "not-a-valid-uuid"},
+    )
+    assert res.status_code == 422
+    assert "Invalid user ID format in X-User-Id header" in res.json()["detail"]
+
+
 # -----------------------------------------------------------------------------
 # 10. P4 Regression Safety Tests
 # -----------------------------------------------------------------------------

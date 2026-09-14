@@ -50,7 +50,7 @@ def _resolve_effective_user_id(
     header_user_id: Optional[str],
 ) -> Optional[uuid.UUID]:
     """
-    Resolves target user ID from query param or X-User-Id header.
+    Resolves target user ID from query param or X-User-Id header for public endpoints.
     Re-maps 403 identity conflict to 400 Bad Request per main static roadmap convention.
     """
     try:
@@ -62,6 +62,43 @@ def _resolve_effective_user_id(
                 detail=exc.detail,
             )
         raise exc
+
+
+def _resolve_authenticated_user_id(
+    query_user_id: Optional[uuid.UUID],
+    header_user_id: Optional[str],
+    db: Session,
+) -> uuid.UUID:
+    """
+    Resolves and strictly authenticates candidate user identity for /users/me/* endpoints.
+    Strictly requires the trusted X-User-Id header.
+    Rejects missing header with 401 Unauthorized.
+    Rejects malformed UUID in header with 422 Unprocessable Entity.
+    Rejects conflicting query user_id with 400 Bad Request (IDOR protection).
+    Verifies user exists in database (404 Not Found).
+    """
+    if not header_user_id or not header_user_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: X-User-Id header missing.",
+        )
+
+    try:
+        authenticated_id = uuid.UUID(header_user_id.strip())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid user ID format in X-User-Id header.",
+        )
+
+    if query_user_id is not None and query_user_id != authenticated_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cross-user access denied: target user_id does not match authenticated user context.",
+        )
+
+    verify_user_exists(db, authenticated_id)
+    return authenticated_id
 
 
 # -----------------------------------------------------------------------------
@@ -249,13 +286,7 @@ def get_current_user_progress(
     db: Session = Depends(get_db),
 ) -> Any:
     """Returns progress mapping or summary for the authenticated user."""
-    effective_user_id = _resolve_effective_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required: user identity not provided via X-User-Id header or user_id.",
-        )
-    verify_user_exists(db, effective_user_id)
+    effective_user_id = _resolve_authenticated_user_id(user_id, x_user_id, db)
 
     if summary and roadmap_id:
         try:
@@ -297,13 +328,7 @@ def update_current_user_progress(
     db: Session = Depends(get_db),
 ) -> UserProgressResponse:
     """Updates skill learning progress for authenticated user."""
-    effective_user_id = _resolve_effective_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required: user identity not provided via X-User-Id header or user_id.",
-        )
-    verify_user_exists(db, effective_user_id)
+    effective_user_id = _resolve_authenticated_user_id(user_id, x_user_id, db)
 
     try:
         updated = skill_roadmap_service.update_user_progress(
@@ -342,13 +367,7 @@ def update_current_user_practice_progress(
     db: Session = Depends(get_db),
 ) -> UserPracticeProgressResponse:
     """Updates practice problem progress for authenticated user."""
-    effective_user_id = _resolve_effective_user_id(user_id, x_user_id)
-    if not effective_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required: user identity not provided via X-User-Id header or user_id.",
-        )
-    verify_user_exists(db, effective_user_id)
+    effective_user_id = _resolve_authenticated_user_id(user_id, x_user_id, db)
 
     try:
         updated = skill_roadmap_service.update_user_practice_progress(

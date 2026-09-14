@@ -10,6 +10,7 @@ Validates:
 """
 
 import importlib
+from pathlib import Path
 import pytest
 from sqlalchemy import inspect
 from app.db.database import Base
@@ -139,9 +140,11 @@ def test_p4_p5_models_intact():
 
 
 def test_alembic_migration_metadata():
+    backend_dir = Path(__file__).resolve().parent.parent
+    migration_path = backend_dir / "alembic" / "versions" / "0021_skill_roadmaps_and_practice_problems.py"
     spec = importlib.util.spec_from_file_location(
         "migration_0021",
-        r"alembic/versions/0021_skill_roadmaps_and_practice_problems.py"
+        str(migration_path)
     )
     migration_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration_mod)

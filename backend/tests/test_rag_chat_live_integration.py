@@ -234,22 +234,77 @@ def test_3_rag_service_injected_into_career_chat_service(
     assert injected_service.rag_service.embedding_provider.dimension == 384
 
 
+@pytest.fixture
+def unindexed_skill(db_session: Session) -> Generator[Skill, None, None]:
+    """Provides a canonical Skill entity with no indexed RAG chunks."""
+    skill_id = uuid4()
+    slug = f"test-unindexed-{skill_id.hex[:8]}"
+    skill = Skill(
+        id=skill_id,
+        name=f"TestUnindexed_{skill_id.hex[:4]}",
+        slug=slug,
+        category="Testing",
+        description="Skill with no indexed chunks",
+    )
+    db_session.add(skill)
+    db_session.commit()
+    yield skill
+
+    cleanup = SessionLocal()
+    try:
+        s = cleanup.query(Skill).filter(Skill.id == skill_id).first()
+        if s:
+            cleanup.delete(s)
+            cleanup.commit()
+    finally:
+        cleanup.close()
+
+
+@pytest.fixture
+def verified_context_with_unindexed_skill(unindexed_skill: Skill) -> VerifiedContext:
+    """VerifiedContext containing unindexed_skill as PARTIAL."""
+    return VerifiedContext(
+        candidate=VerifiedCandidateContext(
+            candidate_id=uuid4(),
+            target_role_name="Backend Engineer",
+            location="Remote",
+            has_resume=True,
+            has_github=True,
+            provenance=FactProvenance.DETERMINISTIC_ANALYSIS,
+        ),
+        skills=(
+            VerifiedSkillFact(
+                skill_id=unindexed_skill.id,
+                skill_name=unindexed_skill.name,
+                canonical_slug=unindexed_skill.slug,
+                classification=SkillClassification.PARTIAL,
+                demonstrated_score=0.45,
+                claimed=True,
+                evidence_count=1,
+                provenance=FactProvenance.DETERMINISTIC_ANALYSIS,
+            ),
+        ),
+        provenance=FactProvenance.DETERMINISTIC_ANALYSIS,
+    )
+
+
 def test_4_live_chat_with_rag_active_and_zero_matching_chunks(
     test_client: TestClient,
-    verified_context_with_skill: VerifiedContext,
+    unindexed_skill: Skill,
+    verified_context_with_unindexed_skill: VerifiedContext,
 ):
     """Verify /api/v1/ai/chat with RAG active and 0 matching chunks returns retrieved_evidence=[]."""
     payload = {
-        "user_query": "Explain my Python status",
+        "user_query": f"Explain my {unindexed_skill.name} status",
         "conversation_id": None,
-        "verified_context": verified_context_with_skill.model_dump(mode="json"),
+        "verified_context": verified_context_with_unindexed_skill.model_dump(mode="json"),
     }
 
     with patch("app.ai.chatbot.service.QwenClient") as MockQwen:
         mock_instance = MockQwen.return_value
         mock_instance.model = "qwen3:8b"
         mock_msg = MagicMock()
-        mock_msg.content = "Python is partial in your verified profile."
+        mock_msg.content = f"{unindexed_skill.name} is partial in your verified profile."
         mock_resp = MagicMock()
         mock_resp.message = mock_msg
         mock_resp.model = "qwen3:8b"
@@ -273,8 +328,8 @@ def test_4_live_chat_with_rag_active_and_zero_matching_chunks(
 def test_5_live_chat_retrieves_indexed_test_fixture_chunk(
     test_client: TestClient,
     db_session: Session,
-    sample_skill: Skill,
-    verified_context_with_skill: VerifiedContext,
+    unindexed_skill: Skill,
+    verified_context_with_unindexed_skill: VerifiedContext,
 ):
     """
     Verify indexed test chunk is retrieved through the live /api/v1/ai/chat path
@@ -290,21 +345,21 @@ def test_5_live_chat_retrieves_indexed_test_fixture_chunk(
     db_doc = DBRAGDocument(
         id=doc_id,
         source_type=RAGSourceType.APPROVED_RESOURCE.value,
-        source_reference="official:python:tutorial",
-        title="Python Official Tutorial",
-        content="Python is an interpreted, high-level, general-purpose programming language.",
-        document_metadata={"skill_id": str(sample_skill.id), "approved_by": "test"},
+        source_reference=f"official:{unindexed_skill.slug}:tutorial",
+        title=f"{unindexed_skill.name} Official Tutorial",
+        content=f"{unindexed_skill.name} is an interpreted, high-level, general-purpose programming language.",
+        document_metadata={"skill_id": str(unindexed_skill.id), "approved_by": "test"},
     )
     db_chunk = DBRAGChunk(
         id=chunk_id,
         document_id=doc_id,
         chunk_index=0,
-        content="Python is an interpreted, high-level, general-purpose programming language.",
+        content=f"{unindexed_skill.name} is an interpreted, high-level, general-purpose programming language.",
         embedding=mock_vector,
-        skill_id=sample_skill.id,
+        skill_id=unindexed_skill.id,
         source_type=RAGSourceType.APPROVED_RESOURCE.value,
-        source_reference="official:python:tutorial",
-        chunk_metadata={"chunk_index": 0, "source_reference": "official:python:tutorial"},
+        source_reference=f"official:{unindexed_skill.slug}:tutorial",
+        chunk_metadata={"chunk_index": 0, "source_reference": f"official:{unindexed_skill.slug}:tutorial"},
     )
     db_session.add(db_doc)
     db_session.add(db_chunk)
@@ -312,9 +367,9 @@ def test_5_live_chat_retrieves_indexed_test_fixture_chunk(
 
     try:
         payload = {
-            "user_query": "Explain my Python status",
+            "user_query": f"Explain my {unindexed_skill.name} status",
             "conversation_id": None,
-            "verified_context": verified_context_with_skill.model_dump(mode="json"),
+            "verified_context": verified_context_with_unindexed_skill.model_dump(mode="json"),
         }
 
         # Mock query embedding generation so test does not depend on model download
@@ -327,7 +382,7 @@ def test_5_live_chat_retrieves_indexed_test_fixture_chunk(
                 mock_instance = MockQwen.return_value
                 mock_instance.model = "qwen3:8b"
                 mock_msg = MagicMock()
-                mock_msg.content = "Python is partial and high demand."
+                mock_msg.content = f"{unindexed_skill.name} is partial and high demand."
                 mock_resp = MagicMock()
                 mock_resp.message = mock_msg
                 mock_resp.model = "qwen3:8b"
@@ -343,7 +398,7 @@ def test_5_live_chat_retrieves_indexed_test_fixture_chunk(
                 assert len(data["retrieved_evidence"]) == 1
                 ev = data["retrieved_evidence"][0]
                 assert ev["chunk_id"] == str(chunk_id)
-                assert "Python" in ev["content"]
+                assert unindexed_skill.name in ev["content"]
                 assert ev["source_type"] == "APPROVED_RESOURCE"
                 assert ev["similarity_score"] > 0.99
     finally:

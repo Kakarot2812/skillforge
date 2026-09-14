@@ -12,7 +12,7 @@ Guarantees:
 - Typed exception translation
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -129,8 +129,19 @@ class RAGRepository:
                     stmt = stmt.where(DBRAGChunk.source_type == filters.source_type.value)
                 if filters.skill_id is not None:
                     stmt = stmt.where(DBRAGChunk.skill_id == filters.skill_id)
+                elif filters.skill_ids is not None and len(filters.skill_ids) > 0:
+                    stmt = stmt.where(DBRAGChunk.skill_id.in_(filters.skill_ids))
                 if filters.source_reference is not None:
                     stmt = stmt.where(DBRAGChunk.source_reference == filters.source_reference)
+
+            # Minimum similarity threshold
+            effective_min_sim = (
+                filters.min_similarity
+                if (filters is not None and filters.min_similarity is not None)
+                else settings.RAG_MIN_SIMILARITY_THRESHOLD
+            )
+            max_distance = max(0.0, 1.0 - effective_min_sim)
+            stmt = stmt.where(distance_expr <= max_distance)
 
             # Deterministic ordering: primary distance ASC (similarity DESC), secondary ID ASC
             stmt = stmt.order_by(distance_expr.asc(), DBRAGChunk.id.asc()).limit(bounded_top_k)
@@ -200,3 +211,22 @@ class RAGRepository:
         except SQLAlchemyError as exc:
             self.session.rollback()
             raise RAGStorageError(f"Failed to delete RAG document '{document_id}': {str(exc)}") from exc
+
+    def find_document_by_reference(
+        self, source_type: Union[str, RAGSourceType], source_reference: str
+    ) -> Optional[DBRAGDocument]:
+        """
+        Finds an existing raw database document by source_type and source_reference.
+        Used for idempotent ingestion, change detection, and deduplication.
+        """
+        st_val = source_type.value if isinstance(source_type, RAGSourceType) else str(source_type)
+        try:
+            stmt = select(DBRAGDocument).where(
+                DBRAGDocument.source_type == st_val,
+                DBRAGDocument.source_reference == source_reference,
+            )
+            return self.session.execute(stmt).scalars().first()
+        except SQLAlchemyError as exc:
+            raise RAGStorageError(
+                f"Database error looking up document by reference '{st_val}:{source_reference}': {str(exc)}"
+            ) from exc

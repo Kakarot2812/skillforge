@@ -19,7 +19,7 @@ from enum import Enum
 import re
 from typing import Any, Optional, Tuple
 from uuid import UUID, uuid4
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
 from app.rag.exceptions import RAGValidationError
@@ -43,6 +43,7 @@ class RAGSourceType(str, Enum):
     GITHUB = "GITHUB"
     DETERMINISTIC_ANALYSIS = "DETERMINISTIC_ANALYSIS"
     APPROVED_RESOURCE = "APPROVED_RESOURCE"
+    APPROVED_PROJECT = "APPROVED_PROJECT"
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ class RAGDocumentMetadata(BaseModel):
     observed_at: Optional[datetime] = Field(None, description="Timestamp when evidence/document was observed")
     confidence_score: float = Field(1.0, ge=0.0, le=1.0, description="Evidence extraction confidence")
     approved_by: str = Field("deterministic_pipeline", description="Approval authority identifying this as approved evidence")
+    content_hash: Optional[str] = Field(None, description="SHA-256 hash of normalized document content and metadata")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -170,9 +172,17 @@ class RAGRetrievalFilter(BaseModel):
     """
     source_type: Optional[RAGSourceType] = Field(None, description="Restrict retrieval to specific source type")
     skill_id: Optional[UUID] = Field(None, description="Restrict retrieval to specific canonical skill UUID")
+    skill_ids: Optional[Tuple[UUID, ...]] = Field(None, description="Restrict retrieval to one or more canonical skill UUIDs")
     source_reference: Optional[str] = Field(None, description="Restrict retrieval to exact source reference")
+    min_similarity: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum cosine similarity threshold [0.0, 1.0]")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_filter_consistency(self) -> "RAGRetrievalFilter":
+        if self.skill_id is not None and self.skill_ids is not None:
+            raise ValueError("Cannot specify both 'skill_id' and 'skill_ids' in RAGRetrievalFilter.")
+        return self
 
 
 class RAGRetrievalResult(BaseModel):

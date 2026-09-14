@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     RAG_CHUNK_SIZE: int = 500
     RAG_CHUNK_OVERLAP: int = 50
     RAG_MAX_DOCUMENT_CONTENT_LENGTH: int = 50000
+    RAG_MIN_SIMILARITY_THRESHOLD: float = 0.30
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

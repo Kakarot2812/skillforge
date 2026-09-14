@@ -352,8 +352,8 @@ class CareerChatService:
         retrieved_evidence: List[RAGRetrievalResult] = []
         if self.rag_service is not None:
             rag_filter = None
-            if len(referenced_skill_ids) == 1:
-                rag_filter = RAGRetrievalFilter(skill_id=referenced_skill_ids[0])
+            if referenced_skill_ids:
+                rag_filter = RAGRetrievalFilter(skill_ids=tuple(referenced_skill_ids))
             try:
                 retrieved_evidence = self.rag_service.retrieve(
                     query=request.user_query,

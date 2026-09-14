@@ -32,6 +32,13 @@ from app.rag.models import (
     RAGRetrievalResult,
     RAGSourceType,
 )
+from app.rag.ingestion import (
+    EvidenceIngestionService,
+    build_market_demand_rag_document,
+    build_market_job_rag_document,
+    build_resource_rag_document,
+    compute_document_content_hash,
+)
 from app.rag.repository import RAGRepository
 from app.rag.retriever import EvidenceRetriever
 from app.rag.service import RAGService
@@ -39,6 +46,8 @@ from app.rag.service import RAGService
 __all__ = [
     "DeterministicChunker",
     "EmbeddingProvider",
+    "EvidenceIngestionService",
+    "EvidenceRetriever",
     "LazySentenceTransformerProvider",
     "LocalSentenceTransformerProvider",
     "MockEmbeddingProvider",
@@ -59,6 +68,10 @@ __all__ = [
     "RAGSourceType",
     "RAGStorageError",
     "RAGValidationError",
+    "build_market_demand_rag_document",
+    "build_market_job_rag_document",
+    "build_resource_rag_document",
+    "compute_document_content_hash",
     "get_shared_embedding_provider",
 ]
 

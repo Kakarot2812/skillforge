@@ -221,7 +221,21 @@ def seed_data(db_session: Session):
 
     db_session.commit()
 
-    return {
+    created_ids = {
+        "candidate_id": candidate.id,
+        "other_user_id": other_user.id,
+        "repo_id": repo.id,
+        "other_repo_id": other_repo.id,
+        "forked_repo_id": forked_repo.id,
+        "roadmap_id": roadmap.id,
+        "other_roadmap_id": other_roadmap.id,
+        "milestone_id": m1.id,
+        "milestone_2_id": m2_unrelated.id,
+        "project_id": project.id,
+        "evidence_id": evidence.id,
+    }
+
+    yield {
         "candidate": candidate,
         "other_user": other_user,
         "repo": repo,
@@ -235,6 +249,28 @@ def seed_data(db_session: Session):
         "skill": skill,
         "skill2": skill2,
     }
+
+    # Teardown: clean up test-created records
+    db_session.query(MilestoneVerification).filter(
+        MilestoneVerification.roadmap_id.in_([created_ids["roadmap_id"], created_ids["other_roadmap_id"]])
+    ).delete(synchronize_session=False)
+    db_session.query(ProjectEvidence).filter(ProjectEvidence.id == created_ids["evidence_id"]).delete(synchronize_session=False)
+    db_session.query(RoadmapMilestone).filter(
+        RoadmapMilestone.id.in_([created_ids["milestone_id"], created_ids["milestone_2_id"]])
+    ).delete(synchronize_session=False)
+    db_session.query(CandidateRoadmap).filter(
+        CandidateRoadmap.id.in_([created_ids["roadmap_id"], created_ids["other_roadmap_id"]])
+    ).delete(synchronize_session=False)
+    db_session.query(ApprovedProject).filter(
+        ApprovedProject.id == created_ids["project_id"]
+    ).delete(synchronize_session=False)
+    db_session.query(GitHubRepository).filter(
+        GitHubRepository.id.in_([created_ids["repo_id"], created_ids["other_repo_id"], created_ids["forked_repo_id"]])
+    ).delete(synchronize_session=False)
+    db_session.query(User).filter(
+        User.id.in_([created_ids["candidate_id"], created_ids["other_user_id"]])
+    ).delete(synchronize_session=False)
+    db_session.commit()
 
 
 # Helper mock tree and files

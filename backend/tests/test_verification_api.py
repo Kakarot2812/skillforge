@@ -268,6 +268,7 @@ def seed_data(db_session: Session):
         "milestone_2_id": m2.id,
         "other_milestone_id": other_m1.id,
         "evidence_id": evidence.id,
+        "project_id": project.id,
     }
 
     yield {
@@ -296,6 +297,9 @@ def seed_data(db_session: Session):
     ).delete(synchronize_session=False)
     db_session.query(CandidateRoadmap).filter(
         CandidateRoadmap.id.in_([created_ids["roadmap_id"], created_ids["other_roadmap_id"]])
+    ).delete(synchronize_session=False)
+    db_session.query(ApprovedProject).filter(
+        ApprovedProject.id == created_ids["project_id"]
     ).delete(synchronize_session=False)
     db_session.query(GitHubRepository).filter(
         GitHubRepository.id.in_([created_ids["repo_id"], created_ids["other_repo_id"], created_ids["forked_repo_id"]])

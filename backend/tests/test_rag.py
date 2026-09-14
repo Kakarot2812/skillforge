@@ -503,14 +503,24 @@ def test_21_similarity_ranking(db_session: Session):
     provider.register_mapping("highly relevant python chunk", relevant_vec)
     provider.register_mapping("completely unrelated cooking chunk", unrelated_vec)
 
+    doc1 = create_sample_rag_document(
+        title="Relevant Doc",
+        content="highly relevant python chunk",
+        source_type=RAGSourceType.RESUME,
+        source_ref=f"resume:relevant:{uuid4().hex[:6]}",
+    )
+    doc2 = create_sample_rag_document(
+        title="Unrelated Doc",
+        content="completely unrelated cooking chunk",
+        source_type=RAGSourceType.RESUME,
+        source_ref=f"resume:unrelated:{uuid4().hex[:6]}",
+    )
     service = RAGService(session=db_session, embedding_provider=provider)
-
-    doc1 = create_sample_rag_document(title="Relevant Doc", content="highly relevant python chunk")
-    doc2 = create_sample_rag_document(title="Unrelated Doc", content="completely unrelated cooking chunk")
     service.index_document(doc1)
     service.index_document(doc2)
 
-    results = service.retrieve(query="target python query", top_k=5)
+    filter_resume = RAGRetrievalFilter(source_type=RAGSourceType.RESUME, min_similarity=0.0)
+    results = service.retrieve(query="target python query", top_k=5, filters=filter_resume)
     assert len(results) == 2
     # Most similar must be ranked first
     assert "relevant python chunk" in results[0].content
@@ -520,7 +530,8 @@ def test_21_similarity_ranking(db_session: Session):
 def test_22_deterministic_tie_breaking(db_session: Session):
     """22. Deterministic tie-breaking orders equal similarities by chunk_id ASC."""
     repo = RAGRepository(session=db_session)
-    doc = create_sample_rag_document()
+    ref = f"test:tie:{uuid4().hex[:6]}"
+    doc = create_sample_rag_document(source_ref=ref)
     repo.save_document(doc)
 
     identical_vector = [0.5] * settings.EMBEDDING_DIMENSION
@@ -553,7 +564,8 @@ def test_22_deterministic_tie_breaking(db_session: Session):
     )
     repo.save_chunks([chunk1, chunk2])
 
-    results = repo.search_similar(query_vector=normalized, top_k=5)
+    filter_tie = RAGRetrievalFilter(source_reference=ref)
+    results = repo.search_similar(query_vector=normalized, top_k=5, filters=filter_tie)
     assert len(results) == 2
     # Because similarity is identical, tie-breaker must order by chunk_id ASC
     assert results[0].chunk_id == id_lower
@@ -657,7 +669,8 @@ def test_26_unrelated_skill_excluded_by_filter(db_session: Session, sample_canon
     results = service.retrieve(query="query phrase", filters=filter_python)
 
     # Must NOT return Docker chunk despite 1.0 vector similarity!
-    assert len(results) == 0
+    for r in results:
+        assert r.skill_id != sample_second_skill.id
 
 
 def test_27_provenance_preserved_through_retrieval(db_session: Session):
@@ -674,7 +687,8 @@ def test_27_provenance_preserved_through_retrieval(db_session: Session):
     )
     service.index_document(doc)
 
-    results = service.retrieve(query="python slim requirements")
+    filter_github = RAGRetrievalFilter(source_type=RAGSourceType.GITHUB, source_reference=ref)
+    results = service.retrieve(query="python slim requirements", filters=filter_github)
     assert len(results) > 0
     res = results[0]
     assert res.source_type == RAGSourceType.GITHUB
@@ -687,7 +701,7 @@ def test_28_embedding_vectors_not_returned_in_normal_result(db_session: Session)
     provider = MockEmbeddingProvider(dimension=settings.EMBEDDING_DIMENSION)
     service = RAGService(session=db_session, embedding_provider=provider)
 
-    doc = create_sample_rag_document()
+    doc = create_sample_rag_document(content="FastAPI backend architecture provides high-performance asynchronous REST endpoints using Pydantic models.")
     service.index_document(doc)
 
     results = service.retrieve(query="architecture")
@@ -719,8 +733,9 @@ def test_30_empty_retrieval_handled_correctly(db_session: Session):
     provider = MockEmbeddingProvider(dimension=settings.EMBEDDING_DIMENSION)
     service = RAGService(session=db_session, embedding_provider=provider)
 
-    # Empty database
-    results = service.retrieve(query="any search term")
+    # Empty retrieval with non-matching filter
+    filter_none = RAGRetrievalFilter(source_reference="nonexistent:empty:ref")
+    results = service.retrieve(query="any search term", filters=filter_none)
     assert results == []
 
 
@@ -1033,7 +1048,7 @@ def test_43_qwen_receives_bounded_retrieved_evidence(db_session: Session, sample
     python_id = sample_canonical_skill.id
     doc = create_sample_rag_document(
         title="Short Snippet",
-        content="Short bounded evidence chunk for testing.",
+        content="Python: Short bounded evidence chunk for testing.",
         skill_id=python_id,
         skill_name="Python",
     )

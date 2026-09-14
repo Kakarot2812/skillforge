@@ -17,7 +17,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.rag.exceptions import RAGValidationError
-from app.rag.models import RAGChunk, RAGChunkMetadata, RAGDocument
+from app.rag.models import RAGChunk, RAGChunkMetadata, RAGDocument, RAGSourceType
 
 
 class DeterministicChunker:
@@ -58,8 +58,14 @@ class DeterministicChunker:
         text_len = len(raw_text)
         chunks: List[RAGChunk] = []
 
+        effective_chunk_size = (
+            max(self.chunk_size, 1000)
+            if getattr(document, "source_type", None) == RAGSourceType.APPROVED_PROJECT
+            else self.chunk_size
+        )
+
         # If text fits within single chunk
-        if text_len <= self.chunk_size:
+        if text_len <= effective_chunk_size:
             chunk_metadata = RAGChunkMetadata(
                 skill_id=document.metadata.skill_id,
                 skill_name=document.metadata.skill_name,
@@ -88,7 +94,7 @@ class DeterministicChunker:
         chunk_idx = 0
 
         while start < text_len:
-            end = min(start + self.chunk_size, text_len)
+            end = min(start + effective_chunk_size, text_len)
 
             # If not at the end of the text, look for word boundary near end
             if end < text_len:

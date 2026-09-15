@@ -14,3 +14,5 @@ sentence-transformers>=3.0.0
 langchain>=1.4.0
 langchain-core>=1.6.3
 langchain-ollama>=1.1.0
+langchain-google-genai>=4.4.0
+reportlab>=4.1.0

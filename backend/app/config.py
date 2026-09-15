@@ -1,5 +1,5 @@
 from typing import List, Optional, Union
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,22 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "qwen3:8b"
     OLLAMA_TIMEOUT_SECONDS: float = 60.0
     OLLAMA_THINK: bool = False
+
+    # Google Gemini API Settings (Post-MVP Career Roadmap PDF Foundation)
+    GEMINI_API_KEY: Optional[str] = Field(
+        default=None,
+        repr=False,
+        description="Google Gemini API key (backend-only secret)",
+    )
+    GEMINI_MODEL: str = Field(
+        default="gemini-2.5-flash",
+        description="Configured Google Gemini model identifier",
+    )
+    GEMINI_TIMEOUT_SECONDS: float = Field(
+        default=30.0,
+        gt=0.0,
+        description="Gemini API request timeout threshold in seconds",
+    )
 
     # RAG / Local Embedding Settings (Post-MVP P3 RAG Foundation)
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"

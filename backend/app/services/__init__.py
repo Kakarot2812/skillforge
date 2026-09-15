@@ -23,6 +23,15 @@ from app.services.user_profile_service import (
     InvalidUserProfileError,
 )
 
+from app.services.roadmap_pdf_context_service import (
+    RoadmapPDFContextService,
+    roadmap_pdf_context_service,
+)
+from app.services.roadmap_pdf_renderer import (
+    RoadmapPDFRenderer,
+    roadmap_pdf_renderer,
+)
+
 __all__ = [
     "extract_text_from_file",
     "parse_resume_sections",
@@ -42,5 +51,9 @@ __all__ = [
     "UserProfileAlreadyExistsError",
     "UserProfileOwnershipError",
     "InvalidUserProfileError",
+    "RoadmapPDFContextService",
+    "roadmap_pdf_context_service",
+    "RoadmapPDFRenderer",
+    "roadmap_pdf_renderer",
 ]
 

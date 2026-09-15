@@ -16,10 +16,11 @@ Strictly decoupled from P4 Personalized Roadmap (/api/v1/roadmap).
 
 from typing import Any, Dict, List, Optional, Union
 import uuid
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.gaps import resolve_user_id, verify_user_exists
+from app.api.v1.roadmap import get_roadmap_pdf
 from app.db.database import get_db
 from app.schemas.skill_roadmap import (
     RoadmapDetailResponse,
@@ -123,6 +124,35 @@ def list_roadmaps(db: Session = Depends(get_db)) -> RoadmapListResponse:
     """Returns all 12 static roadmap domains with metadata and counts."""
     catalog_items = skill_roadmap_service.get_roadmap_catalog(db)
     return RoadmapListResponse(data=catalog_items, total=len(catalog_items))
+
+
+router.add_api_route(
+    "/{roadmap_id}/pdf",
+    get_roadmap_pdf,
+    methods=["GET"],
+    response_class=Response,
+    status_code=status.HTTP_200_OK,
+    summary="Download Personalized Career Roadmap PDF",
+    description=(
+        "Assembles verified candidate evidence and deterministic roadmap milestones, "
+        "synthesizes validated personalized career narratives via Gemini 2.5 Flash, "
+        "and renders a publication-quality A4 PDF document. Strict candidate ownership enforced."
+    ),
+    tags=["Career Roadmaps"],
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "Publication-quality personalized career roadmap PDF document.",
+        },
+        401: {"description": "Authentication required: missing or invalid X-User-Id header."},
+        403: {"description": "Cross-user access denied (candidate ownership protection)."},
+        404: {"description": "Roadmap or user not found."},
+        422: {"description": "Validation error on roadmap UUID or X-User-Id format."},
+        500: {"description": "Narrative reference integrity failure or PDF document compilation failure."},
+        502: {"description": "Upstream AI narrative generation service failure."},
+        504: {"description": "Upstream AI narrative generation gateway timeout."},
+    },
+)
 
 
 @router.get(

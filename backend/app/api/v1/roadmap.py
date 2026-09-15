@@ -14,10 +14,11 @@ from datetime import datetime, timezone
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.ai.gemini.exceptions import GeminiTimeoutError
 from app.ai.qwen.exceptions import (
     QwenAPIError,
     QwenConnectionError,
@@ -25,8 +26,13 @@ from app.ai.qwen.exceptions import (
     QwenResponseError,
     QwenTimeoutError,
 )
-from app.ai.roadmap import AIRoadmapExplanationService
-from app.api.v1.gaps import resolve_user_id
+from app.ai.roadmap import AIRoadmapExplanationService, RoadmapPDFNarrativeService
+from app.ai.roadmap.exceptions import (
+    NarrativeGenerationError,
+    NarrativeValidationError,
+    ReferenceIntegrityError,
+)
+from app.api.v1.gaps import resolve_user_id, verify_user_exists
 from app.db.database import get_db
 from app.db.models import (
     CandidateRoadmap,
@@ -44,6 +50,8 @@ from app.schemas.roadmap import (
 from app.services.demonstrated_skill_service import is_repo_owned_by_user
 from app.services.resource_service import resource_service
 from app.services.roadmap_engine import RoadmapDependencyCycleError, RoadmapError
+from app.services.roadmap_pdf_context_service import roadmap_pdf_context_service
+from app.services.roadmap_pdf_renderer import roadmap_pdf_renderer
 from app.services.roadmap_service import roadmap_service
 from app.services.verification_service import (
     ForkedRepositoryError,
@@ -265,6 +273,118 @@ def get_roadmap_by_id(
         resolved_user_id=effective_user_id,
     )
     return RoadmapResponse(data=roadmap_data)
+
+
+@router.get(
+    "/{roadmap_id}/pdf",
+    response_class=Response,
+    status_code=status.HTTP_200_OK,
+    summary="Download Personalized Career Roadmap PDF",
+    description=(
+        "Assembles verified candidate evidence and deterministic roadmap milestones, "
+        "synthesizes validated personalized career narratives via Gemini 2.5 Flash, "
+        "and renders a publication-quality A4 PDF document. Strict candidate ownership enforced."
+    ),
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "Publication-quality personalized career roadmap PDF document.",
+        },
+        401: {"description": "Authentication required: missing or invalid X-User-Id header."},
+        403: {"description": "Cross-user access denied (candidate ownership protection)."},
+        404: {"description": "Roadmap or user not found."},
+        422: {"description": "Validation error on roadmap UUID or X-User-Id format."},
+        500: {"description": "Narrative reference integrity failure or PDF document compilation failure."},
+        502: {"description": "Upstream AI narrative generation service failure."},
+        504: {"description": "Upstream AI narrative generation gateway timeout."},
+    },
+)
+def get_roadmap_pdf(
+    roadmap_id: UUID = Path(..., description="Canonical CandidateRoadmap UUID"),
+    download: bool = Query(False, description="If true, sets Content-Disposition: attachment; if false, sets inline preview"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="Authenticated candidate user UUID context"),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Generates and returns the personalized career roadmap PDF for an authenticated candidate.
+    Enforces strict candidate ownership (IDOR protection). Fails closed on integrity or provider failures.
+    """
+    # 1. Authenticate Request & Resolve User
+    if not x_user_id or not x_user_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: X-User-Id header missing.",
+        )
+    try:
+        authenticated_user_id = UUID(x_user_id.strip())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid user ID format in X-User-Id header.",
+        )
+
+    verify_user_exists(db, authenticated_user_id)
+
+    # 2. Build Verified Context (enforces roadmap existence and candidate ownership)
+    context = roadmap_pdf_context_service.build_verified_context(
+        db=db,
+        roadmap_id=roadmap_id,
+        authenticated_user_id=authenticated_user_id,
+    )
+
+    # 3. Generate Validated Personalized Narrative via Gemini 2.5 Flash
+    narrative_svc = RoadmapPDFNarrativeService()
+    try:
+        validated_content = narrative_svc.generate_validated_narrative(context)
+    except (ReferenceIntegrityError, NarrativeValidationError) as exc:
+        logger.error("Roadmap narrative validation failed closed for roadmap %s: %s", roadmap_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Roadmap integrity validation failed.",
+        )
+    except NarrativeGenerationError as exc:
+        logger.error("AI narrative generation failed for roadmap %s: %s", roadmap_id, exc)
+        if isinstance(exc.original_exception, GeminiTimeoutError):
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Roadmap narrative generation timed out.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI narrative generation service unavailable.",
+        )
+    except Exception as exc:
+        logger.error("Unexpected failure during narrative generation for roadmap %s: %s", roadmap_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI narrative generation service unavailable.",
+        )
+
+    # 4. Render Exact ReportLab A4 PDF Bytes
+    try:
+        pdf_bytes = roadmap_pdf_renderer.render(validated_content)
+    except Exception as exc:
+        logger.error("PDF compilation failed for roadmap %s: %s", roadmap_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PDF document compilation failed.",
+        )
+
+    # 5. Assemble HTTP Response
+    disposition_type = "attachment" if download else "inline"
+    safe_filename = f"skillforge-roadmap-{roadmap_id}.pdf"
+    content_disposition = f'{disposition_type}; filename="{safe_filename}"'
+
+    headers = {
+        "Content-Disposition": content_disposition,
+        "Cache-Control": "no-store",
+    }
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers=headers,
+    )
 
 
 @router.post(

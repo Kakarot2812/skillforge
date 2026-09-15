@@ -364,8 +364,8 @@ export default function VerificationEvidence({
             <div className="p-2.5 rounded-lg bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 space-y-1">
               <span className="text-slate-500 dark:text-neutral-500 block">Deliverables Score</span>
               <span className="font-mono text-sm font-bold text-slate-900 dark:text-neutral-200">
-                {details.deliverables_score !== undefined
-                  ? `${Math.round(details.deliverables_score * 100)}%`
+                {details.scores?.deliverables_score !== undefined
+                  ? `${Math.round(details.scores!.deliverables_score! * 100)}%`
                   : "--"}
               </span>
             </div>
@@ -373,8 +373,8 @@ export default function VerificationEvidence({
             <div className="p-2.5 rounded-lg bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 space-y-1">
               <span className="text-slate-500 dark:text-neutral-500 block">Criteria Pass Score</span>
               <span className="font-mono text-sm font-bold text-slate-900 dark:text-neutral-200">
-                {details.criteria_score !== undefined
-                  ? `${Math.round(details.criteria_score * 100)}%`
+                {details.scores?.criteria_score !== undefined
+                  ? `${Math.round(details.scores!.criteria_score! * 100)}%`
                   : "--"}
               </span>
             </div>
@@ -382,8 +382,8 @@ export default function VerificationEvidence({
             <div className="p-2.5 rounded-lg bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 space-y-1">
               <span className="text-slate-500 dark:text-neutral-500 block">Demonstrated Skill Score</span>
               <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                {details.demonstrated_skill_score !== null && details.demonstrated_skill_score !== undefined
-                  ? `${Math.round(details.demonstrated_skill_score * 100)}%`
+                {details.scores?.demonstrated_skill_score !== null && details.scores?.demonstrated_skill_score !== undefined
+                  ? `${Math.round(details.scores!.demonstrated_skill_score! * 100)}%`
                   : "N/A (Project Deliverable Evaluation)"}
               </span>
             </div>
@@ -391,8 +391,8 @@ export default function VerificationEvidence({
             <div className="p-2.5 rounded-lg bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 space-y-1">
               <span className="text-slate-500 dark:text-neutral-500 block">Composite Confidence</span>
               <span className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                {details.composite_confidence !== null && details.composite_confidence !== undefined
-                  ? `${Math.round(details.composite_confidence * 100)}%`
+                {details.scores?.composite_confidence !== null && details.scores?.composite_confidence !== undefined
+                  ? `${Math.round(details.scores!.composite_confidence! * 100)}%`
                   : "--"}
               </span>
             </div>
@@ -407,11 +407,11 @@ export default function VerificationEvidence({
             </div>
           )}
 
-          {details.analyzed_at && (
+          {details.verified_at && (
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-600 dark:text-neutral-400">
               <span>Analyzed At:</span>
               <span className="text-slate-800 dark:text-neutral-300">
-                {new Date(details.analyzed_at).toLocaleString()}
+                {new Date(details.verified_at).toLocaleString()}
               </span>
             </div>
           )}

@@ -823,17 +823,17 @@ export default function SkillGapExplorer({
                 {/* Tri-color progress segment */}
                 <div className="w-full sm:w-64 h-2 rounded-full bg-slate-200 dark:bg-neutral-800 overflow-hidden flex">
                   <div
-                    style={{ width: `${(summary.strong_count / summary.total_required_skills) * 100}%` }}
+                    style={{ width: `${summary.total_required_skills > 0 ? (summary.strong_count / summary.total_required_skills) * 100 : 0}%` }}
                     className="bg-emerald-500 h-full transition-all duration-500"
                     title={`Strong: ${summary.strong_count}`}
                   />
                   <div
-                    style={{ width: `${(summary.partial_count / summary.total_required_skills) * 100}%` }}
+                    style={{ width: `${summary.total_required_skills > 0 ? (summary.partial_count / summary.total_required_skills) * 100 : 0}%` }}
                     className="bg-amber-500 h-full transition-all duration-500"
                     title={`Partial: ${summary.partial_count}`}
                   />
                   <div
-                    style={{ width: `${(summary.missing_count / summary.total_required_skills) * 100}%` }}
+                    style={{ width: `${summary.total_required_skills > 0 ? (summary.missing_count / summary.total_required_skills) * 100 : 0}%` }}
                     className="bg-rose-500/80 h-full transition-all duration-500"
                     title={`Missing: ${summary.missing_count}`}
                   />

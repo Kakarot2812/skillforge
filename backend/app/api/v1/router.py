@@ -10,6 +10,7 @@ from app.api.v1.demand_intelligence import router as intelligence_router
 from app.api.v1.gaps import router as gaps_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.roadmap import router as roadmap_router
+from app.api.v1.roadmaps import router as roadmaps_router, user_progress_router
 from app.api.v1.users import router as users_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.conversations import router as conversations_router
@@ -57,6 +58,12 @@ api_router.include_router(profile_router)
 
 # Mount Persistent AI Chat History routes under /api/v1/conversations
 api_router.include_router(conversations_router, prefix="/conversations")
+
+# Mount Static Skill Roadmaps routes under /api/v1/roadmaps
+api_router.include_router(roadmaps_router, prefix="/roadmaps")
+
+# Mount Static User Roadmap Progress routes under /api/v1/users/me/roadmap-progress
+api_router.include_router(user_progress_router)
 
 
 

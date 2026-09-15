@@ -19,7 +19,15 @@ from app.db.models import (
     Conversation,
     Message,
     UserProfile,
+    Roadmap,
+    RoadmapStage,
+    RoadmapSkill,
+    RoadmapPrerequisite,
+    LearningResource,
+    UserRoadmapProgress,
+    UserPracticeProgress,
 )
+from app.db.seed_roadmaps import seed_roadmaps, validate_seeded_roadmaps
 
 __all__ = [
     "Base",
@@ -45,5 +53,14 @@ __all__ = [
     "Conversation",
     "Message",
     "UserProfile",
+    "Roadmap",
+    "RoadmapStage",
+    "RoadmapSkill",
+    "RoadmapPrerequisite",
+    "LearningResource",
+    "UserRoadmapProgress",
+    "UserPracticeProgress",
+    "seed_roadmaps",
+    "validate_seeded_roadmaps",
 ]
 

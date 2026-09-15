@@ -64,16 +64,20 @@ export interface CriteriaCheckDetail {
   manual_review_criteria: string[];
 }
 
-export interface VerificationAuditDetails {
-  deliverables?: DeliverableCheckDetail;
-  criteria?: CriteriaCheckDetail;
+export interface VerificationScoresDetail {
   deliverables_score?: number;
   criteria_score?: number;
   demonstrated_skill_score?: number | null;
   composite_confidence?: number | null;
+}
+
+export interface VerificationAuditDetails {
+  deliverables?: DeliverableCheckDetail;
+  criteria?: CriteriaCheckDetail;
+  scores?: VerificationScoresDetail;
   commit_sha?: string;
   tree_sha?: string;
-  analyzed_at?: string;
+  verified_at?: string;
   error?: string;
   [key: string]: unknown;
 }

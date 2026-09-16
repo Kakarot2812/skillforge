@@ -152,9 +152,6 @@ export default function RoadmapSection({
               <h2 className="text-xl font-bold text-foreground tracking-tight">
                 Personalized Career Roadmap
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-surface-subtle text-foreground border border-border font-semibold uppercase">
-                Prerequisite DAG
-              </span>
             </div>
             <p className="text-xs sm:text-sm text-muted leading-relaxed">
               Topological prerequisite sequencing (Kahn&apos;s DAG algorithm) aligning candidate skill gaps, vetted learning materials, and practical engineering challenges.

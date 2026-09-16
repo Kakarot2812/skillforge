@@ -114,13 +114,10 @@ export default function RoadmapExplanationModal({
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div>
                 <h2 id="explanation-modal-title" className="text-base font-semibold text-slate-900 dark:text-neutral-100">
                   AI Roadmap Strategy & Reasoning
                 </h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-semibold">
-                  Local Qwen 3 8B
-                </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-neutral-400">
                 Grounded explanation of milestones for <span className="text-purple-600 dark:text-purple-300 font-medium">{roleTitle}</span>

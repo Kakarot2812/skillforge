@@ -169,14 +169,9 @@ export default function DemandIntelligenceExplorer() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              Cross-Role Career Demand Intelligence
-            </h2>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-surface-subtle text-foreground border border-border rounded-sm uppercase">
-              Benchmark
-            </span>
-          </div>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">
+            Cross-Role Career Demand Intelligence
+          </h2>
           <p className="text-xs sm:text-sm text-muted mt-1">
             Cross-market skill rankings, multi-role skill comparisons, and verified YoY growth trends.
           </p>

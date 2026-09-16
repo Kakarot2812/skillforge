@@ -518,9 +518,6 @@ export default function CareerAssistant({
               <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 AI Career Intelligence Assistant
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-semibold uppercase">
-                Qwen 3 8B
-              </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">
               Natural-language coaching grounded strictly in your verified SkillForge evidence with persistent session history.

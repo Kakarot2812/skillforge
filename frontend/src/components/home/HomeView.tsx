@@ -2,17 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  TrendingUp,
-  FileCode,
-  Cpu,
-  BarChart2,
-  GitPullRequest,
-  Compass,
-  CheckCircle2,
-} from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { IndustrySkillsDemand } from "@/components/market/IndustrySkillsDemand";
+import { TechnicalWaveVisual } from "./TechnicalWaveVisual";
 
 export interface HomeViewProps {
   onNavigate?: (tab: "home" | "analyzer" | "dashboard") => void;
@@ -26,249 +18,235 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     }
   };
 
+  const pipelineSteps = [
+    {
+      id: "skills",
+      title: "Your Skills",
+      desc: "Resume & GitHub AST Evidence",
+      badge: "Ingestion",
+    },
+    {
+      id: "analysis",
+      title: "Skill Analysis",
+      desc: "Verified Capability Extraction",
+      badge: "Verification",
+    },
+    {
+      id: "demand",
+      title: "Industry Demand",
+      desc: "Live Hiring Market Weights",
+      badge: "Benchmark",
+    },
+    {
+      id: "gap",
+      title: "Skill Gap",
+      desc: "Target Deficit Matrix",
+      badge: "Scoring",
+    },
+    {
+      id: "roadmap",
+      title: "Career Roadmap",
+      desc: "Structured Milestone DAG",
+      badge: "Execution",
+    },
+  ];
+
+  const workflowSteps = [
+    {
+      id: "connect",
+      title: "Connect Evidence",
+      desc: "Connect your GitHub profile and upload your resume for deterministic ingestion.",
+      meta: "Resume + GitHub",
+    },
+    {
+      id: "analyze",
+      title: "Analyze Skills",
+      desc: "Extract verified capabilities and project proficiencies through AST parsing.",
+      meta: "Capability Extraction",
+    },
+    {
+      id: "compare",
+      title: "Compare Market",
+      desc: "Benchmark verified skills against real-time industry hiring demand weights.",
+      meta: "Industry Benchmark",
+    },
+    {
+      id: "roadmap",
+      title: "Build Roadmap",
+      desc: "Identify priority skill deficits and follow actionable milestone roadmaps.",
+      meta: "Milestone Execution",
+    },
+  ];
+
   return (
-    <div className="space-y-12 sm:space-y-16 pb-16">
+    <div className="space-y-16 sm:space-y-24 pb-20 select-none">
       {/* ========================================================================= */}
-      {/* 1. HERO SECTION WITH WORKFLOW PIPELINE GRAPHIC */}
+      {/* 1. HERO SECTION WITH SUBTLE TECHNICAL WAVE CONTOUR LINES */}
       {/* ========================================================================= */}
-      <section className="relative rounded-3xl overflow-hidden p-6 sm:p-10 lg:p-12 border border-neutral-200/90 dark:border-neutral-800/80 bg-white/90 dark:bg-neutral-950/80 backdrop-blur-md shadow-xl shadow-neutral-200/40 dark:shadow-none transition-colors duration-200">
-        {/* Subtle ambient light */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
-        <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-indigo-500/10 dark:bg-indigo-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
+      <section className="relative min-h-[58vh] sm:min-h-[64vh] flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 overflow-hidden rounded-2xl border border-border bg-surface/70 backdrop-blur-xs transition-colors duration-200">
+        {/* Subtle mathematical harmonic wave lines behind hero */}
+        <TechnicalWaveVisual />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-          {/* Left Column: Headline, Description & CTAs */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-              <span>AI Career Intelligence Platform</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-neutral-900 dark:text-white leading-[1.15]">
-              Know Your Skill Gap. <br />
-              <span className="bg-gradient-to-r from-emerald-600 via-teal-500 to-indigo-600 dark:from-emerald-400 dark:via-teal-300 dark:to-indigo-400 bg-clip-text text-transparent">
-                Build the Right Career.
-              </span>
-            </h1>
-
-            <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-300/90 leading-relaxed max-w-xl">
-              SkillForge analyzes your real skills, compares them with industry demand, and creates a practical roadmap to your target career.
-            </p>
-
-            {/* CTAs */}
-            <div className="pt-2 flex flex-wrap items-center gap-3.5">
-              {onNavigate ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigate("analyzer")}
-                  className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 dark:shadow-emerald-950/50 hover:shadow-emerald-600/30 transition-all flex items-center gap-2 group cursor-pointer"
-                >
-                  <span>Analyze My Skills</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              ) : (
-                <Link
-                  href="/analyzer"
-                  className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 dark:shadow-emerald-950/50 hover:shadow-emerald-600/30 transition-all flex items-center gap-2 group"
-                >
-                  <span>Analyze My Skills</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              )}
-
-              <button
-                type="button"
-                onClick={scrollToIndustryDemand}
-                className="px-5 py-3 rounded-xl font-semibold text-sm text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Explore Industry Demand</span>
-              </button>
-            </div>
+        <div className="max-w-4xl mx-auto space-y-6 relative z-10">
+          {/* Subtle Category Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md border border-border bg-surface-subtle/80 text-secondary text-xs font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span>AI Career Intelligence Platform</span>
           </div>
 
-          {/* Right Column: Clean Visual Workflow Pipeline Graphic */}
-          <div className="lg:col-span-5">
-            <div className="p-5 sm:p-6 rounded-2xl bg-neutral-50/90 dark:bg-neutral-900/80 border border-neutral-200/90 dark:border-neutral-800 shadow-inner space-y-3">
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-neutral-200/80 dark:border-neutral-800/80">
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200">Intelligence Pipeline</span>
-                <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Automated Flow</span>
-              </div>
+          {/* Large, Bold, Clean Editorial Headline */}
+          <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.06] text-foreground">
+            Know Your Skill Gap.
+            <span className="block text-accent font-bold tracking-tight mt-1 sm:mt-2">
+              Build the Right Career.
+            </span>
+          </h1>
 
-              {/* Step 1: Your Skills */}
-              <div className="p-3 rounded-xl bg-white dark:bg-neutral-950/90 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
-                    <FileCode className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-neutral-900 dark:text-white">YOUR SKILLS</div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Resume &amp; GitHub AST Evidence</div>
-                  </div>
-                </div>
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              </div>
+          {/* Comfortable & Readable Description */}
+          <p className="text-base sm:text-lg text-secondary leading-relaxed max-w-2xl mx-auto font-normal">
+            SkillForge analyzes your real skills, compares them with industry demand, and creates a practical roadmap to your target career.
+          </p>
 
-              {/* Arrow Connector */}
-              <div className="flex justify-center -my-1 text-neutral-400 dark:text-neutral-600">
-                <span className="text-xs font-mono">↓</span>
-              </div>
+          {/* Simple Premium Action Buttons */}
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-3.5 sm:gap-4">
+            {onNavigate ? (
+              <button
+                type="button"
+                onClick={() => onNavigate("analyzer")}
+                className="editorial-btn-primary !px-7 !py-3.5 !rounded-md shadow-xs flex items-center gap-2 group cursor-pointer"
+              >
+                <span>Analyze My Skills</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            ) : (
+              <Link
+                href="/analyzer"
+                className="editorial-btn-primary !px-7 !py-3.5 !rounded-md shadow-xs flex items-center gap-2 group"
+              >
+                <span>Analyze My Skills</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            )}
 
-              {/* Step 2: Skill Analysis */}
-              <div className="p-3 rounded-xl bg-white dark:bg-neutral-950/90 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-500/20 shrink-0">
-                    <Cpu className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-neutral-900 dark:text-white">SKILL ANALYSIS</div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Verified Capability Extraction</div>
-                  </div>
-                </div>
-                <div className="h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 animate-pulse" />
-              </div>
-
-              {/* Arrow Connector */}
-              <div className="flex justify-center -my-1 text-neutral-400 dark:text-neutral-600">
-                <span className="text-xs font-mono">↓</span>
-              </div>
-
-              {/* Step 3: Industry Demand */}
-              <div className="p-3 rounded-xl bg-white dark:bg-neutral-950/90 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
-                    <BarChart2 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-neutral-900 dark:text-white">INDUSTRY DEMAND</div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Live Hiring Market Weights</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold">5 Tracks</span>
-              </div>
-
-              {/* Arrow Connector */}
-              <div className="flex justify-center -my-1 text-neutral-400 dark:text-neutral-600">
-                <span className="text-xs font-mono">↓</span>
-              </div>
-
-              {/* Step 4: Skill Gap */}
-              <div className="p-3 rounded-xl bg-white dark:bg-neutral-950/90 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
-                    <GitPullRequest className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-neutral-900 dark:text-white">SKILL GAP</div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Target Deficit Matrix</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">Scored</span>
-              </div>
-
-              {/* Arrow Connector */}
-              <div className="flex justify-center -my-1 text-neutral-400 dark:text-neutral-600">
-                <span className="text-xs font-mono">↓</span>
-              </div>
-
-              {/* Step 5: Career Roadmap */}
-              <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-950/30 dark:to-neutral-950 border border-emerald-500/30 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center border border-emerald-500/30 shrink-0">
-                    <Compass className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-neutral-900 dark:text-white">CAREER ROADMAP</div>
-                    <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Structured Milestone DAG</div>
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={scrollToIndustryDemand}
+              className="editorial-btn-secondary !px-6 !py-3.5 !rounded-md flex items-center gap-2 cursor-pointer"
+            >
+              <TrendingUp className="h-4 w-4 text-accent" />
+              <span>Explore Industry Demand</span>
+            </button>
           </div>
         </div>
       </section>
 
       {/* ========================================================================= */}
-      {/* 2. INDUSTRY SKILLS DEMAND (COMPACT DATA-DRIVEN COMPONENT) */}
+      {/* 2. INTELLIGENCE PIPELINE (CLEAN FLOW WITHOUT NUMERIC PREFIXES) */}
       {/* ========================================================================= */}
-      <div id="industry-demand-section">
+      <section className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-3 border-b border-border">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+              Intelligence Pipeline
+            </h2>
+            <p className="text-xs sm:text-sm text-muted">
+              Automated deterministic flow from candidate evidence to validated career roadmap
+            </p>
+          </div>
+          <div className="text-xs text-muted font-medium shrink-0">
+            5-Stage Pipeline
+          </div>
+        </div>
+
+        {/* Desktop 5-step horizontal flow with connecting hairlines */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 lg:gap-4 relative">
+          {pipelineSteps.map((step, idx) => (
+            <div
+              key={step.id}
+              className="editorial-card p-4 sm:p-5 flex flex-col justify-between space-y-4 relative group"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted font-medium px-2 py-0.5 rounded border border-border/80 bg-surface-subtle">
+                    {step.badge}
+                  </span>
+                </div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {step.title}
+                </h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
+
+              {/* Step indicator footer */}
+              <div className="pt-2.5 border-t border-border flex items-center justify-between text-xs text-subtle font-medium">
+                <span>Stage</span>
+                {idx < pipelineSteps.length - 1 && (
+                  <span className="hidden md:inline text-muted font-bold">→</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 3. INDUSTRY SKILLS DEMAND (EXISTING DATA-DRIVEN COMPONENT) */}
+      {/* ========================================================================= */}
+      <div id="industry-demand-section" className="scroll-mt-20">
         <IndustrySkillsDemand />
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. HOW SKILLFORGE WORKS (4 SIMPLE CONCISE STEPS) */}
+      {/* 4. HOW SKILLFORGE WORKS (4 STEPS) */}
       {/* ========================================================================= */}
       <section className="space-y-6">
-        <div className="text-center sm:text-left space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            How SkillForge Works
-          </h2>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
-            A 4-step deterministic process from skill verification to career acceleration
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-3 border-b border-border">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+              How SkillForge Works
+            </h2>
+            <p className="text-xs sm:text-sm text-muted">
+              A 4-step deterministic process from skill verification to career acceleration
+            </p>
+          </div>
+          <div className="text-xs text-muted font-medium shrink-0">
+            Standard Method
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Step 01 */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">01</div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Connect Evidence</h3>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Connect your GitHub profile and upload your resume for deterministic ingestion.
-              </p>
+          {workflowSteps.map((step) => (
+            <div
+              key={step.id}
+              className="editorial-card p-5 sm:p-6 flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  {step.title}
+                </h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
+              <div className="pt-3 border-t border-border text-xs text-subtle font-medium">
+                {step.meta}
+              </div>
             </div>
-            <div className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">Resume + GitHub</div>
-          </div>
-
-          {/* Step 02 */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400">02</div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Analyze Skills</h3>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Extract verified capabilities and project proficiencies through AST parsing.
-              </p>
-            </div>
-            <div className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">Extract capabilities</div>
-          </div>
-
-          {/* Step 03 */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">03</div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Compare Market</h3>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Benchmark verified skills against real-time industry hiring demand weights.
-              </p>
-            </div>
-            <div className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">Industry benchmark</div>
-          </div>
-
-          {/* Step 04 */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">04</div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Build Roadmap</h3>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Identify priority skill deficits and follow actionable milestone roadmaps.
-              </p>
-            </div>
-            <div className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">Milestone execution</div>
-          </div>
+          ))}
         </div>
       </section>
 
       {/* ========================================================================= */}
-      {/* 4. CLEAN DIRECT CTA BANNER */}
+      {/* 5. CLEAN DIRECT CTA BANNER */}
       {/* ========================================================================= */}
-      <section className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 shadow-md flex flex-col sm:flex-row items-center justify-between gap-5 transition-colors duration-200">
-        <div className="space-y-1 text-center sm:text-left">
-          <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
+      <section className="editorial-card p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 transition-colors duration-200">
+        <div className="space-y-1.5 text-center sm:text-left">
+          <h3 className="text-lg sm:text-xl font-bold text-foreground">
             Ready to identify your skill gaps?
           </h3>
-          <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-lg">
+          <p className="text-xs sm:text-sm text-muted max-w-xl">
             Benchmark your profile against target industry roles and generate your step-by-step career roadmap.
           </p>
         </div>
@@ -277,18 +255,18 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           <button
             type="button"
             onClick={() => onNavigate("analyzer")}
-            className="px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 dark:shadow-none transition-all shrink-0 flex items-center gap-2 cursor-pointer"
+            className="editorial-btn-primary !px-6 !py-3 !rounded-md shrink-0 flex items-center gap-2 group cursor-pointer"
           >
             <span>Analyze My Skills</span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
           </button>
         ) : (
           <Link
             href="/analyzer"
-            className="px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 dark:shadow-none transition-all shrink-0 flex items-center gap-2"
+            className="editorial-btn-primary !px-6 !py-3 !rounded-md shrink-0 flex items-center gap-2 group"
           >
             <span>Analyze My Skills</span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         )}
       </section>

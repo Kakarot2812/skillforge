@@ -7,14 +7,7 @@ import RoadmapSection from "@/components/roadmap/RoadmapSection";
 import CareerAssistant from "@/components/assistant/CareerAssistant";
 import DemandIntelligenceExplorer from "@/components/DemandIntelligenceExplorer";
 import { useCandidate } from "@/context/CandidateContext";
-import {
-  LayoutDashboard,
-  TrendingUp,
-  Briefcase,
-  ShieldCheck,
-  FileText,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export interface DashboardViewProps {
   onNavigate?: (tab: "home" | "analyzer" | "dashboard") => void;
@@ -31,107 +24,125 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   } = useCandidate();
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* Dashboard Top Header & Executive Stats Cards */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 shadow-md shadow-neutral-200/50 dark:shadow-none transition-colors duration-200">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-              <LayoutDashboard className="h-3.5 w-3.5" />
-              <span>Career Roadmap & Market Intelligence</span>
+    <div className="space-y-12 sm:space-y-16 pb-20 select-none">
+      {/* 1. EXECUTIVE HEADER BANNER */}
+      <div className="editorial-card p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-colors duration-200">
+        <div className="space-y-2 max-w-2xl">
+          <div className="inline-flex items-center gap-2 text-[11px] font-mono text-muted uppercase tracking-widest">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span>02 / Career Analytics Suite</span>
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
+            Career Dashboard
+          </h1>
+          <p className="text-xs sm:text-sm text-muted leading-relaxed">
+            Track real-time hiring benchmarks, explore your personalized milestone DAG roadmap, and get evidence-grounded career coaching.
+          </p>
+        </div>
+
+        {!candidateReady && (
+          <div className="shrink-0">
+            {onNavigate ? (
+              <button
+                type="button"
+                onClick={() => onNavigate("analyzer")}
+                className="editorial-btn-primary !py-2 !px-4 !text-xs !rounded-md flex items-center gap-2 cursor-pointer"
+              >
+                <span>Connect Evidence</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <Link
+                href="/analyzer"
+                className="editorial-btn-primary !py-2 !px-4 !text-xs !rounded-md flex items-center gap-2"
+              >
+                <span>Connect Evidence</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 2. ANALYTICS METRICS STRIP (LARGE NUMBERS + THIN DIVIDERS) */}
+      <div className="border-y border-border py-6 sm:py-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+          {/* Metric 1: Target Track */}
+          <div className="p-4 sm:p-6 text-center space-y-1">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-muted">
+              Target Track
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground truncate">
+              {selectedRoleId ? selectedRoleId.replace(/_/g, " ").toUpperCase() : "SELECT ROLE"}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Career Dashboard
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-2xl">
-              Track real-time hiring benchmarks, explore your personalized milestone DAG roadmap, and get evidence-grounded career coaching.
+            <p className="text-[11px] text-subtle font-normal">
+              Active industry benchmark
             </p>
           </div>
 
-          {!candidateReady && (
-            <div className="shrink-0">
-              {onNavigate ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigate("analyzer")}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <span>Connect Evidence</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              ) : (
-                <Link
-                  href="/analyzer"
-                  className="px-4 py-2.5 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  <span>Connect Evidence</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              )}
+          {/* Metric 2: Resume Evidence */}
+          <div className="p-4 sm:p-6 text-center space-y-1">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-muted">
+              Resume Evidence
+            </span>
+            <div className={`text-xl sm:text-2xl font-bold font-mono ${hasResume ? "text-accent" : "text-foreground"}`}>
+              {hasResume ? "VERIFIED" : "PENDING"}
             </div>
-          )}
-        </div>
-
-        {/* 4 Summary Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Target Track</div>
-              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                {selectedRoleId ? selectedRoleId.replace(/_/g, " ").toUpperCase() : "Select Track"}
-              </div>
-            </div>
+            <p className="text-[11px] text-subtle font-normal">
+              {hasResume ? "Semantic parsing synced" : "Upload resume to verify"}
+            </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
-            <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-500/20 shrink-0">
-              <FileText className="h-5 w-5" />
+          {/* Metric 3: GitHub Code Evidence */}
+          <div className="p-4 sm:p-6 text-center space-y-1">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-muted">
+              GitHub Code AST
+            </span>
+            <div className={`text-xl sm:text-2xl font-bold font-mono truncate ${connectedGitHubUser ? "text-accent" : "text-foreground"}`}>
+              {connectedGitHubUser ? `@${connectedGitHubUser}` : "UNCONNECTED"}
             </div>
-            <div className="min-w-0">
-              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Resume Evidence</div>
-              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                {hasResume ? "Verified & Parsed" : "Not Provided"}
-              </div>
-            </div>
+            <p className="text-[11px] text-subtle font-normal">
+              {connectedGitHubUser ? "AST repository evidence" : "Connect GitHub profile"}
+            </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
-            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
-              <ShieldCheck className="h-5 w-5" />
+          {/* Metric 4: Market Geographic Scope */}
+          <div className="p-4 sm:p-6 text-center space-y-1">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-muted">
+              Market Scope
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
+              INDIA TECH
             </div>
-            <div className="min-w-0">
-              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">GitHub Code Evidence</div>
-              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                {connectedGitHubUser ? `@${connectedGitHubUser}` : "Not Connected"}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-xs flex items-center gap-3 transition-colors duration-200">
-            <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">Hiring Benchmark</div>
-              <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">India Tech Market</div>
-            </div>
+            <p className="text-[11px] text-subtle font-normal">
+              Continuous market index
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 1. Industry Market Demand Benchmark */}
-      <section aria-label="Industry Skill Demand Benchmark" className="space-y-4">
+      {/* 3. SECTION 01: INDUSTRY SKILL DEMAND BENCHMARK */}
+      <section aria-label="Industry Skill Demand Benchmark" className="space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-border text-xs">
+          <span className="font-mono text-muted uppercase tracking-widest text-[11px]">
+            Section 01 ── Market Demand Benchmark
+          </span>
+          <span className="text-muted text-[11px] font-mono">Live Requirements</span>
+        </div>
         <MarketDemandSection
           selectedRoleId={selectedRoleId}
           onSelectRole={setSelectedRoleId}
         />
       </section>
 
-      {/* 2. Personalized Career Roadmap */}
-      <section aria-label="Personalized Career Roadmap" className="space-y-4">
+      {/* 4. SECTION 02: PERSONALIZED CAREER ROADMAP */}
+      <section aria-label="Personalized Career Roadmap" className="space-y-3 pt-4 border-t border-border">
+        <div className="flex items-center justify-between pb-2 border-b border-border text-xs">
+          <span className="font-mono text-muted uppercase tracking-widest text-[11px]">
+            Section 02 ── Career Roadmap Milestones
+          </span>
+          <span className="text-muted text-[11px] font-mono">Prerequisite DAG</span>
+        </div>
         <RoadmapSection
           selectedRoleId={selectedRoleId}
           candidateReady={candidateReady}
@@ -141,8 +152,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         />
       </section>
 
-      {/* 3. AI Career Intelligence Assistant */}
-      <section aria-label="AI Career Intelligence Assistant" className="space-y-4">
+      {/* 5. SECTION 03: AI CAREER INTELLIGENCE ASSISTANT */}
+      <section aria-label="AI Career Intelligence Assistant" className="space-y-3 pt-4 border-t border-border">
+        <div className="flex items-center justify-between pb-2 border-b border-border text-xs">
+          <span className="font-mono text-muted uppercase tracking-widest text-[11px]">
+            Section 03 ── AI Career Intelligence Assistant
+          </span>
+          <span className="text-muted text-[11px] font-mono">Deterministic Context</span>
+        </div>
         <CareerAssistant
           selectedRoleId={selectedRoleId}
           candidateReady={candidateReady}
@@ -152,8 +169,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         />
       </section>
 
-      {/* 4. Cross-Role Demand Intelligence */}
-      <section aria-label="Career Demand Intelligence Explorer" className="space-y-4">
+      {/* 6. SECTION 04: CROSS-ROLE DEMAND INTELLIGENCE */}
+      <section aria-label="Career Demand Intelligence Explorer" className="space-y-3 pt-4 border-t border-border">
+        <div className="flex items-center justify-between pb-2 border-b border-border text-xs">
+          <span className="font-mono text-muted uppercase tracking-widest text-[11px]">
+            Section 04 ── Cross-Role Demand Matrix
+          </span>
+          <span className="text-muted text-[11px] font-mono">Comparative Intelligence</span>
+        </div>
         <DemandIntelligenceExplorer />
       </section>
     </div>

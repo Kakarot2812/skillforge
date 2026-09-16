@@ -43,100 +43,100 @@ export default function MarketSkillCard({
   const trend = skill.trend || "STABLE";
 
   return (
-    <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700/80 rounded-2xl p-4 sm:p-5 transition-all shadow-xs hover:shadow-md flex flex-col justify-between space-y-4">
+    <div className="editorial-card p-5 transition-all flex flex-col justify-between space-y-4">
       {/* Top Row: Skill Name, Category, Trend Badge */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white truncate">
+              <h4 className="text-sm font-bold text-foreground truncate">
                 {skill.skill_name}
               </h4>
               {skill.category && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700/60 shrink-0">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-surface-subtle text-foreground border border-border shrink-0">
                   {skill.category}
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-neutral-500 font-mono">
+            <div className="text-[10px] text-muted font-mono">
               Slug: {skill.canonical_slug}
             </div>
           </div>
 
-          {/* Growth Classification Badge (Strictly displaying backend trend) */}
+          {/* Growth Classification Badge */}
           <div className="shrink-0">
             {trend === "RISING" && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Rising Demand</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm border border-accent/40 bg-accent/5 text-accent">
+                <TrendingUp className="h-3 w-3" aria-hidden="true" />
+                <span>RISING</span>
               </span>
             )}
             {trend === "STABLE" && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">
-                <Activity className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Stable Demand</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-sm border border-border bg-surface-subtle text-foreground">
+                <Activity className="h-3 w-3" aria-hidden="true" />
+                <span>STABLE</span>
               </span>
             )}
             {trend === "DECLINING" && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
-                <TrendingDown className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Declining Demand</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-sm border border-border bg-surface-subtle text-muted">
+                <TrendingDown className="h-3 w-3" aria-hidden="true" />
+                <span>DECLINING</span>
               </span>
             )}
           </div>
         </div>
 
         {/* Market vs. Candidate Notice Pill */}
-        <div className="text-[10px] text-neutral-500 dark:text-neutral-500 bg-neutral-50 dark:bg-neutral-950/60 px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800/80">
-          <span className="text-neutral-700 dark:text-neutral-400 font-medium">Market Fact:</span> Employer hiring demand in India (not your personal skill status)
+        <div className="text-[10px] text-muted bg-surface-subtle px-2.5 py-1 rounded-sm border border-border">
+          <span className="text-foreground font-mono font-medium">Market Benchmark:</span> Employer demand in India
         </div>
       </div>
 
       {/* Metrics Row: Demand Score and YoY Growth */}
-      <div className="grid grid-cols-2 gap-3 pt-1">
+      <div className="grid grid-cols-2 divide-x divide-border border-y border-border py-3">
         {/* Demand Score Metric */}
-        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-400">
-            <span>Demand Score</span>
-            <span className="font-mono font-bold text-neutral-900 dark:text-white text-xs">
+        <div className="pr-3 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-muted">
+            <span>Demand</span>
+            <span className="font-mono font-bold text-foreground text-xs">
               {skill.demand_score.toFixed(2)}
             </span>
           </div>
-          {/* Progress bar visual equivalent */}
-          <div className="w-full bg-neutral-200 dark:bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+          {/* Hairline bar */}
+          <div className="w-full bg-border rounded-none h-1 overflow-hidden">
             <div
-              className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
+              className="bg-accent h-1 transition-all duration-300"
               style={{ width: `${Math.min(100, Math.max(0, demandPercent))}%` }}
               aria-label={`Demand score: ${demandPercent}%`}
             />
           </div>
-          <div className="text-[10px] font-mono text-indigo-600 dark:text-indigo-300 text-right font-medium">
-            {demandPercent}% Market Weight
+          <div className="text-[10px] font-mono text-muted text-right">
+            {demandPercent}% weight
           </div>
         </div>
 
         {/* YoY Growth Rate Metric */}
-        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-400">
-            <span>YoY Trajectory</span>
+        <div className="pl-3 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-muted">
+            <span>Trajectory</span>
             <span
               className={`font-mono font-bold text-xs ${
                 trend === "RISING"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-accent"
                   : trend === "DECLINING"
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-blue-600 dark:text-blue-300"
+                  ? "text-muted"
+                  : "text-foreground"
               }`}
             >
               {formattedGrowth}
             </span>
           </div>
-          <div className="text-[10px] text-neutral-500 flex items-center justify-between">
+          <div className="text-[10px] text-muted flex items-center justify-between font-mono">
             <span>Historical</span>
-            <span className="font-mono text-neutral-700 dark:text-neutral-300">{trend}</span>
+            <span className="text-foreground">{trend}</span>
           </div>
           {typeof skill.sample_size === "number" && skill.sample_size > 0 && (
-            <div className="text-[10px] font-mono text-neutral-500 flex items-center gap-1 truncate">
+            <div className="text-[10px] font-mono text-muted flex items-center gap-1 truncate">
               <Users className="h-3 w-3 shrink-0" />
               <span>{skill.sample_size.toLocaleString()} postings</span>
             </div>
@@ -145,12 +145,12 @@ export default function MarketSkillCard({
       </div>
 
       {/* Action Links: Contextual Navigation to Roadmap or Assistant */}
-      <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-2 text-xs">
+      <div className="flex items-center justify-between gap-2 text-xs pt-1">
         {onExploreInRoadmap && (
           <button
             type="button"
             onClick={onExploreInRoadmap}
-            className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors cursor-pointer text-xs"
+            className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground font-mono transition-colors cursor-pointer"
           >
             <Compass className="h-3.5 w-3.5" />
             <span>Cross-reference Roadmap</span>
@@ -161,10 +161,10 @@ export default function MarketSkillCard({
           <button
             type="button"
             onClick={() => onAskAssistant(skill.skill_name)}
-            className="inline-flex items-center gap-1.5 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors cursor-pointer text-xs ml-auto"
+            className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent font-mono transition-colors cursor-pointer ml-auto"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Ask Assistant</span>
+            <span>Ask AI</span>
           </button>
         )}
       </div>

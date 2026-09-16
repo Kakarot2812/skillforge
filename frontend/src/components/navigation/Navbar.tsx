@@ -1,25 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Sparkles,
-  Home,
-  ScanLine,
-  LayoutDashboard,
-  Map,
-  FileText,
-  LogIn,
-  LogOut,
-  User as UserIcon,
   Sun,
   Moon,
+  User as UserIcon,
+  LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 import { useCandidate } from "@/context/CandidateContext";
 import { useTheme } from "@/context/ThemeContext";
 
-export type NavTab = "home" | "analyzer" | "dashboard" | "roadmaps" | "pdf-test";
+export type NavTab = "home" | "analyzer" | "dashboard" | "roadmaps" | "assistant" | "pdf-test";
 
 export interface NavbarProps {
   activeTab?: NavTab;
@@ -30,8 +25,9 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
   const pathname = usePathname();
   const { userProfile, handleLogout } = useCandidate();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const currentTab =
+  const currentTab: NavTab =
     activeTab ||
     (pathname === "/analyzer"
       ? "analyzer"
@@ -41,99 +37,112 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
       ? "roadmaps"
       : pathname === "/roadmap-pdf-test"
       ? "pdf-test"
-      : pathname === "/login"
-      ? ""
       : "home");
 
   const navItems = [
-    { id: "home", label: "Home", href: "/", icon: Home },
-    { id: "analyzer", label: "Skill Analyzer", href: "/analyzer", icon: ScanLine },
-    { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { id: "roadmaps", label: "Roadmaps", href: "/roadmaps", icon: Map },
-    { id: "pdf-test", label: "PDF Demo", href: "/roadmap-pdf-test", icon: FileText },
+    { id: "home", label: "Home", href: "/" },
+    { id: "analyzer", label: "Skill Analyzer", href: "/analyzer" },
+    { id: "dashboard", label: "Dashboard", href: "/dashboard" },
+    { id: "roadmaps", label: "Roadmaps", href: "/roadmaps" },
+    { id: "assistant", label: "AI Assistant", href: "/dashboard#ai-career-assistant-section" },
   ] as const;
 
+  const handleNavClick = (id: typeof navItems[number]["id"], href: string, e: React.MouseEvent) => {
+    setMobileMenuOpen(false);
+    if (onSelectTab && pathname === "/") {
+      if (id === "home" || id === "analyzer" || id === "dashboard") {
+        e.preventDefault();
+        onSelectTab(id);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else if (id === "assistant") {
+        e.preventDefault();
+        onSelectTab("dashboard");
+        setTimeout(() => {
+          const el = document.getElementById("ai-career-assistant-section");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 120);
+      }
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full h-14 bg-white/85 dark:bg-neutral-950/90 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 select-none transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-        {/* Brand Logo & Compact Name */}
+    <header className="sticky top-0 z-50 w-full h-16 bg-background/90 backdrop-blur-md border-b border-border select-none transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+        {/* Brand SF Logo & Name */}
         <Link
           href="/"
-          onClick={() => onSelectTab?.("home")}
-          className="flex items-center gap-2.5 group"
+          onClick={(e) => handleNavClick("home", "/", e)}
+          className="group flex items-center gap-3 cursor-pointer select-none"
           aria-label="SkillForge AI Home"
         >
-          <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-            <Sparkles className="h-4 w-4 text-white" />
+          {/* SF Monogram Emblem with subtle hover scale & restrained teal edge glow */}
+          <div className="relative flex items-center justify-center">
+            <div className="h-8 w-8 rounded-md bg-foreground text-background flex items-center justify-center font-bold text-xs tracking-wider border border-border/80 transition-all duration-300 ease-out group-hover:scale-105 group-hover:border-accent group-hover:shadow-[0_0_12px_rgba(13,148,136,0.35)] dark:group-hover:shadow-[0_0_14px_rgba(20,184,166,0.4)]">
+              <span>SF</span>
+            </div>
           </div>
-          <span className="font-bold text-sm sm:text-base tracking-tight text-neutral-900 dark:text-white">
-            SkillForge<span className="text-emerald-600 dark:text-emerald-400">.ai</span>
-          </span>
+
+          {/* Clean Editorial Wordmark */}
+          <div className="flex items-baseline gap-1">
+            <span className="font-bold text-sm tracking-[0.14em] uppercase text-foreground transition-colors">
+              SkillForge
+            </span>
+            <span className="text-[10px] font-mono tracking-widest text-accent font-semibold">
+              .AI
+            </span>
+          </div>
         </Link>
 
-        {/* Center Navigation Links */}
-        <nav className="flex items-center gap-1 p-1 bg-neutral-100/90 dark:bg-neutral-900/60 rounded-xl border border-neutral-200/80 dark:border-neutral-800/60 text-xs">
+        {/* Center Editorial Navigation Links (Desktop) */}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs">
           {navItems.map((item) => {
-            const Icon = item.icon;
             const isActive = currentTab === item.id;
-            return onSelectTab && item.id !== "roadmaps" && item.id !== "pdf-test" ? (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelectTab(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-white dark:bg-neutral-800 text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs border border-neutral-200/60 dark:border-transparent"
-                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/50"
-                }`}
-              >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`} />
-                <span>{item.label}</span>
-              </button>
-            ) : (
+            return (
               <Link
                 key={item.id}
                 href={item.href}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+                onClick={(e) => handleNavClick(item.id, item.href, e)}
+                className={`relative py-1 font-medium tracking-wide transition-colors duration-200 cursor-pointer ${
                   isActive
-                    ? "bg-white dark:bg-neutral-800 text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs border border-neutral-200/60 dark:border-transparent"
-                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/50"
+                    ? "text-foreground font-semibold after:content-[''] after:absolute after:-bottom-1.5 after:left-0 after:right-0 after:h-[1.5px] after:bg-accent"
+                    : "text-muted hover:text-foreground"
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`} />
                 <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Right Section: Theme Toggle, Market & Authentication */}
-        <div className="flex items-center gap-2 sm:gap-2.5 text-xs">
+        {/* Right Section: Market, Theme Toggle, Auth, Mobile Menu */}
+        <div className="flex items-center gap-2.5 sm:gap-3 text-xs">
+          {/* Market Indicator */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface-subtle/50 text-[11px] font-medium text-secondary">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span>Market: India</span>
+          </div>
+
           {/* Theme Switcher Button */}
           <button
             type="button"
             onClick={toggleTheme}
             title={resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
             aria-label={resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-amber-500 dark:hover:text-amber-300 transition-all cursor-pointer flex items-center justify-center shadow-xs"
+            className="p-1.5 rounded-md border border-border bg-surface hover:bg-surface-subtle text-secondary hover:text-foreground transition-all duration-200 cursor-pointer flex items-center justify-center"
           >
             {resolvedTheme === "dark" ? (
-              <Sun className="h-4 w-4 text-amber-400 transition-transform hover:rotate-45" />
+              <Sun className="h-4 w-4 text-secondary hover:text-amber-400 transition-colors" />
             ) : (
-              <Moon className="h-4 w-4 text-indigo-600 transition-transform hover:-rotate-12" />
+              <Moon className="h-4 w-4 text-secondary hover:text-foreground transition-colors" />
             )}
           </button>
 
-          <div className="hidden md:flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400 font-medium text-xs bg-neutral-100 dark:bg-neutral-900/60 px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span>Market: India</span>
-          </div>
-
+          {/* User Profile or Sign In CTA */}
           {userProfile ? (
             <div className="flex items-center gap-1.5">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-300">
-                <UserIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="max-w-[100px] truncate font-medium text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface-subtle text-foreground text-xs font-medium">
+                <UserIcon className="h-3.5 w-3.5 text-accent" />
+                <span className="max-w-[100px] truncate">
                   {userProfile.email.split("@")[0]}
                 </span>
               </div>
@@ -142,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
                 onClick={handleLogout}
                 title="Log out"
                 aria-label="Log out"
-                className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-rose-500 transition-colors cursor-pointer"
+                className="p-1.5 rounded-md border border-border bg-surface hover:bg-surface-subtle text-muted hover:text-danger transition-colors cursor-pointer"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -150,14 +159,55 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-all"
+              className="editorial-btn-primary !py-1.5 !px-3.5 !text-xs !rounded-md"
             >
-              <LogIn className="h-3.5 w-3.5" />
-              <span>Sign In</span>
+              Sign In
             </Link>
           )}
+
+          {/* Mobile Menu Hamburger Toggle */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle Navigation Menu"
+            className="md:hidden p-1.5 rounded-md border border-border bg-surface text-secondary hover:text-foreground transition-colors cursor-pointer"
+          >
+            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Drawer Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-b border-border bg-surface px-4 py-3 space-y-2 animate-in fade-in duration-150">
+          <nav className="flex flex-col space-y-1">
+            {navItems.map((item) => {
+              const isActive = currentTab === item.id;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  onClick={(e) => handleNavClick(item.id, item.href, e)}
+                  className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-surface-subtle text-foreground font-semibold border-l-2 border-accent"
+                      : "text-muted hover:text-foreground hover:bg-surface-subtle"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted px-3">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              Market: India
+            </span>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
+

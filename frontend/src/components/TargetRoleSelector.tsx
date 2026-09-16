@@ -39,31 +39,42 @@ export default function TargetRoleSelector({
   const activeRole = roles.find((r) => r.role_id === selectedRoleId) || roles[0];
 
   return (
-    <div className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden shadow-xs transition-colors duration-200">
+    <div className="editorial-card p-6 sm:p-7 relative select-none">
       {/* Header Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-            <Briefcase className="h-4 w-4" />
+      <div className="flex items-center justify-between pb-4 border-b border-border">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              Target Career Track
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-border bg-surface-subtle text-muted uppercase tracking-wider">
+              Benchmark Role
+            </span>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">Target Career Role</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Configure target industry profile</p>
-          </div>
+          <p className="text-xs text-muted">
+            Configure target industry profile to benchmark capabilities against
+          </p>
         </div>
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider font-mono">
-          Career Tracks
+        <span className="hidden sm:inline-block text-[11px] font-mono text-muted">
+          5 Career Tracks Available
         </span>
       </div>
 
-      <div className="mt-4 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Select Target Role</label>
-          <span className="text-[11px] text-neutral-500 font-mono">5 Career Tracks</span>
+      <div className="mt-5 space-y-3">
+        <div className="flex items-center justify-between text-xs">
+          <label className="font-medium text-secondary">
+            Select Track
+          </label>
+          <span className="text-[11px] font-mono text-muted">
+            Click to activate
+          </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {loading ? (
-            <div className="col-span-2 text-xs text-neutral-500 p-4 text-center">Loading target roles...</div>
+            <div className="col-span-full text-xs text-muted p-6 text-center">
+              Loading target roles...
+            </div>
           ) : (
             roles.map((role) => {
               const isSelected = selectedRoleId === role.role_id;
@@ -73,17 +84,23 @@ export default function TargetRoleSelector({
                   key={role.role_id}
                   type="button"
                   onClick={() => onSelectRole?.(role.role_id)}
-                  className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-md text-left border transition-all cursor-pointer ${
                     isSelected
-                      ? "bg-blue-50/80 dark:bg-neutral-800/90 border-blue-500/70 text-neutral-900 dark:text-neutral-100 shadow-xs ring-1 ring-blue-500/30"
-                      : "bg-neutral-50 dark:bg-neutral-950/40 border-neutral-200 dark:border-neutral-800/80 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-200"
+                      ? "bg-surface-subtle border-foreground text-foreground shadow-xs font-semibold"
+                      : "bg-surface border-border text-secondary hover:border-border-hover hover:text-foreground"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold">{role.title}</span>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold tracking-tight">{role.title}</span>
+                    {isSelected ? (
+                      <Check className="h-3.5 w-3.5 text-accent shrink-0" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-border shrink-0" />
+                    )}
                   </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-500 mt-1 truncate">{focusDesc}</p>
+                  <p className="text-[11px] text-muted mt-1 truncate font-normal">
+                    {focusDesc}
+                  </p>
                 </button>
               );
             })
@@ -91,9 +108,13 @@ export default function TargetRoleSelector({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800/50 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
-        <span>Selected Track: <strong className="text-neutral-900 dark:text-neutral-300 font-medium">{activeRole?.title || "None"}</strong></span>
-        <span className="text-[11px] text-emerald-600 dark:text-emerald-400/80 font-medium">Synchronized with Career Intelligence</span>
+      <div className="mt-5 pt-3.5 border-t border-border flex items-center justify-between text-xs text-muted">
+        <span>
+          Selected Track: <strong className="text-foreground font-semibold">{activeRole?.title || "None"}</strong>
+        </span>
+        <span className="text-[11px] font-mono text-accent">
+          Active In Intelligence Matrix
+        </span>
       </div>
     </div>
   );

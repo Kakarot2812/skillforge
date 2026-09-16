@@ -302,22 +302,17 @@ function reconcileRoadmapSkillStatus(
   return (
     <div className="space-y-6">
       {/* Title & Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <Map className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Static Skill Roadmaps
-            </h2>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 font-semibold">
-              12 Engineering Tracks
-            </span>
+      <div className="editorial-card p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-colors duration-200">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 text-[11px] font-mono text-muted uppercase tracking-widest">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span>03 / Structured Milestone Sequence</span>
           </div>
-          <p className="text-xs text-slate-600 dark:text-neutral-400 max-w-2xl leading-relaxed">
-            Curated, prerequisite-aware learning sequences with official documentation, video deep-dives,
-            and 390 interactive coding challenges across canonical industry roles.
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+            Curated Skill Roadmaps
+          </h2>
+          <p className="text-xs sm:text-sm text-muted max-w-2xl leading-relaxed">
+            Prerequisite-aware milestone pathways featuring official documentation, video deep-dives, and structured engineering practice.
           </p>
         </div>
 
@@ -325,7 +320,7 @@ function reconcileRoadmapSkillStatus(
           type="button"
           onClick={() => loadDetail(selectedRoadmapId, ordering)}
           disabled={loadingDetail}
-          className="self-start md:self-auto px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-xs font-medium text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-neutral-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+          className="editorial-btn-secondary !py-2 !px-3.5 !text-xs !rounded-md self-start md:self-auto flex items-center gap-1.5 cursor-pointer"
           title="Refresh roadmap data"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loadingDetail ? "animate-spin" : ""}`} />
@@ -343,15 +338,15 @@ function reconcileRoadmapSkillStatus(
 
       {/* Error Alert Banner */}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-rose-800 dark:text-rose-300 text-xs flex items-center justify-between gap-2 shadow-xs">
+        <div className="p-4 rounded-md bg-danger-subtle border border-danger/30 text-danger text-xs flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
           <button
             type="button"
             onClick={() => setError(null)}
-            className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-200 p-1 cursor-pointer"
+            className="text-danger hover:opacity-80 p-1 cursor-pointer"
             aria-label="Dismiss error"
           >
             <X className="h-4 w-4" />
@@ -362,40 +357,40 @@ function reconcileRoadmapSkillStatus(
       {/* Loading Skeleton */}
       {loadingDetail && !roadmapDetail && (
         <div className="space-y-4">
-          <div className="h-28 rounded-2xl bg-slate-100 dark:bg-neutral-900/60 border border-slate-200 dark:border-neutral-800 animate-pulse" />
-          <div className="h-64 rounded-2xl bg-slate-100 dark:bg-neutral-900/60 border border-slate-200 dark:border-neutral-800 animate-pulse" />
+          <div className="h-28 rounded-md bg-surface-subtle border border-border animate-pulse" />
+          <div className="h-64 rounded-md bg-surface-subtle border border-border animate-pulse" />
         </div>
       )}
 
       {/* Active Roadmap View */}
       {roadmapDetail && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Roadmap Description Header Card */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="editorial-card p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="space-y-1.5 max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-bold text-foreground">
                   {roadmapDetail.roadmap.title}
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-subtle text-muted border border-border">
                   v{roadmapDetail.roadmap.version}
                 </span>
                 {roadmapDetail.roadmap.has_market_data ? (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 font-semibold">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-subtle text-accent border border-accent/30 font-semibold">
                     Market Intel Track
                   </span>
                 ) : (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 font-semibold">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-subtle text-muted border border-border font-semibold">
                     Curated Industry Track
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">
+              <p className="text-xs text-muted leading-relaxed">
                 {roadmapDetail.roadmap.description}
               </p>
             </div>
 
-            <div className="text-[11px] text-slate-500 dark:text-neutral-500 sm:text-right flex-shrink-0 flex items-center gap-1.5">
+            <div className="text-[11px] font-mono text-muted sm:text-right shrink-0 flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5" />
               <span>{roadmapDetail.roadmap.total_stages} Stages • {roadmapDetail.roadmap.total_skills} Skills</span>
             </div>
@@ -414,20 +409,20 @@ function reconcileRoadmapSkillStatus(
           {/* Content Views: Recommended (Topological Sequence) vs Curated (Stage Curriculum) */}
           {ordering === "recommended" && roadmapDetail.recommended_skills ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="p-4 rounded-md border border-border bg-surface-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Recommended Sequence Order
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Recommended Sequence Order (Topological DAG)
                     </h4>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed">
-                    Deterministic prerequisite-aware ordering calculated via Kahn&apos;s topological sort.
+                  <p className="text-xs text-muted leading-relaxed">
+                    Deterministic prerequisite-aware ordering calculated via topological sort.
                     Foundational skills appear first, followed by dependent competencies.
                   </p>
                 </div>
-                <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold flex-shrink-0 self-start sm:self-auto">
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded-md bg-surface text-foreground border border-border font-semibold shrink-0 self-start sm:self-auto">
                   Topological DAG
                 </span>
               </div>
@@ -435,7 +430,7 @@ function reconcileRoadmapSkillStatus(
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
                 {roadmapDetail.recommended_skills.map((skill, index) => (
                   <div key={skill.id} className="relative group">
-                    <div className="absolute -top-2.5 left-3 z-10 px-2 py-0.5 rounded-full bg-slate-900 dark:bg-neutral-800 text-white text-[10px] font-mono font-semibold shadow-xs">
+                    <div className="absolute -top-2.5 left-3 z-10 px-2 py-0.5 rounded-md bg-foreground text-background text-[10px] font-mono font-semibold shadow-xs">
                       Step {index + 1}
                     </div>
                     <RoadmapSkillCard
@@ -449,11 +444,12 @@ function reconcileRoadmapSkillStatus(
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
-              {roadmapDetail.stages.map((stage) => (
+            <div className="space-y-6 pt-2">
+              {roadmapDetail.stages.map((stage, idx) => (
                 <RoadmapStage
                   key={stage.id}
                   stage={stage}
+                  isLast={idx === roadmapDetail.stages.length - 1}
                   selectedSkillId={selectedSkill?.id}
                   onSelectSkill={setSelectedSkill}
                   allSkillStatuses={allSkillStatuses}
@@ -466,10 +462,10 @@ function reconcileRoadmapSkillStatus(
 
       {/* Empty State */}
       {!loadingCatalog && !loadingDetail && roadmaps.length === 0 && (
-        <div className="text-center p-12 rounded-2xl bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800 space-y-3">
-          <Layers className="h-10 w-10 text-slate-400 dark:text-neutral-600 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800 dark:text-neutral-200">No Roadmaps Found</h3>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-sm mx-auto">
+        <div className="editorial-card text-center p-12 space-y-3">
+          <Layers className="h-10 w-10 text-muted mx-auto" />
+          <h3 className="text-base font-bold text-foreground">No Roadmaps Found</h3>
+          <p className="text-xs text-muted max-w-sm mx-auto">
             Unable to locate static roadmap tracks. Verify database seeding in Phase 2.
           </p>
         </div>

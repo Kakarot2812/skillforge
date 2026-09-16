@@ -9,6 +9,7 @@ interface RoadmapStageProps {
   selectedSkillId?: string;
   onSelectSkill: (skill: RoadmapSkillItem) => void;
   allSkillStatuses?: Record<string, string>;
+  isLast?: boolean;
 }
 
 export default function RoadmapStage({
@@ -16,6 +17,7 @@ export default function RoadmapStage({
   selectedSkillId,
   onSelectSkill,
   allSkillStatuses = {},
+  isLast = false,
 }: RoadmapStageProps) {
   const doneCount = Array.isArray(stage.skills)
     ? stage.skills.filter((s) => s.user_status === "DONE").length
@@ -28,47 +30,50 @@ export default function RoadmapStage({
       ? Math.min(100, Math.max(0, Math.round((doneCount / totalCount) * 100)))
       : 0;
 
+  const formattedIndex = String(stage.stage_order).padStart(2, "0");
+
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-neutral-800/80 bg-slate-50/50 dark:bg-neutral-900/30 p-5 space-y-4 shadow-sm">
-      {/* Stage Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-neutral-800/60">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono font-semibold text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
-              Stage {stage.stage_order}
-            </span>
-            <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-              {stage.name}
-            </h4>
-          </div>
-          {stage.description && (
-            <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed max-w-2xl">
-              {stage.description}
-            </p>
-          )}
+    <div className="relative pl-8 sm:pl-10 space-y-4">
+      {/* Subtle vertical connecting timeline line */}
+      {!isLast && (
+        <div className="absolute left-3.5 sm:left-4 top-8 bottom-0 w-[1px] bg-border" />
+      )}
+
+      {/* Milestone Node in Timeline */}
+      <div className="flex items-center gap-3">
+        <div className="absolute -left-0.5 sm:left-0 top-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-surface border border-border flex items-center justify-center font-mono text-xs font-bold text-foreground shadow-xs z-10">
+          {formattedIndex}
         </div>
 
-        {/* Stage progress */}
-        <div className="flex items-center gap-3 sm:text-right flex-shrink-0">
-          <div>
-            <div className="text-xs font-semibold text-slate-800 dark:text-neutral-200">
-              {doneCount} / {totalCount} Done
-            </div>
-            <div className="text-[10px] font-mono text-slate-500 dark:text-neutral-500">
-              {completionPct}% Stage Progress
-            </div>
+        {/* Milestone Header */}
+        <div className="flex-1 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-border pb-2.5">
+          <div className="space-y-0.5">
+            <h4 className="text-sm sm:text-base font-bold text-foreground tracking-tight">
+              {formattedIndex} ─ {stage.name}
+            </h4>
+            {stage.description && (
+              <p className="text-xs text-muted leading-relaxed">
+                {stage.description}
+              </p>
+            )}
           </div>
-          <div className="w-16 bg-slate-200 dark:bg-neutral-950 rounded-full h-1.5 overflow-hidden border border-slate-300 dark:border-neutral-800">
-            <div
-              className="bg-emerald-500 dark:bg-emerald-400 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${completionPct}%` }}
-            />
+
+          <div className="flex items-center gap-3 sm:text-right shrink-0 text-xs text-muted">
+            <span className="font-mono">
+              {doneCount}/{totalCount} Completed
+            </span>
+            <div className="w-16 bg-surface-subtle border border-border rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-accent h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${completionPct}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Skills Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+      {/* Skills Grid for this stage */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pt-1 pb-4">
         {stage.skills.map((skill) => (
           <RoadmapSkillCard
             key={skill.id}

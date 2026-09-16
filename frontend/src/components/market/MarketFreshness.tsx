@@ -38,28 +38,28 @@ export default function MarketFreshness({
   const formattedDate = formatFreshnessDate(dataFreshness);
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5 text-xs text-neutral-600 dark:text-neutral-400">
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
       {/* Freshness Timestamp */}
-      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800">
-        <Calendar className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-subtle border border-border">
+        <Calendar className="h-3.5 w-3.5 text-accent" />
         <span>
-          Market Freshness: <strong className="text-neutral-900 dark:text-neutral-200 font-mono">{formattedDate}</strong>
+          Market Freshness: <strong className="text-foreground font-mono">{formattedDate}</strong>
         </span>
       </div>
 
       {/* Geographic Scope */}
-      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800">
-        <MapPin className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-subtle border border-border">
+        <MapPin className="h-3.5 w-3.5 text-foreground" />
         <span>
-          Region: <strong className="text-neutral-900 dark:text-neutral-200 font-medium">{location}</strong>
+          Region: <strong className="text-foreground font-mono">{location}</strong>
         </span>
       </div>
 
       {/* Audit Verification */}
       {typeof auditRecordsCount === "number" && auditRecordsCount > 0 && (
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 font-medium">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span>{auditRecordsCount.toLocaleString()} Verified Market Records</span>
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-subtle text-foreground border border-border font-mono text-[11px]">
+          <ShieldCheck className="h-3.5 w-3.5 text-accent" />
+          <span>{auditRecordsCount.toLocaleString()} Records</span>
         </div>
       )}
     </div>

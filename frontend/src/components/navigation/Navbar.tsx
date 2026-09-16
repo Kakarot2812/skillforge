@@ -9,6 +9,7 @@ import {
   ScanLine,
   LayoutDashboard,
   Map,
+  FileText,
   LogIn,
   LogOut,
   User as UserIcon,
@@ -18,7 +19,7 @@ import {
 import { useCandidate } from "@/context/CandidateContext";
 import { useTheme } from "@/context/ThemeContext";
 
-export type NavTab = "home" | "analyzer" | "dashboard" | "roadmaps";
+export type NavTab = "home" | "analyzer" | "dashboard" | "roadmaps" | "pdf-test";
 
 export interface NavbarProps {
   activeTab?: NavTab;
@@ -38,6 +39,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
       ? "dashboard"
       : pathname === "/roadmaps"
       ? "roadmaps"
+      : pathname === "/roadmap-pdf-test"
+      ? "pdf-test"
       : pathname === "/login"
       ? ""
       : "home");
@@ -47,6 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
     { id: "analyzer", label: "Skill Analyzer", href: "/analyzer", icon: ScanLine },
     { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { id: "roadmaps", label: "Roadmaps", href: "/roadmaps", icon: Map },
+    { id: "pdf-test", label: "PDF Demo", href: "/roadmap-pdf-test", icon: FileText },
   ] as const;
 
   return (
@@ -72,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onSelectTab }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
-            return onSelectTab && item.id !== "roadmaps" ? (
+            return onSelectTab && item.id !== "roadmaps" && item.id !== "pdf-test" ? (
               <button
                 key={item.id}
                 type="button"

@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
+from pathlib import Path
+import re
 from unittest.mock import MagicMock
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
 
 from app.main import app
 from app.db.database import SessionLocal
@@ -250,11 +251,14 @@ def test_frontend_has_no_hardcoded_badge_literal():
 
     content = frontend_explorer.read_text(encoding="utf-8")
 
-    # Hardcoded literal must NOT exist in the badge
-    assert 'Freshness: <strong className="text-slate-800 dark:text-slate-200 font-mono">2026-09-01</strong>' not in content
+    # 1. Freshness indicator must be present in frontend
+    assert "Freshness:" in content
 
-    # Dynamic state must be rendered in the badge
-    assert 'Freshness: <strong className="text-slate-800 dark:text-slate-200 font-mono">{dataFreshness}</strong>' in content
+    # 2. Hardcoded date literal must NOT exist in the badge
+    assert not re.search(r"Freshness:\s*<strong[^>]*>\s*202\d-\d\d-\d\d\s*</strong>", content)
 
-    # State update must be present from API meta
+    # 3. Dynamic state {dataFreshness} must be rendered in the badge (style-independent)
+    assert re.search(r"Freshness:\s*<strong[^>]*>\s*\{dataFreshness\}\s*</strong>", content)
+
+    # 4. State update must be present from API meta
     assert "setDataFreshness(res.data.meta.data_freshness)" in content

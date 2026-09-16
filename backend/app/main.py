@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+import logging
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -9,6 +11,39 @@ from app.config import settings
 from app.api.health import router as health_router
 from app.api.v1.router import api_router
 
+logger = logging.getLogger("skillforge.startup")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan context manager.
+    Ensures static skill roadmaps catalog is seeded idempotently on startup if absent.
+    Uses a cheap existence count check to prevent unnecessary database operations.
+    """
+    try:
+        from app.db.database import SessionLocal
+        from app.db.models import Roadmap
+        from app.db.seed_roadmaps import seed_roadmaps
+
+        db = SessionLocal()
+        try:
+            roadmap_count = db.query(Roadmap.id).count()
+            if roadmap_count < 12:
+                logger.info(
+                    "Static roadmap catalog incomplete (%d/12 roadmaps found). Auto-initializing canonical roadmaps...",
+                    roadmap_count,
+                )
+                seed_roadmaps(db, auto_commit=True, validate=True)
+                logger.info("Static roadmap catalog auto-initialization complete.")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Could not auto-initialize static roadmaps catalog on startup: %s", exc)
+
+    yield
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -16,6 +51,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration

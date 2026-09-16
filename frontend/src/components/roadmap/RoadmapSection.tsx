@@ -10,10 +10,14 @@ import {
   Award,
   ArrowRight,
   ShieldCheck,
+  FileText,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import {
   fetchActiveRoadmap,
   generateRoadmap,
+  downloadRoadmapPdf,
   CanonicalRoadmapData,
 } from "@/lib/api";
 import RoadmapMilestoneCard from "./RoadmapMilestoneCard";
@@ -40,9 +44,35 @@ export default function RoadmapSection({
   const [generating, setGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // AI Roadmap PDF state
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [pdfSuccess, setPdfSuccess] = useState<boolean>(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
   // Modals state
   const [resourceModalSkill, setResourceModalSkill] = useState<{ id: string; name: string } | null>(null);
   const [isExplanationOpen, setIsExplanationOpen] = useState<boolean>(false);
+
+  const handleDownloadPdf = async () => {
+    if (!roadmap?.id) return;
+    setDownloadingPdf(true);
+    setPdfError(null);
+    setPdfSuccess(false);
+
+    try {
+      const res = await downloadRoadmapPdf(roadmap.id, { download: true });
+      if (res.success) {
+        setPdfSuccess(true);
+        setTimeout(() => setPdfSuccess(false), 4000);
+      } else {
+        setPdfError(res.error || "Failed to generate AI roadmap PDF.");
+      }
+    } catch (err: unknown) {
+      setPdfError(err instanceof Error ? err.message : "Unexpected error downloading PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   // Fetch candidate's active roadmap for the target role
   const loadActiveRoadmap = useCallback(async (roleId: string) => {
@@ -161,15 +191,42 @@ export default function RoadmapSection({
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5">
             {roadmap && (
-              <button
-                type="button"
-                onClick={() => setIsExplanationOpen(true)}
-                disabled={generating || loadingActive}
-                className="editorial-btn-secondary !py-2 !px-3.5 !text-xs !rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50 font-mono"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-accent" />
-                <span>AI Strategy</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={generating || loadingActive || downloadingPdf}
+                  className="editorial-btn-secondary !py-2 !px-3.5 !text-xs !rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50 font-mono"
+                  title="Generate and download publication-quality AI-powered career roadmap PDF"
+                >
+                  {downloadingPdf ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                      <span>Synthesizing PDF...</span>
+                    </>
+                  ) : pdfSuccess ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                      <span className="text-success">PDF Downloaded</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3.5 w-3.5 text-accent" />
+                      <span>Generate AI Roadmap PDF</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsExplanationOpen(true)}
+                  disabled={generating || loadingActive || downloadingPdf}
+                  className="editorial-btn-secondary !py-2 !px-3.5 !text-xs !rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50 font-mono"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-accent" />
+                  <span>AI Strategy</span>
+                </button>
+              </>
             )}
 
             <button
@@ -250,6 +307,27 @@ export default function RoadmapSection({
             className="editorial-btn-secondary !py-1 !px-2.5 !text-xs !rounded-md"
           >
             Retry
+          </button>
+        </div>
+      )}
+
+      {/* PDF Error Alert */}
+      {pdfError && (
+        <div className="p-4 rounded-md bg-danger-subtle border border-danger/30 text-danger flex items-start justify-between gap-3 text-xs">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <strong className="font-medium">AI Roadmap PDF Generation Notice:</strong>
+              <p className="mt-0.5">{pdfError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPdfError(null)}
+            className="text-danger hover:opacity-80 p-1 cursor-pointer"
+            aria-label="Dismiss error"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}

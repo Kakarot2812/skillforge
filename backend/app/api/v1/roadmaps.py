@@ -14,6 +14,7 @@ Exposes public and user-authenticated endpoints for the curated and canonical st
 Strictly decoupled from P4 Personalized Roadmap (/api/v1/roadmap).
 """
 
+import logging
 from typing import Any, Dict, List, Optional, Union
 import uuid
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
@@ -22,6 +23,8 @@ from sqlalchemy.orm import Session
 from app.api.v1.gaps import resolve_user_id, verify_user_exists
 from app.api.v1.roadmap import get_roadmap_pdf
 from app.db.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.schemas.skill_roadmap import (
     RoadmapDetailResponse,
     RoadmapListResponse,
@@ -123,6 +126,15 @@ router = APIRouter(tags=["Static Skill Roadmaps"])
 def list_roadmaps(db: Session = Depends(get_db)) -> RoadmapListResponse:
     """Returns all 12 static roadmap domains with metadata and counts."""
     catalog_items = skill_roadmap_service.get_roadmap_catalog(db)
+    if not catalog_items:
+        try:
+            from app.db.seed_roadmaps import seed_roadmaps
+
+            logger.info("Static roadmap catalog empty in list_roadmaps. Auto-initializing canonical roadmaps...")
+            seed_roadmaps(db, auto_commit=True, validate=True)
+            catalog_items = skill_roadmap_service.get_roadmap_catalog(db)
+        except Exception as exc:
+            logger.warning("Could not auto-seed roadmap catalog in list_roadmaps: %s", exc)
     return RoadmapListResponse(data=catalog_items, total=len(catalog_items))
 
 

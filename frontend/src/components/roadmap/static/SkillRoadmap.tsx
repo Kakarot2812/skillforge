@@ -9,6 +9,9 @@ import {
   RoadmapOrdering,
   fetchRoadmapsCatalog,
   fetchRoadmapDetail,
+  fetchActiveRoadmap,
+  generateRoadmap,
+  downloadRoadmapPdf,
   updateSkillProgress,
 } from "@/lib/api";
 import { getCandidateUserId, ensureCandidateIdentity } from "@/lib/identity";
@@ -17,7 +20,18 @@ import RoadmapProgress from "./RoadmapProgress";
 import RoadmapStage from "./RoadmapStage";
 import RoadmapSkillCard from "./RoadmapSkillCard";
 import SkillDetailPanel from "./SkillDetailPanel";
-import { Sparkles, Map, AlertCircle, RefreshCw, X, BookOpen, Layers } from "lucide-react";
+import {
+  Sparkles,
+  Map,
+  AlertCircle,
+  RefreshCw,
+  X,
+  BookOpen,
+  Layers,
+  FileText,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 
 export interface SkillRoadmapProps {
   targetRoleId?: string;
@@ -40,6 +54,11 @@ export default function SkillRoadmap({
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // AI Roadmap PDF state
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [pdfSuccess, setPdfSuccess] = useState<boolean>(false);
+  const [pdfMessage, setPdfMessage] = useState<string | null>(null);
 
   const [candidateUserId, setCandidateUserId] = useState<string | undefined>(() => {
     if (typeof window !== "undefined") {
@@ -299,6 +318,69 @@ function reconcileRoadmapSkillStatus(
     }
   };
 
+  // Generate and download personalized AI Career Roadmap PDF
+  const handleGeneratePdf = async () => {
+    if (!roadmapDetail) return;
+    setDownloadingPdf(true);
+    setError(null);
+    setPdfMessage(null);
+    setPdfSuccess(false);
+
+    try {
+      const roleId = roadmapDetail.roadmap.role_id;
+      if (!roleId) {
+        setError(
+          "AI Personalized Roadmap PDF is available for Market Intelligence tracks (Backend, Full Stack, Frontend, Cloud/DevOps, AI/ML)."
+        );
+        setDownloadingPdf(false);
+        return;
+      }
+
+      // Try fetching active candidate roadmap
+      let candidateRoadmapId: string | null = null;
+      const activeRes = await fetchActiveRoadmap(roleId, effectiveUserId);
+      if (activeRes.success && activeRes.data?.id) {
+        candidateRoadmapId = activeRes.data.id;
+      } else {
+        // Auto-generate candidate roadmap if not yet created
+        const genRes = await generateRoadmap(
+          { role_id: roleId, location: "India" },
+          effectiveUserId
+        );
+        if (genRes.success && genRes.data?.id) {
+          candidateRoadmapId = genRes.data.id;
+        } else {
+          throw new Error(genRes.error || "Failed to initialize personalized roadmap for this role.");
+        }
+      }
+
+      if (!candidateRoadmapId) {
+        throw new Error("Candidate roadmap could not be established.");
+      }
+
+      // Download PDF
+      const pdfRes = await downloadRoadmapPdf(candidateRoadmapId, {
+        download: true,
+        userId: effectiveUserId,
+      });
+
+      if (pdfRes.success) {
+        setPdfSuccess(true);
+        setPdfMessage("Personalized AI Roadmap PDF successfully generated and downloaded!");
+        setTimeout(() => {
+          setPdfSuccess(false);
+          setPdfMessage(null);
+        }, 5000);
+      } else {
+        setError(pdfRes.error || "Failed to download AI roadmap PDF.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error generating AI roadmap PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Title & Header Section */}
@@ -354,6 +436,24 @@ function reconcileRoadmapSkillStatus(
         </div>
       )}
 
+      {/* PDF Success Alert Banner */}
+      {pdfMessage && (
+        <div className="p-3.5 rounded-md bg-accent-subtle border border-accent/30 text-accent text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+            <span>{pdfMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPdfMessage(null)}
+            className="text-accent hover:opacity-80 p-1 cursor-pointer"
+            aria-label="Dismiss message"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Loading Skeleton */}
       {loadingDetail && !roadmapDetail && (
         <div className="space-y-4">
@@ -390,9 +490,38 @@ function reconcileRoadmapSkillStatus(
               </p>
             </div>
 
-            <div className="text-[11px] font-mono text-muted sm:text-right shrink-0 flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" />
-              <span>{roadmapDetail.roadmap.total_stages} Stages • {roadmapDetail.roadmap.total_skills} Skills</span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
+              <div className="text-[11px] font-mono text-muted flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>{roadmapDetail.roadmap.total_stages} Stages • {roadmapDetail.roadmap.total_skills} Skills</span>
+              </div>
+
+              {roadmapDetail.roadmap.has_market_data && (
+                <button
+                  type="button"
+                  onClick={handleGeneratePdf}
+                  disabled={downloadingPdf}
+                  className="editorial-btn-secondary !py-1.5 !px-3 !text-xs !rounded-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-mono"
+                  title="Generate and download publication-quality AI-powered career roadmap PDF"
+                >
+                  {downloadingPdf ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                      <span>Synthesizing PDF...</span>
+                    </>
+                  ) : pdfSuccess ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                      <span className="text-success">PDF Downloaded</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3.5 w-3.5 text-accent" />
+                      <span>Generate AI Roadmap PDF</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

@@ -2426,3 +2426,131 @@ export async function updatePracticeProblemProgress(
   );
 }
 
+/**
+ * Downloads the personalized career roadmap PDF for an authenticated candidate.
+ * Calls GET /api/v1/roadmaps/{roadmap_id}/pdf?download=true with X-User-Id.
+ * Triggers native browser download and returns success/status metadata.
+ */
+export async function downloadRoadmapPdf(
+  roadmapId: string,
+  options: {
+    download?: boolean;
+    userId?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  blob?: Blob;
+  filename?: string;
+  error?: string;
+  status?: number;
+}> {
+  const { download = true, userId } = options;
+
+  if (!roadmapId || !isValidUUID(roadmapId)) {
+    return {
+      success: false,
+      error: "Invalid roadmap identifier format.",
+      status: 422,
+    };
+  }
+
+  // Resolve candidate identity
+  let effectiveUserId: string | null | undefined = userId || getCandidateUserId();
+  if (!effectiveUserId && typeof window !== "undefined") {
+    effectiveUserId = (await ensureCandidateIdentity()) || undefined;
+  }
+
+  if (!effectiveUserId || !isValidUUID(effectiveUserId)) {
+    return {
+      success: false,
+      error: "Authentication required. Please ensure your candidate profile is active.",
+      status: 401,
+    };
+  }
+
+  const headers: Record<string, string> = {
+    "X-User-Id": effectiveUserId,
+  };
+
+  try {
+    const url = `${API_BASE_URL}/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/pdf?download=${download ? "true" : "false"}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+
+    if (!res.ok) {
+      let message = `PDF generation failed with HTTP ${res.status}.`;
+      try {
+        const errJson = await res.json();
+        message = errJson?.error?.message || errJson?.detail || message;
+      } catch {
+        // Fallback to safe status mapping
+      }
+
+      switch (res.status) {
+        case 401:
+          message = "Authentication required: missing or invalid candidate identity.";
+          break;
+        case 403:
+          message = "Cross-user access denied: this roadmap does not belong to your active candidate profile.";
+          break;
+        case 404:
+          message = "Roadmap not found in database. Please generate your career roadmap first.";
+          break;
+        case 422:
+          message = "Invalid identifier format.";
+          break;
+        case 500:
+          message = "Roadmap verification or PDF compilation failed. Please try again.";
+          break;
+        case 502:
+          message = "AI narrative generation service temporarily unavailable. Please try again in a moment.";
+          break;
+        case 504:
+          message = "Roadmap narrative generation timed out. Please try again.";
+          break;
+      }
+
+      return {
+        success: false,
+        error: message,
+        status: res.status,
+      };
+    }
+
+    const blob = await res.blob();
+
+    let filename = `skillforge-roadmap-${roadmapId.slice(0, 8)}.pdf`;
+    const disposition = res.headers.get("Content-Disposition");
+    if (disposition) {
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      if (match && match[1]) {
+        filename = match[1].trim();
+      }
+    }
+
+    if (download && typeof window !== "undefined") {
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
+
+    return {
+      success: true,
+      blob,
+      filename,
+      status: 200,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Network error downloading roadmap PDF.",
+    };
+  }
+}

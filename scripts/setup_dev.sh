@@ -28,8 +28,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Run Alembic migrations
-echo "[3/4] Running Alembic database migrations..."
+echo "[3/4] Running Alembic database migrations and seeding static roadmaps..."
 alembic upgrade head
+python -m app.db.seed_roadmaps
 
 # 4. Install Frontend dependencies
 echo "[4/4] Setting up Next.js frontend..."

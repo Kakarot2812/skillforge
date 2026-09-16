@@ -783,3 +783,327 @@ def test_31_visual_inspection_validation(sample_validated_content):
     info = reader.metadata
     assert info.title == "Personalized Career Roadmap"
     assert info.author == "SkillForge AI"
+
+
+# -----------------------------------------------------------------------------
+# Conciseness Refactor: 3-Page Hard Limit & 13-Phase Validation Suite
+# -----------------------------------------------------------------------------
+
+@pytest.fixture
+def sample_13_phase_validated_content(sample_ids) -> ValidatedRoadmapPDFContent:
+    """Constructs a realistic 13-phase roadmap matching the full demo curriculum."""
+    skills_data = [
+        ("Git", "Systems", PriorityTierLevel.HIGH, 0.70, 0.78, 0.02, "Pro Git Book", "https://git-scm.com/book/en/v2", 240),
+        ("REST APIs", "Systems", PriorityTierLevel.HIGH, 0.68, 0.75, 0.04, "RESTful API Tutorial", "https://restfulapi.net", 120),
+        ("Java", "Languages", PriorityTierLevel.MEDIUM, 0.66, 0.72, 0.04, "Oracle Java Tutorial", "https://docs.oracle.com/javase/tutorial", 300),
+        ("Python", "Languages", PriorityTierLevel.MEDIUM, 0.64, 0.68, 0.08, "Official Python Tutorial", "https://docs.python.org/3/tutorial", 240),
+        ("Spring Boot", "Frameworks", PriorityTierLevel.MEDIUM, 0.62, 0.65, 0.05, "Spring Boot Guide", "https://spring.io/guides", 180),
+        ("SQL", "Databases", PriorityTierLevel.MEDIUM, 0.60, 0.64, 0.06, "SQL Reference", "https://w3schools.com/sql", 150),
+        ("PostgreSQL", "Databases", PriorityTierLevel.MEDIUM, 0.58, 0.62, 0.09, "PostgreSQL Tutorial", "https://postgresql.org/docs", 240),
+        ("FastAPI", "Frameworks", PriorityTierLevel.MEDIUM, 0.56, 0.60, 0.12, "FastAPI Documentation", "https://fastapi.tiangolo.com", 180),
+        ("Docker", "DevOps", PriorityTierLevel.MEDIUM, 0.54, 0.58, 0.15, "Docker Getting Started", "https://docker.com/get-started", 180),
+        ("AWS", "Cloud", PriorityTierLevel.MEDIUM, 0.52, 0.56, 0.18, "AWS Essentials", "https://aws.amazon.com/getting-started", 240),
+        ("Redis", "Databases", PriorityTierLevel.MEDIUM, 0.50, 0.54, 0.14, "Redis Documentation", "https://redis.io/documentation", 120),
+        ("Pytest", "Testing", PriorityTierLevel.MEDIUM, 0.48, 0.52, 0.10, "Pytest Tutorial", "https://docs.pytest.org", 120),
+        ("Kubernetes", "DevOps", PriorityTierLevel.MEDIUM, 0.46, 0.50, 0.22, "Kubernetes Basics", "https://kubernetes.io/docs/tutorials", 240),
+    ]
+
+    candidate = VerifiedCandidateProfile(
+        user_id=sample_ids["user_id"],
+        email="alice.engineer@skillforge.test",
+        name="Alice Candidate",
+        target_role="Backend Engineer",
+        experience_level="INTERMEDIATE",
+        college="National Institute of Technology",
+        degree="B.Tech",
+        branch="Computer Science",
+        semester=7,
+        education="B.Tech Computer Science (Sem 7)",
+    )
+
+    readiness = VerifiedReadinessMetrics(
+        readiness_percentage=65,
+        total_required_skills=13,
+        strong_count=4,
+        partial_count=1,
+        missing_count=8,
+        has_resume=True,
+        has_github=True,
+        scoring_version="v1",
+    )
+
+    top_gaps = []
+    all_gap_names = ["Git", "REST APIs", "Java", "Python", "PostgreSQL", "Docker", "Redis", "Kubernetes"]
+    for i, name in enumerate(all_gap_names):
+        skill_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"skill.{name.lower()}")
+        top_gaps.append(
+            ValidatedTopSkillGap(
+                skill_id=skill_uuid,
+                skill_name=name,
+                canonical_slug=name.lower().replace(" ", "-"),
+                category="Backend",
+                gap_status=SkillGapClassification.MISSING,
+                priority_score=0.70 - (i * 0.02),
+                priority_level=PriorityTierLevel.HIGH if i < 2 else PriorityTierLevel.MEDIUM,
+                demand_score=0.78 - (i * 0.03),
+                growth_rate=0.02 + (i * 0.02),
+                why_it_matters=f"{name} is foundational for modern backend engineering architectures and industry readiness.",
+                suggested_focus=f"Focus on core concepts and applied patterns in {name}.",
+            )
+        )
+
+    phases = []
+    for idx, (name, cat, prio_lvl, prio_score, dem_score, growth, res_title, res_url, res_mins) in enumerate(skills_data, start=1):
+        skill_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"skill.{name.lower()}")
+        res_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"res.{name.lower()}")
+        resource = VerifiedApprovedResource(
+            resource_id=res_uuid,
+            skill_id=skill_uuid,
+            skill_name=name,
+            title=res_title,
+            url=res_url,
+            resource_type="DOCUMENTATION",
+            provider="Official Docs",
+            difficulty="INTERMEDIATE",
+            estimated_minutes=res_mins,
+            is_approved=True,
+        )
+        proj = None
+        if idx in (1, 4, 7):
+            proj_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"proj.{name.lower()}")
+            proj = VerifiedApprovedProject(
+                project_id=proj_uuid,
+                skill_id=skill_uuid,
+                skill_name=name,
+                title=f"Production Challenge: {name} Service",
+                description=f"Implement robust {name} patterns with testing and CI integration.",
+                difficulty="INTERMEDIATE",
+                deliverables=("Source code", "Config"),
+                verification_criteria=("Passes test suite",),
+                estimated_hours=8,
+                is_curated_challenge=True,
+                is_candidate_proof=False,
+            )
+
+        phases.append(
+            ValidatedRoadmapPhase(
+                milestone_id=uuid.uuid5(uuid.NAMESPACE_DNS, f"milestone.{idx}"),
+                order_index=idx,
+                skill_id=skill_uuid,
+                skill_name=name,
+                canonical_slug=name.lower().replace(" ", "-"),
+                category=cat,
+                gap_status=SkillGapClassification.MISSING,
+                priority_score=prio_score,
+                priority_level=prio_lvl,
+                is_transitive_prerequisite=False,
+                deterministic_reason=f"Master {name} to fulfill backend engineering standard competencies.",
+                status="NOT_STARTED",
+                prerequisites=(),
+                learning_objectives=(f"Core {name} architecture", f"Applied {name} workflows"),
+                resources=(resource,),
+                project=proj,
+                latest_verification=None,
+                phase_title=f"Mastering {name} for Production",
+                personalized_rationale=f"Systematically master {name} to eliminate critical skill gaps.",
+                key_topics=(f"{name} syntax", f"{name} patterns", f"{name} tooling"),
+                expected_focus=f"Gain production mastery in {name}.",
+            )
+        )
+
+    return ValidatedRoadmapPDFContent(
+        schema_version="v1.0",
+        generated_at=datetime(2026, 9, 15, 12, 0, 0, tzinfo=timezone.utc),
+        roadmap_id=sample_ids["roadmap_id"],
+        candidate=candidate,
+        readiness=readiness,
+        target_role_title="Backend Engineer",
+        location="India",
+        total_milestones=13,
+        high_priority_count=2,
+        medium_priority_count=11,
+        low_priority_count=0,
+        transitive_prerequisite_count=0,
+        market_facts=tuple(
+            VerifiedMarketDemandFact(
+                skill_id=uuid.uuid5(uuid.NAMESPACE_DNS, f"skill.{name.lower()}"),
+                skill_name=name,
+                canonical_slug=name.lower().replace(" ", "-"),
+                demand_score=dem_score,
+                growth_rate=growth,
+                growth_class="RISING",
+                data_source="adzuna",
+            )
+            for name, _, _, _, dem_score, growth, _, _, _ in skills_data
+        ),
+        verification_evidence=(),
+        weekly_hours_recommendation=None,
+        verification_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        personalized_subtitle="Targeted Competency Pathway for Backend Engineer Roles",
+        executive_summary="Candidate demonstrates foundational knowledge. Closing prioritized gaps across Git, REST APIs, Java, Python, and PostgreSQL will establish industry readiness.",
+        readiness_explanation="The 65% readiness score reflects verified core competence with actionable focus areas across foundational backend domains.",
+        validated_top_gaps=tuple(top_gaps),
+        validated_phases=tuple(phases),
+        immediate_next_steps=(
+            "Review full career roadmap to understand prerequisite sequencing.",
+            "Begin Phase 1 focusing on Git version control workflows.",
+            "Configure local development environment for hands-on exercises.",
+            "Implement repository branching and rebasing challenge.",
+            "Review REST architectural guidelines ahead of Phase 2.",
+        ),
+        closing_encouragement="Executing this focused curriculum will position you strongly for competitive Backend Engineering roles in the Indian market.",
+    )
+
+
+def test_32_hard_maximum_three_pages_with_13_phases(sample_13_phase_validated_content):
+    """
+    Scenario 32: A complete 13-phase roadmap MUST render in <= 3 A4 pages (HARD LIMIT).
+    Enforces non-negotiable assert len(pdf_pages) <= 3.
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    assert pdf_bytes.startswith(b"%PDF-")
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    page_count = len(reader.pages)
+
+    # Hard Maximum: Exactly 3 pages
+    assert page_count <= 3, f"PDF exceeded hard 3-page limit: got {page_count} pages"
+    assert page_count == 3, f"Expected exactly 3 structured pages, got {page_count}"
+
+
+def test_33_all_13_phases_represented_on_page_2(sample_13_phase_validated_content):
+    """
+    Scenario 33: All 13 phases remain fully represented on Page 2 in a compact grid.
+    No phases may be dropped to achieve the page limit.
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    assert len(reader.pages) == 3
+
+    page_2_text = reader.pages[1].extract_text()
+
+    # Verify all 13 phase markers
+    for idx in range(1, 14):
+        assert f"PHASE {idx}" in page_2_text, f"PHASE {idx} missing on Page 2"
+
+    # Verify all 13 skill names are present on Page 2
+    expected_skills = [
+        "Git", "REST APIs", "Java", "Python", "Spring Boot",
+        "SQL", "PostgreSQL", "FastAPI", "Docker", "AWS",
+        "Redis", "Pytest", "Kubernetes"
+    ]
+    for skill in expected_skills:
+        assert skill in page_2_text, f"Skill {skill} missing on Page 2"
+
+    # Verify approved resources are present
+    assert "Pro Git Book" in page_2_text
+    assert "240 min" in page_2_text
+
+
+def test_34_page_1_executive_snapshot_and_top_5_gaps(sample_13_phase_validated_content):
+    """
+    Scenario 34: Page 1 contains executive snapshot, candidate profile, readiness score,
+    and a strictly capped table of top 5 gaps with single strategic sentences.
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    page_1_text = reader.pages[0].extract_text()
+
+    # Candidate profile
+    assert "Alice Candidate" in page_1_text
+    assert "Backend Engineer" in page_1_text
+
+    # Readiness score & breakdown
+    assert "65%" in page_1_text
+    assert "ROLE READINESS SCORE" in page_1_text
+    assert "4 Demonstrated" in page_1_text
+    assert "1 Partial" in page_1_text
+    assert "8 Missing" in page_1_text
+
+    # Top 5 gaps (Git, REST APIs, Java, Python, PostgreSQL)
+    for skill in ["Git", "REST APIs", "Java", "Python", "PostgreSQL"]:
+        assert skill in page_1_text
+
+    # Demand / Growth
+    assert "+2% YoY" in page_1_text
+    assert "+10% YoY" in page_1_text
+
+    # Footnote indicates capped top 5 out of 8
+    assert "Showing top 5 prioritized gaps out of 8" in page_1_text
+
+
+def test_35_page_3_action_plan_challenges_and_audit(sample_13_phase_validated_content):
+    """
+    Scenario 35: Page 3 contains immediate execution steps, practice challenges with
+    explicit disclaimers, career outlook, and SHA-256 integrity audit card.
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    page_3_text = reader.pages[2].extract_text()
+
+    # Immediate Execution Steps
+    assert "Immediate Execution Steps (7–14 Days)" in page_3_text
+    assert "#1" in page_3_text
+    assert "#2" in page_3_text
+
+    # Recommended Challenges with explicit disclaimer
+    assert "Recommended Practice Challenges" in page_3_text
+    assert "RECOMMENDED CHALLENGE — NOT CANDIDATE PROOF" in page_3_text
+    assert "Production Challenge: Git Service" in page_3_text
+
+    # Closing encouragement
+    assert "Career Acceleration Outlook" in page_3_text
+
+    # Audit Card with Hash & Grounding Mandate
+    assert "EVIDENCE GROUNDING & VERIFICATION AUDIT" in page_3_text
+    assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" in page_3_text
+    assert "Grounding Mandate" in page_3_text
+
+
+def test_36_authoritative_values_remain_unmodified(sample_13_phase_validated_content):
+    """
+    Scenario 36: Renderer never alters authoritative values (readiness, priorities, hash).
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    all_text = " ".join(p.extract_text() for p in reader.pages)
+
+    # Exact readiness
+    assert "65%" in all_text
+    # Exact verification hash
+    assert sample_13_phase_validated_content.verification_hash in all_text
+    # Exact priority scores
+    assert "HIGH (0.70)" in all_text
+    assert "HIGH (0.68)" in all_text
+
+
+def test_37_no_invented_urls_or_unapproved_resources(sample_13_phase_validated_content):
+    """
+    Scenario 37: Only approved resources from validated content are embedded.
+    No unverified URLs or resources appear.
+    """
+    renderer = RoadmapPDFRenderer()
+    pdf_bytes = renderer.render(sample_13_phase_validated_content)
+
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    all_text = " ".join(p.extract_text() for p in reader.pages)
+
+    # Approved resource titles
+    assert "Pro Git Book" in all_text
+    assert "RESTful API Tutorial" in all_text
+    assert "Oracle Java Tutorial" in all_text
+    assert "Official Python Tutorial" in all_text
+
+    # Fake resource titles must NOT be present
+    assert "Fake Random Course" not in all_text
+    assert "Unapproved Udemy Course" not in all_text
+
